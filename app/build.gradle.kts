@@ -1,4 +1,12 @@
 android {
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isDebuggable = false
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
     namespace = "com.gestor360.app"
     compileSdk = 35
     defaultConfig {
