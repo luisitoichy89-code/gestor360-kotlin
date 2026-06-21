@@ -2,7 +2,7 @@ name: Build Gestor360 Kotlin APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
   workflow_dispatch: {}
 
 jobs:
@@ -42,4 +42,3 @@ jobs:
         with:
           name: gestor360-kotlin-apk
           path: app/build/outputs/apk/debug/app-debug.apk
-          
