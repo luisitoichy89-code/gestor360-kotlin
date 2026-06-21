@@ -47,8 +47,11 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = "17"
-        freeCompilerArgs += "-Xskip-metadata-version-check"
+        // Bloque legacy vacío requerido por AGP, configuración real en compilerOptions
+    }
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        freeCompilerArgs.addAll("-Xskip-metadata-version-check")
     }
 
     packaging {
