@@ -17,8 +17,8 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        buildConfigField("String", "SUPABASE_URL", "\"${project.findProperty("SUPABASE_URL") ?: ""}\"")
-        buildConfigField("String", "SUPABASE_KEY", "\"${project.findProperty("SUPABASE_KEY") ?: ""}\"")
+        buildConfigField("String", "SUPABASE_URL", ""${project.findProperty("SUPABASE_URL") ?: ""}"")
+        buildConfigField("String", "SUPABASE_KEY", ""${project.findProperty("SUPABASE_KEY") ?: ""}"")
     }
 
     buildTypes {
