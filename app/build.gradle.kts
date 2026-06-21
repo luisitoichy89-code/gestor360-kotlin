@@ -9,6 +9,9 @@ android {
     namespace = "org.luisito.gestor360"
     compileSdk = 36
 
+    val supabaseUrl = (project.findProperty("SUPABASE_URL") as String?) ?: ""
+    val supabaseKey = (project.findProperty("SUPABASE_KEY") as String?) ?: ""
+
     defaultConfig {
         applicationId = "org.luisito.gestor360"
         minSdk = 26
@@ -16,8 +19,11 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        buildConfigField("String", "SUPABASE_URL", ""${project.findProperty("SUPABASE_URL") ?: ""}"")
-        buildConfigField("String", "SUPABASE_KEY", ""${project.findProperty("SUPABASE_KEY") ?: ""}"")
+        // Las credenciales de Supabase se inyectan en tiempo de build
+        // desde gradle.properties (que a su vez viene de GitHub Secrets,
+        // nunca hardcodeadas en el código fuente).
+        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
+        buildConfigField("String", "SUPABASE_KEY", "\"$supabaseKey\"")
     }
 
     buildTypes {
@@ -35,19 +41,27 @@ android {
         buildConfig = true
     }
 
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.15"
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-}
+    kotlinOptions {
+        jvmTarget = "17"
+    }
 
-kotlin {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
     }
 }
 
 dependencies {
+    // --- Core Android / Compose ---
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
     implementation("androidx.activity:activity-compose:1.9.1")
@@ -59,6 +73,7 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
 
+    // --- Supabase Kotlin SDK (supabase-kt) ---
     implementation(platform("io.github.jan-tennert.supabase:bom:3.5.0"))
     implementation("io.github.jan-tennert.supabase:postgrest-kt")
     implementation("io.github.jan-tennert.supabase:auth-kt")
@@ -68,12 +83,15 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
+    // --- Room (SQLite local, offline-first) ---
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     kapt("androidx.room:room-compiler:2.6.1")
 
+    // --- DataStore (preferencias locales: cliente_id, sesión cacheada) ---
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
+    // --- Testing ---
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
