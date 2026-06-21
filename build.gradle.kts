@@ -5,6 +5,6 @@
 // a AGP 9.x, que trae cambios de breaking (Kotlin integrado obligatorio).
 plugins {
     id("com.android.application") version "8.12.0" apply false
-    id("org.jetbrains.kotlin.android") version "2.3.0" apply false
-    id("org.jetbrains.kotlin.plugin.serialization") version "2.3.0" apply false
+    id("org.jetbrains.kotlin.android") version "1.9.25" apply false
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.25" apply false
 }
