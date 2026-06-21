@@ -1,8 +1,6 @@
-buildscript {
-    repositories {
-        flatDir { dirs("${projectDir}/maven-local") }
-    }
-    dependencies {
-        classpath(fileTree("${projectDir}/maven-local") { include("*.jar") })
-    }
+// Top-level build file - configuración global del proyecto
+plugins {
+    id("com.android.application") version "8.5.2" apply false
+    id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.24" apply false
 }
