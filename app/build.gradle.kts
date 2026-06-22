@@ -1,92 +1,96 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization")
     id("kotlin-kapt")
 }
 
 android {
-    namespace = "com.gestor360.app"
-    compileSdk = 34
+    namespace = "org.luisito.gestor360"
+    compileSdk = 36
+
+    val supabaseUrl = (project.findProperty("SUPABASE_URL") as String?) ?: ""
+    val supabaseKey = (project.findProperty("SUPABASE_KEY") as String?) ?: ""
 
     defaultConfig {
-        applicationId = "com.gestor360.app"
-        minSdk = 24
-        targetSdk = 34
+        applicationId = "org.luisito.gestor360"
+        minSdk = 26
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
+        buildConfigField("String", "SUPABASE_KEY", "\"$supabaseKey\"")
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         debug {
             isMinifyEnabled = false
-            isShrinkResources = false
         }
     }
-    
+
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    
-    kotlinOptions {
-        jvmTarget = "17"
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
     }
-    
-    buildFeatures {
-        compose = true
-    }
-    
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.0"
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    implementation("androidx.activity:activity-compose:1.8.0")
-    implementation(platform("androidx.compose:compose-bom:2023.08.00"))
+    // Core Android / Compose
+    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
+    implementation("androidx.activity:activity-compose:1.9.1")
+    implementation(platform("androidx.compose:compose-bom:2025.06.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
-    
-    // Room
+    implementation("androidx.navigation:navigation-compose:2.7.7")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
+
+    // Supabase Kotlin SDK
+    implementation(platform("io.github.jan-tennert.supabase:bom:3.5.0"))
+    implementation("io.github.jan-tennert.supabase:postgrest-kt")
+    implementation("io.github.jan-tennert.supabase:auth-kt")
+    implementation("io.ktor:ktor-client-android:3.4.3")
+    implementation("io.ktor:ktor-client-core:3.4.3")
+    implementation("io.ktor:ktor-utils:3.4.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // Room (SQLite local)
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     kapt("androidx.room:room-compiler:2.6.1")
-    
-    // Retrofit
-    implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
-    
-    // Supabase
-    implementation("io.github.jan-tennert.supabase:supabase-kt:2.0.0")
-    implementation("io.ktor:ktor-client-android:2.3.7")
-    
-    // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-    
-    // Security
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
-    
+
+    // DataStore
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
-    androidTestImplementation("androidx.test.ext:junit:1.1.5")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
-    androidTestImplementation(platform("androidx.compose:compose-bom:2023.08.00"))
-    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
-    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }

@@ -1,171 +1,169 @@
 package org.luisito.gestor360
 
 import android.os.Bundle
+import android.os.Environment
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.*
-import androidx.lifecycle.viewmodel.compose.viewModel
-import org.luisito.gestor360.data.repository.AuthRepository
-import org.luisito.gestor360.data.repository.LicenciaRepository
-import org.luisito.gestor360.data.repository.ProductRepository
-import org.luisito.gestor360.data.repository.SaleRepository
-import org.luisito.gestor360.ui.screens.*
-import org.luisito.gestor360.ui.viewmodels.CartViewModel
-import org.luisito.gestor360.ui.viewmodels.MainViewModel
-import org.luisito.gestor360.ui.viewmodels.SalesViewModel
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.luisito.gestor360.data.SupabaseClientProvider
+import org.luisito.gestor360.ui.theme.Gestor360Theme
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import java.io.File
+import java.io.PrintWriter
+import java.io.StringWriter
+
+private fun installCrashLogger(context: android.content.Context) {
+    val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+    Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+        try {
+            val sw = StringWriter()
+            throwable.printStackTrace(PrintWriter(sw))
+            val texto = "CRASH en hilo '${thread.name}':\n\n$sw"
+            val rutas = listOf(
+                File(context.filesDir, "gestor360_crash.txt"),
+                File(Environment.getExternalStorageDirectory(), "gestor360_crash.txt"),
+                File("/sdcard/gestor360_crash.txt")
+            )
+            for (ruta in rutas) {
+                try {
+                    ruta.writeText(texto)
+                } catch (_: Exception) {
+                }
+            }
+        } catch (_: Exception) {
+        }
+        defaultHandler?.uncaughtException(thread, throwable)
+    }
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        installCrashLogger(this)
         super.onCreate(savedInstanceState)
 
-        setContent {
-            MaterialTheme {
-                Surface {
-                    val authRepository = AuthRepository(applicationContext)
-                    val licenciaRepository = LicenciaRepository(applicationContext)
-                    val productRepository = ProductRepository(applicationContext)
-                    val saleRepository = SaleRepository(applicationContext)
+        val crashFile = File(filesDir, "gestor360_crash.txt")
+        val crashPrevio = if (crashFile.exists()) {
+            val texto = crashFile.readText()
+            crashFile.delete()
+            texto
+        } else null
 
-                    val mainViewModel: MainViewModel = viewModel(
-                        factory = MainViewModelFactory(authRepository, licenciaRepository)
-                    )
-
-                    var pantalla by remember { mutableStateOf<Pantalla>(Pantalla.Inicio) }
-                    var mensajeError by remember { mutableStateOf<String?>(null) }
-                    val user by mainViewModel.currentUser.collectAsState()
-                    val isLoading by mainViewModel.isLoading.collectAsState()
-                    val error by mainViewModel.error.collectAsState()
-
-                    val prefs = getSharedPreferences("gestor360_config", MODE_PRIVATE)
-                    val clienteId = prefs.getString("cliente_id", null)
-
-                    // Variables para la venta confirmada
-                    var ventaConfirmada by remember { mutableStateOf<Pair<List<CartItem>, Triple<String, Double, Double>>?>(null) }
-
-                    LaunchedEffect(error) {
-                        if (error != null) {
-                            mensajeError = error
-                            mainViewModel.clearError()
+        try {
+            setContent {
+                Gestor360Theme {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        if (crashPrevio != null) {
+                            CrashDisplayScreen(crashPrevio)
+                        } else {
+                            ConnectionTestScreen()
                         }
-                    }
-
-                    when (pantalla) {
-                        Pantalla.Inicio -> {
-                            InicioScreen(
-                                licenciaRepository = licenciaRepository,
-                                onLicenciaValida = { pantalla = Pantalla.Login },
-                                onLicenciaInvalida = { mensaje ->
-                                    mensajeError = mensaje
-                                    pantalla = Pantalla.LicenciaInvalida
-                                }
-                            )
-                        }
-                        Pantalla.LicenciaInvalida -> {
-                            LicenciaInvalidaScreen(
-                                mensaje = mensajeError ?: "Licencia no válida",
-                                onReintentar = { pantalla = Pantalla.Inicio }
-                            )
-                        }
-                        Pantalla.Login -> {
-                            LoginScreen(
-                                mainViewModel = mainViewModel,
-                                onLoginSuccess = { pantalla = Pantalla.Dashboard }
-                            )
-                        }
-                        Pantalla.Dashboard -> {
-                            if (user != null) {
-                                DashboardScreen(
-                                    user = user!!,
-                                    onVentasClick = { pantalla = Pantalla.Ventas },
-                                    onLogout = {
-                                        mainViewModel.logout()
-                                        pantalla = Pantalla.Inicio
-                                    }
-                                )
-                            }
-                        }
-                        Pantalla.Ventas -> {
-                            val cartViewModel: CartViewModel = viewModel()
-                            val salesViewModel: SalesViewModel = viewModel(
-                                factory = SalesViewModelFactory(productRepository, saleRepository, "1")
-                            )
-                            var showCheckout by remember { mutableStateOf(false) }
-
-                            if (!showCheckout) {
-                                ProductSelectionScreen(
-                                    user = user!!,
-                                    cartViewModel = cartViewModel,
-                                    salesViewModel = salesViewModel,
-                                    onNavigateToCheckout = { showCheckout = true },
-                                    onLogout = {
-                                        mainViewModel.logout()
-                                        pantalla = Pantalla.Inicio
-                                    }
-                                )
-                            } else {
-                                val cartItems by cartViewModel.cartItems.collectAsState()
-                                val total by cartViewModel.total.collectAsState()
-
-                                CheckoutScreen(
-                                    cartItems = cartItems,
-                                    total = total,
-                                    onConfirmSale = { method, cash, transfer ->
-                                        if (clienteId != null) {
-                                            val success = salesViewModel.saveSale(
-                                                cartItems = cartItems,
-                                                total = total,
-                                                method = method,
-                                                cashAmount = cash,
-                                                transferAmount = transfer,
-                                                usuarioId = user!!.id,
-                                                clienteId = clienteId
-                                            )
-                                            if (success) {
-                                                ventaConfirmada = Triple(cartItems, Triple(method, cash, transfer))
-                                                cartViewModel.clearCart()
-                                                showCheckout = false
-                                                pantalla = Pantalla.Confirmacion
-                                            }
-                                        } else {
-                                            mensajeError = "Error: Cliente ID no encontrado"
-                                        }
-                                    },
-                                    onCancel = { showCheckout = false }
-                                )
-                            }
-                        }
-                        Pantalla.Confirmacion -> {
-                            ventaConfirmada?.let { (items, payment) ->
-                                SaleConfirmationScreen(
-                                    cartItems = items,
-                                    total = items.sumOf { it.subtotal },
-                                    method = payment.first,
-                                    cashAmount = payment.second,
-                                    transferAmount = payment.third,
-                                    onNewSale = {
-                                        ventaConfirmada = null
-                                        pantalla = Pantalla.Ventas
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    if (isLoading) {
-                        androidx.compose.material3.CircularProgressIndicator(
-                            modifier = androidx.compose.ui.Modifier
-                                .fillMaxSize()
-                                .wrapContentSize()
-                        )
                     }
                 }
             }
+        } catch (e: Throwable) {
+            try {
+                val sw = StringWriter()
+                e.printStackTrace(PrintWriter(sw))
+                val texto = "CRASH en onCreate/setContent:\n\n$sw"
+                File(filesDir, "gestor360_crash.txt").writeText(texto)
+                try { File("/sdcard/gestor360_crash.txt").writeText(texto) } catch (_: Exception) { }
+            } catch (_: Exception) { }
+            throw e
         }
     }
 }
 
-enum class Pantalla {
-    Inicio, LicenciaInvalida, Login, Dashboard, Ventas, Confirmacion
+@Composable
+fun CrashDisplayScreen(crashText: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(20.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        Text(
+            text = "⚠️ La app se cerró inesperadamente. Este es el error:",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.error
+        )
+        androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(8.dp))
+        SelectionContainer {
+            Text(
+                text = crashText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+        }
+    }
+}
+
+@Composable
+fun ConnectionTestScreen() {
+    var status by remember { mutableStateOf("Conectando con Supabase...") }
+    var isLoading by remember { mutableStateOf(true) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        scope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    SupabaseClientProvider.client
+                }
+                status = "✅ Conexión a Supabase inicializada correctamente.\n\nEsta es la Parte 1: solo confirmamos que Gradle compila y el SDK conecta. El login y las pantallas reales vienen en la Parte 2."
+            } catch (e: Exception) {
+                status = "❌ Error al conectar: ${e.message}"
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "Gestor360°",
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(12.dp))
+        if (isLoading) {
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+        }
+        androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(12.dp))
+        Text(
+            text = status,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+    }
 }
