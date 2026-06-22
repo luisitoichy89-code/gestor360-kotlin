@@ -1,44 +1,37 @@
-name: Build Gestor360 Kotlin APK
+name: Build Kotlin APK
 
 on:
   push:
-    branches: [ master ]
-  workflow_dispatch: {}
+    branches: [ "master" ]
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - name: Checkout código
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configurar Java 17
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
           java-version: '17'
+          distribution: 'temurin'
 
-      - name: Instalar Gradle 8.13
-        run: |
-          wget -q https://services.gradle.org/distributions/gradle-8.13-bin.zip
-          unzip -q gradle-8.13-bin.zip
-          echo "$(pwd)/gradle-8.13/bin" >> $GITHUB_PATH
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
 
-      - name: Generar gradlew del proyecto (Gradle Wrapper)
-        run: gradle wrapper --gradle-version 8.13
-
-      - name: Inyectar credenciales de Supabase (desde GitHub Secrets)
+      - name: Inject Supabase credentials
         run: |
           echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> gradle.properties
           echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> gradle.properties
 
-      - name: Compilar APK (debug)
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+      - name: Build Debug APK
+        # Añadidos --stacktrace e --info para que KAPT muestre el error exacto
+        run: ./gradlew assembleDebug --stacktrace --info
 
-      - name: Subir APK como artefacto descargable
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: gestor360-kotlin-apk
+          name: gestor360-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
