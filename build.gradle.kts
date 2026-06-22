@@ -10,3 +10,9 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose") version "2.3.21" apply false
     id("org.jetbrains.kotlin.plugin.serialization") version "2.3.21" apply false
 }
+
+repositories {
+    maven { url = uri("https://mirrors.aliyun.com/google/") }
+    maven { url = uri("https://mirrors.aliyun.com/repository/public/") }
+    mavenCentral()
+}
