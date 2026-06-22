@@ -1,4 +1,4 @@
-package org.luisito.gestor360.data
+package org.luisito.gestor360.data.remote
 
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
