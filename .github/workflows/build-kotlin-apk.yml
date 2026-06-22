@@ -27,7 +27,6 @@ jobs:
           echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> gradle.properties
 
       - name: Build Debug APK
-        # Añadidos --stacktrace e --info para que KAPT muestre el error exacto
         run: ./gradlew assembleDebug --stacktrace --info
 
       - name: Upload APK
