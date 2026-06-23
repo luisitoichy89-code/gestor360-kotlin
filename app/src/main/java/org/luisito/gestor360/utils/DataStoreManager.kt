@@ -37,7 +37,7 @@ class DataStoreManager(private val context: Context) {
             val userRol = preferences[KEY_USER_ROL]
             val username = preferences[KEY_USERNAME]
             val nombre = preferences[KEY_NOMBRE]
-            val tokenExpires = preferences[KEY_TOKEN_EXPIRES]?.toLongOrNull()
+            val tokenExpires = preferences[KEY_TOKEN_EXPIRES]?.toLongOrNull() ?: 0L
 
             if (userId != null && userRol != null && username != null && tokenExpires != null) {
                 val isExpired = System.currentTimeMillis() - tokenExpires > 30 * 24 * 60 * 60 * 1000
