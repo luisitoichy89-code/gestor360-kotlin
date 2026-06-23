@@ -6,6 +6,13 @@ plugins {
     id("kotlin-kapt")
 }
 
+// ✅ CORRECTO: configurations.all va AQUÍ, fuera de android
+configurations.all {
+    resolutionStrategy {
+        force("org.jetbrains.kotlin:kotlin-metadata-jvm:2.3.0-Beta1")
+    }
+}
+
 android {
     namespace = "org.luisito.gestor360"
     compileSdk = 36
@@ -82,10 +89,6 @@ dependencies {
     kapt("androidx.room:room-compiler:2.7.1")
 
     implementation("androidx.datastore:datastore-preferences:1.1.1")
-
-    // NUEVA LÍNEA: FORZAR VERSIÓN DE METADATA
-    implementation("org.jetbrains.kotlinx:kotlinx-metadata-jvm:0.8.0")
-
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
