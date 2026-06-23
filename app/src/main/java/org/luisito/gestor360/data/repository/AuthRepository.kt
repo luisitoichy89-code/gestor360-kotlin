@@ -10,6 +10,7 @@ class AuthRepository {
         return try {
             val supabase = SupabaseClientProvider.client
 
+            // Email fijo con dominio gestor360.local
             val email = "$username@gestor360.local"
 
             val response = supabase.auth.signInWith(Email) {
@@ -17,10 +18,8 @@ class AuthRepository {
                 this.password = password
             }
 
-            // ✅ CORRECTO: response.data contiene la sesión (UserSession)
-            val session = response.data
-            val user = session?.user
-
+            // En supabase-kt 3.5.0, el usuario está en response.user
+            val user = response.user
             if (user != null) {
                 LoginResult.Success(user.id)
             } else {
