@@ -11,18 +11,16 @@ class AuthRepository {
         val email = "$username@gestor360.local"
 
         return runCatching {
-            val response = supabase.auth.signInWith(Email) {
+            supabase.auth.signInWith(Email) {
                 this.email = email
                 this.password = password
             }
-            
-            // El usuario autenticado está en la sesión
-            val user = response.user
-            if (user != null) {
-                LoginResult.Success(user.id)
-            } else {
-                LoginResult.Error("Credenciales inválidas")
-            }
+
+            // En la versión 3.5.0, el usuario se obtiene de la sesión actual
+            val session = supabase.auth.currentSessionOrNull()
+            val userId = session?.user?.id ?: throw Exception("No se pudo obtener el usuario")
+
+            LoginResult.Success(userId)
         }.getOrElse { exception ->
             LoginResult.Error(exception.message ?: "Error de conexión")
         }
