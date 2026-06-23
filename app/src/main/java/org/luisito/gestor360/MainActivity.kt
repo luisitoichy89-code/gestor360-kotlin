@@ -16,48 +16,38 @@ import org.luisito.gestor360.ui.screens.activation.ActivationScreen
 import org.luisito.gestor360.ui.screens.login.LoginScreen
 import org.luisito.gestor360.ui.screens.login.LoginViewModel
 import org.luisito.gestor360.ui.theme.Gestor360Theme
-import org.luisito.gestor360.utils.DataStoreManager
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
-            Gestor360App(
-                dataStoreManager = DataStoreManager(this)
-            )
+            Gestor360App()
         }
     }
 }
 
 @Composable
-fun Gestor360App(
-    dataStoreManager: DataStoreManager
-) {
-    // Estado temporal para pruebas
-    var isLicensed by remember { mutableStateOf(true) }
-    var isLoggedIn by remember { mutableStateOf(false) }
-    var isCheckingSession by remember { mutableStateOf(true) }
+fun Gestor360App() {
+    var isLicensed by remember { mutableStateOf(true) } // Temporal
 
     val loginViewModel: LoginViewModel = viewModel()
     val loginState by loginViewModel.uiState.collectAsState()
 
-    // Verificar si ya hay sesión guardada
-    LaunchedEffect(Unit) {
-        // Por ahora, siempre falso para forzar login
-        isCheckingSession = false
+    LaunchedEffect(loginState.isLoggedIn) {
+        if (loginState.isLoggedIn) {
+            // Guardar sesión en DataStore aquí después
+        }
     }
 
-    if (isCheckingSession) {
-        // Pantalla de carga
-    } else if (!isLicensed) {
+    if (!isLicensed) {
         ActivationScreen(
             onLicenseValid = { isLicensed = true }
         )
-    } else if (!isLoggedIn && !loginState.isLoggedIn) {
+    } else if (!loginState.isLoggedIn) {
         LoginScreen(
             onLoginSuccess = {
-                loginViewModel.login("test", "test")
+                loginViewModel.login("test", "password")
             },
             isLoading = loginState.isLoading,
             error = loginState.error
@@ -65,7 +55,6 @@ fun Gestor360App(
     } else {
         DashboardScreen(
             onLogout = {
-                isLoggedIn = false
                 loginViewModel.resetState()
             }
         )
