@@ -17,7 +17,10 @@ class AuthRepository {
                 this.password = password
             }
 
-            val user = response.data?.user
+            // ✅ CORRECTO: data contiene la sesión, y data.user es el usuario
+            val session = response.data
+            val user = session?.user
+
             if (user != null) {
                 LoginResult.Success(user.id)
             } else {
