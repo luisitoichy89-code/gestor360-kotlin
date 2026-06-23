@@ -23,7 +23,6 @@ class AuthRepository {
         val email = "$username@gestor360.local"
 
         return runCatching {
-            // 1. Iniciar sesión con timeout
             withTimeout(15000L) {
                 supabase.auth.signInWith(Email) {
                     this.email = email
@@ -31,17 +30,13 @@ class AuthRepository {
                 }
             }
 
-            // 2. Esperar a que la sesión se cargue
             supabase.auth.awaitInitialization()
 
-            // 3. Obtener sesión con null check
             val session = supabase.auth.currentSessionOrNull()
                 ?: throw Exception("La sesión no se cargó correctamente. Verifica tu conexión a internet.")
 
-            // 4. Obtener ID del usuario con !! (seguro porque session no es null)
-            val userId = session!!.user.id
+            val userId = session!!.user!!.id
 
-            // 5. Consultar el rol en la tabla usuarios
             val userResponse = withTimeout(10000L) {
                 supabase.postgrest.from("usuarios")
                     .select {
