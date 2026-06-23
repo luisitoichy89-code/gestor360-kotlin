@@ -45,13 +45,13 @@ fun AppNavigation() {
 
     NavHost(navController = navController, startDestination = "activation") {
         composable("activation") {
-            ActivationScreen(navController)
+            ActivationScreen(navController = navController)
         }
         composable("login") {
-            LoginScreen(navController, loginViewModel)
+            LoginScreen(navController = navController, viewModel = loginViewModel)
         }
         composable("dashboard") {
-            DashboardScreen(navController)
+            DashboardScreen(navController = navController)
         }
     }
 }
