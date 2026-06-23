@@ -17,7 +17,6 @@ class AuthRepository {
                 this.password = password
             }
 
-            // ✅ CORRECTO para supabase-kt 3.5.0
             val user = response.data?.user
             if (user != null) {
                 LoginResult.Success(user.id)
