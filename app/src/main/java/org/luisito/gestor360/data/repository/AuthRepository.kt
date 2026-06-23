@@ -10,7 +10,6 @@ class AuthRepository {
         return try {
             val supabase = SupabaseClientProvider.client
 
-            // Email sintético como en Flask
             val email = "$username@gestor360.local"
 
             val response = supabase.auth.signInWith(Email) {
@@ -18,8 +17,8 @@ class AuthRepository {
                 this.password = password
             }
 
-            // En supabase-kt 3.5.0, session está en response
-            val session = response
+            // ✅ CORRECTO: response.data contiene la sesión (UserSession)
+            val session = response.data
             val user = session?.user
 
             if (user != null) {
