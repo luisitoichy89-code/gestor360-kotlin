@@ -24,9 +24,6 @@ class LoginViewModel(
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
-    private val _sessionStatus = MutableStateFlow<SessionStatus?>(null)
-    val sessionStatus: StateFlow<SessionStatus?> = _sessionStatus.asStateFlow()
-
     private val _navigationEvent = MutableStateFlow<NavigationEvent?>(null)
     val navigationEvent: StateFlow<NavigationEvent?> = _navigationEvent.asStateFlow()
 
