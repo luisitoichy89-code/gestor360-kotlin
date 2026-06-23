@@ -2,12 +2,12 @@ package org.luisito.gestor360.data.repository
 
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
+import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.postgrest.postgrest
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeout
 import org.luisito.gestor360.data.SupabaseClientProvider
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 @Serializable
 data class UsuarioRow(
@@ -25,47 +25,61 @@ class AuthRepository {
         val email = "$username@gestor360.local"
 
         return runCatching {
-            // 1. Iniciar sesión con Email/Contraseña
-            supabase.auth.signInWith(Email) {
-                this.email = email
-                this.password = password
+            // 1. Iniciar sesión con timeout para conexiones lentas
+            val authResult = withTimeout(15000L) {
+                supabase.auth.signInWith(Email) {
+                    this.email = email
+                    this.password = password
+                }
             }
 
-            // 2. Esperar a que la sesión se inicialice (importante para persistencia)
-            // Ver: https://github.com/supabase-community/supabase-kt/discussions/559 [citation:9]
-            // y https://slack-chats.kotlinlang.org/t/23089132 [citation:6]
+            // 2. Esperar a que la sesión se cargue desde almacenamiento local
+            // Esto es crítico para conexiones lentas
             supabase.auth.awaitInitialization()
 
-            // 3. Obtener sesión después de inicialización
+            // 3. Obtener sesión con manejo de null seguro
             val session = supabase.auth.currentSessionOrNull()
-                ?: throw Exception("No se pudo obtener la sesión del usuario")
+                ?: throw Exception("La sesión no se cargó correctamente. Verifica tu conexión a internet y vuelve a intentarlo.")
+
+            // 4. Obtener ID del usuario de forma segura
             val userId = session.user.id
 
-            // 4. Consultar rol en tabla usuarios usando postgrest con decodeSingle<T>
-            val userResult = supabase.postgrest["usuarios"]
-                .select {
-                    filter {
-                        eq("auth_id", userId)
-                    }
-                }
-                .decodeSingle<UsuarioRow>()
+            // 5. Consultar el rol en la tabla usuarios con timeout
+            val userResponse = withTimeout(10000L) {
+                supabase.postgrest.from("usuarios")
+                    .select()
+                    .eq("auth_id", userId)
+                    .execute()
+                    .decodeSingle<UsuarioRow>()
+            }
 
             LoginResult.Success(
                 userId = userId,
-                userRol = userResult.rol,
-                username = userResult.username,
-                nombre = userResult.nombre ?: userResult.username
+                userRol = userResponse.rol,
+                username = userResponse.username,
+                nombre = userResponse.nombre ?: userResponse.username
             )
 
         }.getOrElse { exception ->
+            // Manejo profesional de errores con mensajes específicos
             val errorMessage = when {
+                exception is java.util.concurrent.TimeoutException ||
+                exception.message?.contains("timeout") == true ->
+                    "La conexión está tardando más de lo esperado. Revisa tu conexión a internet y vuelve a intentarlo."
+
                 exception.message?.contains("Invalid login credentials") == true ->
                     "Credenciales incorrectas. Verifica tu usuario y contraseña."
-                exception.message?.contains("Session not found") == true ||
-                exception.message?.contains("No se pudo obtener la sesión") == true ->
-                    "Error al iniciar sesión. Revisa tu conexión a internet."
-                else -> exception.message ?: "Error de conexión"
+
+                exception.message?.contains("Network") == true ||
+                exception.message?.contains("connection") == true ->
+                    "Error de conexión. Asegúrate de tener datos móviles o WiFi activos."
+
+                exception.message?.contains("sesión no se cargó") == true ->
+                    "No se pudo cargar tu sesión. Intenta nuevamente con mejor señal."
+
+                else -> exception.message ?: "Error desconocido. Intenta reiniciar la aplicación."
             }
+
             LoginResult.Error(errorMessage)
         }
     }
@@ -78,5 +92,6 @@ sealed class LoginResult {
         val username: String,
         val nombre: String
     ) : LoginResult()
+
     data class Error(val message: String) : LoginResult()
 }
