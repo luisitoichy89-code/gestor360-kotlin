@@ -52,7 +52,7 @@ class LoginViewModel(
                             error = "⚠️ Sin conexión. Los datos se sincronizarán cuando vuelvas a internet."
                         )
                     }
-                    is SessionStatus.LoadingFromStorage -> {
+                    is SessionStatus.Initializing -> {
                         _uiState.value = _uiState.value.copy(loading = true)
                     }
                     is SessionStatus.NotAuthenticated -> {
