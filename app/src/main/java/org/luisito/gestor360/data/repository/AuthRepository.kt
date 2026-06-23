@@ -7,26 +7,18 @@ import org.luisito.gestor360.data.SupabaseClientProvider
 class AuthRepository {
 
     suspend fun login(username: String, password: String): LoginResult {
-        return try {
-            val supabase = SupabaseClientProvider.client
+        val supabase = SupabaseClientProvider.client
+        val email = "$username@gestor360.local"
 
-            // Email fijo con dominio gestor360.local
-            val email = "$username@gestor360.local"
-
-            val response = supabase.auth.signInWith(Email) {
+        return runCatching {
+            supabase.auth.signInWith(Email) {
                 this.email = email
                 this.password = password
             }
-
-            // En supabase-kt 3.5.0, el usuario está en response.user
-            val user = response.user
-            if (user != null) {
-                LoginResult.Success(user.id)
-            } else {
-                LoginResult.Error("Credenciales inválidas")
-            }
-        } catch (e: Exception) {
-            LoginResult.Error(e.message ?: "Error de conexión")
+            // Si llegamos aquí, la autenticación fue exitosa
+            LoginResult.Success(email)
+        }.getOrElse { exception ->
+            LoginResult.Error(exception.message ?: "Error de conexión")
         }
     }
 }
