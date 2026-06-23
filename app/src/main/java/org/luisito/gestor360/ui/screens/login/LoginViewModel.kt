@@ -7,6 +7,7 @@ import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.luisito.gestor360.data.repository.AuthRepository
 import org.luisito.gestor360.data.repository.LoginResult
@@ -40,15 +41,12 @@ class LoginViewModel(
                 _sessionStatus.value = status
                 when (status) {
                     is SessionStatus.Authenticated -> {
-                        // ✅ Sesión válida
                         _uiState.value = _uiState.value.copy(
                             isOffline = false,
                             error = null
                         )
                     }
                     is SessionStatus.RefreshFailure -> {
-                        // ⚠️ Sin internet, pero la sesión sigue válida
-                        // Los vendedores pueden seguir trabajando offline
                         _uiState.value = _uiState.value.copy(
                             isOffline = true,
                             error = "⚠️ Sin conexión. Los datos se sincronizarán cuando vuelvas a internet."
@@ -58,13 +56,14 @@ class LoginViewModel(
                         _uiState.value = _uiState.value.copy(loading = true)
                     }
                     is SessionStatus.NotAuthenticated -> {
-                        // ❌ Sesión expirada o sin sesión
                         _uiState.value = _uiState.value.copy(
                             loading = false,
                             isOffline = false
                         )
                     }
-                    else -> { /* otros estados */ }
+                    else -> {
+                        // Otros estados
+                    }
                 }
             }
         }
