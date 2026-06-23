@@ -1,15 +1,15 @@
 package org.luisito.gestor360.utils
 
 import android.content.Context
-import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "auth")
+private val Context.dataStore by preferencesDataStore("gestor360_prefs")
 
 class DataStoreManager(private val context: Context) {
 
@@ -18,34 +18,29 @@ class DataStoreManager(private val context: Context) {
         private val KEY_USER_ROL = stringPreferencesKey("user_rol")
         private val KEY_USERNAME = stringPreferencesKey("username")
         private val KEY_NOMBRE = stringPreferencesKey("nombre")
-        private val KEY_TOKEN_EXPIRES = stringPreferencesKey("token_expires")
+        private val KEY_SESSION_ACTIVE = stringPreferencesKey("session_active")
     }
 
     suspend fun saveSession(userId: String, userRol: String, username: String, nombre: String) {
-        context.dataStore.edit { preferences ->
-            preferences[KEY_USER_ID] = userId
-            preferences[KEY_USER_ROL] = userRol
-            preferences[KEY_USERNAME] = username
-            preferences[KEY_NOMBRE] = nombre
-            preferences[KEY_TOKEN_EXPIRES] = System.currentTimeMillis().toString()
+        context.dataStore.edit { prefs ->
+            prefs[KEY_USER_ID] = userId
+            prefs[KEY_USER_ROL] = userRol
+            prefs[KEY_USERNAME] = username
+            prefs[KEY_NOMBRE] = nombre
+            prefs[KEY_SESSION_ACTIVE] = "true"
         }
     }
 
     fun getSession(): Flow<SessionData?> {
-        return context.dataStore.data.map { preferences ->
-            val userId = preferences[KEY_USER_ID]
-            val userRol = preferences[KEY_USER_ROL]
-            val username = preferences[KEY_USERNAME]
-            val nombre = preferences[KEY_NOMBRE]
-            val tokenExpires = preferences[KEY_TOKEN_EXPIRES]?.toLongOrNull() ?: 0L ?: 0L ?: 0L ?: 0L
+        return context.dataStore.data.map { prefs ->
+            val userId = prefs[KEY_USER_ID]
+            val userRol = prefs[KEY_USER_ROL]
+            val username = prefs[KEY_USERNAME]
+            val nombre = prefs[KEY_NOMBRE]
+            val isActive = prefs[KEY_SESSION_ACTIVE] == "true"
 
-            if (userId != null && userRol != null && username != null && tokenExpires != null) {
-                val isExpired = System.currentTimeMillis() - tokenExpires > 30 * 24 * 60 * 60 * 1000
-                if (!isExpired) {
-                    SessionData(userId, userRol, username, nombre)
-                } else {
-                    null
-                }
+            if (userId != null && userRol != null && username != null && isActive) {
+                SessionData(userId, userRol, username, nombre)
             } else {
                 null
             }
@@ -53,8 +48,8 @@ class DataStoreManager(private val context: Context) {
     }
 
     suspend fun clearSession() {
-        context.dataStore.edit { preferences ->
-            preferences.clear()
+        context.dataStore.edit { prefs ->
+            prefs.clear()
         }
     }
 }

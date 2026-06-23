@@ -3,12 +3,14 @@ package org.luisito.gestor360.ui.screens.login
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.luisito.gestor360.data.repository.AuthRepository
 import org.luisito.gestor360.data.repository.LoginResult
+import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.utils.DataStoreManager
 
 class LoginViewModel(
@@ -16,27 +18,68 @@ class LoginViewModel(
     private val dataStoreManager: DataStoreManager
 ) : ViewModel() {
 
+    private val supabase = SupabaseClientProvider.client
+
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
+
+    private val _sessionStatus = MutableStateFlow<SessionStatus?>(null)
+    val sessionStatus: StateFlow<SessionStatus?> = _sessionStatus.asStateFlow()
 
     private val _navigationEvent = MutableStateFlow<NavigationEvent?>(null)
     val navigationEvent: StateFlow<NavigationEvent?> = _navigationEvent.asStateFlow()
 
     init {
         checkSession()
+        listenSessionStatus()
+    }
+
+    private fun listenSessionStatus() {
+        viewModelScope.launch {
+            supabase.auth.sessionStatus.collect { status ->
+                _sessionStatus.value = status
+                when (status) {
+                    is SessionStatus.Authenticated -> {
+                        // ✅ Sesión válida
+                        _uiState.value = _uiState.value.copy(
+                            isOffline = false,
+                            error = null
+                        )
+                    }
+                    is SessionStatus.RefreshFailure -> {
+                        // ⚠️ Sin internet, pero la sesión sigue válida
+                        // Los vendedores pueden seguir trabajando offline
+                        _uiState.value = _uiState.value.copy(
+                            isOffline = true,
+                            error = "⚠️ Sin conexión. Los datos se sincronizarán cuando vuelvas a internet."
+                        )
+                    }
+                    is SessionStatus.LoadingFromStorage -> {
+                        _uiState.value = _uiState.value.copy(loading = true)
+                    }
+                    is SessionStatus.NotAuthenticated -> {
+                        // ❌ Sesión expirada o sin sesión
+                        _uiState.value = _uiState.value.copy(
+                            loading = false,
+                            isOffline = false
+                        )
+                    }
+                    else -> { /* otros estados */ }
+                }
+            }
+        }
     }
 
     private fun checkSession() {
         viewModelScope.launch {
-            dataStoreManager.getSession().collect { session ->
-                if (session != null) {
-                    _navigationEvent.value = NavigationEvent.NavigateToDashboard(
-                        userId = session.userId,
-                        userRol = session.userRol,
-                        username = session.username,
-                        nombre = session.nombre
-                    )
-                }
+            val session = dataStoreManager.getSession().first()
+            if (session != null) {
+                _navigationEvent.value = NavigationEvent.NavigateToDashboard(
+                    userId = session.userId,
+                    userRol = session.userRol,
+                    username = session.username,
+                    nombre = session.nombre
+                )
             }
         }
     }
@@ -76,7 +119,9 @@ class LoginViewModel(
 
     fun logout() {
         viewModelScope.launch {
+            supabase.auth.signOut()
             dataStoreManager.clearSession()
+            _navigationEvent.value = NavigationEvent.NavigateToLogin
         }
     }
 
@@ -102,6 +147,7 @@ class LoginViewModel(
 
 data class LoginUiState(
     val loading: Boolean = false,
+    val isOffline: Boolean = false,
     val error: String? = null
 )
 
@@ -112,4 +158,5 @@ sealed class NavigationEvent {
         val username: String,
         val nombre: String
     ) : NavigationEvent()
+    object NavigateToLogin : NavigationEvent()
 }
