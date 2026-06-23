@@ -118,7 +118,11 @@ class LoginViewModel(
 
     fun logout() {
         viewModelScope.launch {
-            supabase.auth.signOut()
+            try {
+                supabase.auth.signOut()
+            } catch (e: Exception) {
+                // Si falla, igual limpiamos la sesión local
+            }
             dataStoreManager.clearSession()
             _navigationEvent.value = NavigationEvent.NavigateToLogin
         }
