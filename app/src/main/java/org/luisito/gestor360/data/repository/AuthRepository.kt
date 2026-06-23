@@ -17,8 +17,9 @@ class AuthRepository {
                 this.password = password
             }
 
-            // ✅ CORRECTO: data contiene la sesión, y data.user es el usuario
-            val session = response.data
+            // ✅ CORRECTO: response contiene la sesión
+            // En supabase-kt 3.x, el usuario está en session.user
+            val session = response
             val user = session?.user
 
             if (user != null) {
