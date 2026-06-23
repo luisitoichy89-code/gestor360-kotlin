@@ -27,7 +27,7 @@ jobs:
           echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> gradle.properties
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace --info
+        run: ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
