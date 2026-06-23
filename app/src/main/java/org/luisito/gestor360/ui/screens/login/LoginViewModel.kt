@@ -5,54 +5,93 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.luisito.gestor360.data.repository.AuthRepository
 import org.luisito.gestor360.data.repository.LoginResult
+import org.luisito.gestor360.utils.DataStoreManager
 
 class LoginViewModel(
-    private val authRepository: AuthRepository = AuthRepository()
+    private val authRepository: AuthRepository,
+    private val dataStoreManager: DataStoreManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
-    fun login(username: String, password: String) {
+    private val _navigationEvent = MutableStateFlow<NavigationEvent?>(null)
+    val navigationEvent: StateFlow<NavigationEvent?> = _navigationEvent.asStateFlow()
+
+    init {
+        checkSession()
+    }
+
+    private fun checkSession() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
-
-            val result = authRepository.login(username, password)
-
-            when (result) {
-                is LoginResult.Success -> {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            isLoggedIn = true,
-                            userId = result.userId
-                        )
-                    }
-                }
-                is LoginResult.Error -> {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            error = result.message
-                        )
-                    }
+            dataStoreManager.getSession().collect { session ->
+                if (session != null) {
+                    _navigationEvent.value = NavigationEvent.NavigateToDashboard(
+                        userId = session.userId,
+                        userRol = session.userRol,
+                        username = session.username,
+                        nombre = session.nombre
+                    )
                 }
             }
         }
     }
 
-    fun resetState() {
-        _uiState.update { LoginUiState() }
+    fun login(username: String, password: String) {
+        if (username.isBlank() || password.isBlank()) {
+            _uiState.value = _uiState.value.copy(error = "Usuario y contraseña son obligatorios")
+            return
+        }
+
+        _uiState.value = _uiState.value.copy(loading = true, error = null)
+
+        viewModelScope.launch {
+            val result = authRepository.login(username, password)
+            when (result) {
+                is LoginResult.Success -> {
+                    dataStoreManager.saveSession(
+                        userId = result.userId,
+                        userRol = result.userRol,
+                        username = result.username,
+                        nombre = result.nombre
+                    )
+                    _uiState.value = _uiState.value.copy(loading = false)
+                    _navigationEvent.value = NavigationEvent.NavigateToDashboard(
+                        userId = result.userId,
+                        userRol = result.userRol,
+                        username = result.username,
+                        nombre = result.nombre
+                    )
+                }
+                is LoginResult.Error -> {
+                    _uiState.value = _uiState.value.copy(loading = false, error = result.message)
+                }
+            }
+        }
+    }
+
+    fun clearError() {
+        _uiState.value = _uiState.value.copy(error = null)
+    }
+
+    fun clearNavigation() {
+        _navigationEvent.value = null
     }
 }
 
 data class LoginUiState(
-    val isLoading: Boolean = false,
-    val isLoggedIn: Boolean = false,
-    val userId: String = "",
+    val loading: Boolean = false,
     val error: String? = null
 )
+
+sealed class NavigationEvent {
+    data class NavigateToDashboard(
+        val userId: String,
+        val userRol: String,
+        val username: String,
+        val nombre: String
+    ) : NavigationEvent()
+}
