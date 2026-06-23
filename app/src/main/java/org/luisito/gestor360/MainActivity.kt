@@ -14,7 +14,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import org.luisito.gestor360.data.repository.AuthRepository
 import org.luisito.gestor360.ui.screens.activation.ActivationScreen
-import org.luisito.gestor360.ui.screens.dashboard.DashboardScreen
+import org.luisito.gestor360.ui.screens.DashboardScreen
 import org.luisito.gestor360.ui.screens.login.LoginScreen
 import org.luisito.gestor360.ui.screens.login.LoginViewModel
 import org.luisito.gestor360.ui.theme.Gestor360Theme
@@ -36,10 +36,11 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
-    val dataStoreManager = DataStoreManager(androidx.compose.ui.platform.LocalContext.current)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val dataStoreManager = DataStoreManager(context)
     val authRepository = AuthRepository()
     val loginViewModel: LoginViewModel = viewModel(
-        factory = LoginViewModel.Factory(authRepository, dataStoreManager)
+        factory = LoginViewModel.provideFactory(authRepository, dataStoreManager)
     )
 
     NavHost(navController = navController, startDestination = "activation") {

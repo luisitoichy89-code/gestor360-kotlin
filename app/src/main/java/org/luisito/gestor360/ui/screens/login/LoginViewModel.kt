@@ -1,6 +1,7 @@
 package org.luisito.gestor360.ui.screens.login
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -79,6 +80,17 @@ class LoginViewModel(
 
     fun clearNavigation() {
         _navigationEvent.value = null
+    }
+
+    companion object {
+        fun provideFactory(authRepository: AuthRepository, dataStoreManager: DataStoreManager): ViewModelProvider.Factory {
+            return object : ViewModelProvider.Factory {
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    @Suppress("UNCHECKED_CAST")
+                    return LoginViewModel(authRepository, dataStoreManager) as T
+                }
+            }
+        }
     }
 }
 
