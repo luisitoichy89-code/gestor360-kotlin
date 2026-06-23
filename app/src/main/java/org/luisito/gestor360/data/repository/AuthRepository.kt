@@ -10,8 +10,6 @@ class AuthRepository {
         return try {
             val supabase = SupabaseClientProvider.client
 
-            // Crear email sintético como en Flask: usuario@cliente_id.gestor360.local
-            // Por ahora usamos email directo, luego mejoramos
             val email = "$username@gestor360.local"
 
             val response = supabase.auth.signInWith(Email) {
@@ -19,8 +17,10 @@ class AuthRepository {
                 this.password = password
             }
 
-            if (response.user != null) {
-                LoginResult.Success(response.user.id)
+            // ✅ CORRECTO para supabase-kt 3.5.0
+            val user = response.data?.user
+            if (user != null) {
+                LoginResult.Success(user.id)
             } else {
                 LoginResult.Error("Credenciales inválidas")
             }
