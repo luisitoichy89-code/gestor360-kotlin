@@ -11,12 +11,18 @@ class AuthRepository {
         val email = "$username@gestor360.local"
 
         return runCatching {
-            supabase.auth.signInWith(Email) {
+            val response = supabase.auth.signInWith(Email) {
                 this.email = email
                 this.password = password
             }
-            // Si llegamos aquí, la autenticación fue exitosa
-            LoginResult.Success(email)
+            
+            // El usuario autenticado está en la sesión
+            val user = response.user
+            if (user != null) {
+                LoginResult.Success(user.id)
+            } else {
+                LoginResult.Error("Credenciales inválidas")
+            }
         }.getOrElse { exception ->
             LoginResult.Error(exception.message ?: "Error de conexión")
         }
