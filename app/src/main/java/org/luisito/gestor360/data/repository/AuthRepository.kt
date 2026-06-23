@@ -2,12 +2,10 @@ package org.luisito.gestor360.data.repository
 
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
-import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.postgrest.postgrest
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeout
-import org.luisito.gestor360.data.SupabaseClientProvider
 import kotlinx.serialization.Serializable
+import org.luisito.gestor360.data.SupabaseClientProvider
 
 @Serializable
 data class UsuarioRow(
@@ -26,7 +24,7 @@ class AuthRepository {
 
         return runCatching {
             // 1. Iniciar sesión con timeout para conexiones lentas
-            val authResult = withTimeout(15000L) {
+            withTimeout(15000L) {
                 supabase.auth.signInWith(Email) {
                     this.email = email
                     this.password = password
@@ -34,22 +32,23 @@ class AuthRepository {
             }
 
             // 2. Esperar a que la sesión se cargue desde almacenamiento local
-            // Esto es crítico para conexiones lentas
             supabase.auth.awaitInitialization()
 
             // 3. Obtener sesión con manejo de null seguro
             val session = supabase.auth.currentSessionOrNull()
-                ?: throw Exception("La sesión no se cargó correctamente. Verifica tu conexión a internet y vuelve a intentarlo.")
+                ?: throw Exception("La sesión no se cargó correctamente. Verifica tu conexión a internet.")
 
             // 4. Obtener ID del usuario de forma segura
             val userId = session.user.id
 
-            // 5. Consultar el rol en la tabla usuarios con timeout
+            // 5. Consultar el rol en la tabla usuarios con filter { eq(...) }
             val userResponse = withTimeout(10000L) {
                 supabase.postgrest.from("usuarios")
-                    .select()
-                    .eq("auth_id", userId)
-                    .execute()
+                    .select {
+                        filter {
+                            eq("auth_id", userId)
+                        }
+                    }
                     .decodeSingle<UsuarioRow>()
             }
 
@@ -65,7 +64,7 @@ class AuthRepository {
             val errorMessage = when {
                 exception is java.util.concurrent.TimeoutException ||
                 exception.message?.contains("timeout") == true ->
-                    "La conexión está tardando más de lo esperado. Revisa tu conexión a internet y vuelve a intentarlo."
+                    "La conexión está tardando más de lo esperado. Revisa tu conexión a internet."
 
                 exception.message?.contains("Invalid login credentials") == true ->
                     "Credenciales incorrectas. Verifica tu usuario y contraseña."
