@@ -74,6 +74,12 @@ class LoginViewModel(
         }
     }
 
+    fun logout() {
+        viewModelScope.launch {
+            dataStoreManager.clearSession()
+        }
+    }
+
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }

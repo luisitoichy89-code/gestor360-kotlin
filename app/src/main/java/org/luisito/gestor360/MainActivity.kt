@@ -45,13 +45,22 @@ fun AppNavigation() {
 
     NavHost(navController = navController, startDestination = "activation") {
         composable("activation") {
-            ActivationScreen(navController = navController)
+            ActivationScreen(
+                onLicenseValid = { navController.navigate("login") }
+            )
         }
         composable("login") {
             LoginScreen(navController = navController, viewModel = loginViewModel)
         }
         composable("dashboard") {
-            DashboardScreen(navController = navController)
+            DashboardScreen(
+                onLogout = {
+                    loginViewModel.logout()
+                    navController.navigate("login") {
+                        popUpTo("dashboard") { inclusive = true }
+                    }
+                }
+            )
         }
     }
 }
