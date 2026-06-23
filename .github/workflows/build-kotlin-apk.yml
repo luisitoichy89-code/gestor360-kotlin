@@ -21,13 +21,8 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Inject Supabase credentials
-        run: |
-          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> gradle.properties
-          echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> gradle.properties
-
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
+      - name: Build Debug APK with credentials
+        run: ./gradlew assembleDebug -PSUPABASE_URL=${{ secrets.SUPABASE_URL }} -PSUPABASE_KEY=${{ secrets.SUPABASE_KEY }}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
