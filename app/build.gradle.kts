@@ -94,3 +94,7 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
+dependencies {
+    implementation("com.russhwolf:multiplatform-settings:1.2.0")
+    implementation("com.russhwolf:multiplatform-settings-coroutines:1.2.0")
+}
