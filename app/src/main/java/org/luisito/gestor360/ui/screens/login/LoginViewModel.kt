@@ -3,6 +3,7 @@ package org.luisito.gestor360.ui.screens.login
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,13 +17,15 @@ import org.luisito.gestor360.utils.DataStoreManager
 
 class LoginViewModel(
     private val authRepository: AuthRepository,
-    private val dataStoreManager: DataStoreManager
+    private val dataStoreManager: DataStoreManager,
+    private val supabase: SupabaseClient = SupabaseClientProvider.client
 ) : ViewModel() {
-
-    private val supabase = SupabaseClientProvider.client
 
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
+
+    private val _sessionStatus = MutableStateFlow<SessionStatus?>(null)
+    val sessionStatus: StateFlow<SessionStatus?> = _sessionStatus.asStateFlow()
 
     private val _navigationEvent = MutableStateFlow<NavigationEvent?>(null)
     val navigationEvent: StateFlow<NavigationEvent?> = _navigationEvent.asStateFlow()
