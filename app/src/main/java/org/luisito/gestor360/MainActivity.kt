@@ -12,14 +12,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import org.luisito.gestor360.ui.components.Gestor360Drawer
 import org.luisito.gestor360.ui.screens.DashboardScreen
 import org.luisito.gestor360.ui.screens.activation.ActivationScreen
 import org.luisito.gestor360.ui.screens.login.LoginScreen
 import org.luisito.gestor360.ui.screens.login.LoginViewModel
 import org.luisito.gestor360.ui.theme.Gestor360Theme
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,7 +67,7 @@ fun Gestor360App() {
                 userRol = loginState.userRol,
                 username = loginState.username,
                 onMenuClick = {
-                    CoroutineScope(it).launch {
+                    CoroutineScope(drawerState).launch {
                         drawerState.open()
                     }
                 },
