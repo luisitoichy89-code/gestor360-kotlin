@@ -38,7 +38,7 @@ class DataStoreManager(private val context: Context) {
             val isActive = prefs[KEY_SESSION_ACTIVE]?.equals("true") ?: false
 
             if (userId != null && userRol != null && username != null && isActive) {
-            val isActive = prefs[KEY_SESSION_ACTIVE]?.equals("true") ?: false // FORZAR_CAMBIO
+                SessionData(userId, userRol, username, nombre)
             } else {
                 null
             }
