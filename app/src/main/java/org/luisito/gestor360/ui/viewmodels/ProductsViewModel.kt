@@ -6,10 +6,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.luisito.gestor360.data.models.Product
-import org.luisito.gestor360.data.repository.ProductRepository
+import org.luisito.gestor360.domain.repository.IProductRepository
+import org.luisito.gestor360.domain.result.Result
 
 class ProductsViewModel(
-    private val productRepo: ProductRepository
+    private val productRepo: IProductRepository
 ) : ViewModel() {
     
     private val _products = MutableStateFlow<List<Product>>(emptyList())
@@ -21,6 +22,9 @@ class ProductsViewModel(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
     
+    private val _successMessage = MutableStateFlow<String?>(null)
+    val successMessage: StateFlow<String?> = _successMessage
+    
     init {
         loadProducts()
     }
@@ -28,10 +32,15 @@ class ProductsViewModel(
     fun loadProducts() {
         viewModelScope.launch {
             _isLoading.value = true
-            try {
-                _products.value = productRepo.getProducts()
-            } catch (e: Exception) {
-                _error.value = e.message
+            _error.value = null
+            
+            when (val result = productRepo.getProducts()) {
+                is Result.Success -> {
+                    _products.value = result.data
+                }
+                is Result.Error -> {
+                    _error.value = result.message
+                }
             }
             _isLoading.value = false
         }
@@ -40,12 +49,16 @@ class ProductsViewModel(
     fun createProduct(product: Product) {
         viewModelScope.launch {
             _isLoading.value = true
-            try {
-                if (productRepo.createProduct(product)) {
+            _error.value = null
+            
+            when (val result = productRepo.createProduct(product)) {
+                is Result.Success -> {
+                    _successMessage.value = "Producto creado exitosamente"
                     loadProducts()
                 }
-            } catch (e: Exception) {
-                _error.value = e.message
+                is Result.Error -> {
+                    _error.value = result.message
+                }
             }
             _isLoading.value = false
         }
@@ -54,12 +67,16 @@ class ProductsViewModel(
     fun updateProduct(product: Product) {
         viewModelScope.launch {
             _isLoading.value = true
-            try {
-                if (productRepo.updateProduct(product.id, product)) {
+            _error.value = null
+            
+            when (val result = productRepo.updateProduct(product.id, product)) {
+                is Result.Success -> {
+                    _successMessage.value = "Producto actualizado"
                     loadProducts()
                 }
-            } catch (e: Exception) {
-                _error.value = e.message
+                is Result.Error -> {
+                    _error.value = result.message
+                }
             }
             _isLoading.value = false
         }
@@ -68,14 +85,23 @@ class ProductsViewModel(
     fun deleteProduct(productId: String) {
         viewModelScope.launch {
             _isLoading.value = true
-            try {
-                if (productRepo.deleteProduct(productId)) {
+            _error.value = null
+            
+            when (val result = productRepo.deleteProduct(productId)) {
+                is Result.Success -> {
+                    _successMessage.value = "Producto eliminado"
                     loadProducts()
                 }
-            } catch (e: Exception) {
-                _error.value = e.message
+                is Result.Error -> {
+                    _error.value = result.message
+                }
             }
             _isLoading.value = false
         }
+    }
+    
+    fun clearMessages() {
+        _error.value = null
+        _successMessage.value = null
     }
 }

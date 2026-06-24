@@ -7,35 +7,58 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.luisito.gestor360.data.models.Product
 import org.luisito.gestor360.data.models.Sale
-import org.luisito.gestor360.data.repository.ProductRepository
-import org.luisito.gestor360.data.repository.SaleRepository
+import org.luisito.gestor360.domain.repository.IProductRepository
+import org.luisito.gestor360.domain.repository.ISaleRepository
+import org.luisito.gestor360.domain.result.Result
 
 class SalesViewModel(
-    private val productRepo: ProductRepository,
-    private val saleRepo: SaleRepository
+    private val productRepo: IProductRepository,
+    private val saleRepo: ISaleRepository
 ) : ViewModel() {
     
     private val _products = MutableStateFlow<List<Product>>(emptyList())
     val products: StateFlow<List<Product>> = _products
     
-    private val _cart = MutableStateFlow<List<CartItem>>(emptyList())
-    val cart: StateFlow<List<CartItem>> = _cart
+    private val _cartItems = MutableStateFlow<List<CartItem>>(emptyList())
+    val cartItems: StateFlow<List<CartItem>> = _cartItems
+    
+    private val _sales = MutableStateFlow<List<Sale>>(emptyList())
+    val sales: StateFlow<List<Sale>> = _sales
     
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
     
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error
+    
+    private val _successMessage = MutableStateFlow<String?>(null)
+    val successMessage: StateFlow<String?> = _successMessage
+    
     init {
         loadProducts()
+        loadSales()
     }
     
     fun loadProducts() {
         viewModelScope.launch {
-            _products.value = productRepo.getProducts()
+            when (val result = productRepo.getProducts()) {
+                is Result.Success -> _products.value = result.data
+                is Result.Error -> _error.value = result.message
+            }
         }
     }
     
-    fun addToCart(product: Product, quantity: Int) {
-        val currentCart = _cart.value.toMutableList()
+    fun loadSales() {
+        viewModelScope.launch {
+            when (val result = saleRepo.getSales()) {
+                is Result.Success -> _sales.value = result.data
+                is Result.Error -> _error.value = result.message
+            }
+        }
+    }
+    
+    fun addToCart(product: Product, quantity: Int = 1) {
+        val currentCart = _cartItems.value.toMutableList()
         val existingItem = currentCart.find { it.product.id == product.id }
         
         if (existingItem != null) {
@@ -44,19 +67,33 @@ class SalesViewModel(
             currentCart.add(CartItem(product, quantity))
         }
         
-        _cart.value = currentCart
+        _cartItems.value = currentCart
     }
     
     fun removeFromCart(productId: String) {
-        _cart.value = _cart.value.filter { it.product.id != productId }
+        _cartItems.value = _cartItems.value.filter { it.product.id != productId }
+    }
+    
+    fun updateQuantity(productId: String, quantity: Int) {
+        if (quantity <= 0) {
+            removeFromCart(productId)
+            return
+        }
+        
+        val currentCart = _cartItems.value.toMutableList()
+        val item = currentCart.find { it.product.id == productId }
+        item?.let {
+            it.quantity = quantity
+            _cartItems.value = currentCart
+        }
     }
     
     fun clearCart() {
-        _cart.value = emptyList()
+        _cartItems.value = emptyList()
     }
     
-    fun calculateTotal(): Double {
-        return _cart.value.sumOf { it.product.price * it.quantity }
+    fun getTotal(): Double {
+        return _cartItems.value.sumOf { it.product.price * it.quantity }
     }
     
     fun completeSale(
@@ -71,11 +108,18 @@ class SalesViewModel(
     ) {
         viewModelScope.launch {
             _isLoading.value = true
+            _error.value = null
             
-            val total = calculateTotal()
+            val total = getTotal()
+            if (total == 0.0) {
+                _error.value = "El carrito está vacío"
+                _isLoading.value = false
+                return@launch
+            }
+            
             val sale = Sale(
                 id = System.currentTimeMillis().toString(),
-                saleItems = _cart.value.map { item ->
+                saleItems = _cartItems.value.map { item ->
                     mapOf(
                         "productId" to item.product.id,
                         "quantity" to item.quantity,
@@ -95,10 +139,23 @@ class SalesViewModel(
                 timestamp = System.currentTimeMillis()
             )
             
-            saleRepo.createSale(sale)
-            clearCart()
+            when (val result = saleRepo.createSale(sale)) {
+                is Result.Success -> {
+                    _successMessage.value = "Venta completada exitosamente"
+                    clearCart()
+                    loadSales()
+                }
+                is Result.Error -> {
+                    _error.value = result.message
+                }
+            }
             _isLoading.value = false
         }
+    }
+    
+    fun clearMessages() {
+        _error.value = null
+        _successMessage.value = null
     }
 }
 
