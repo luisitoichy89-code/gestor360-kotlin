@@ -1,6 +1,7 @@
 package org.luisito.gestor360.utils
 
 import android.content.Context
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -8,6 +9,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 private val Context.dataStore by preferencesDataStore("gestor360_prefs")
+
+// Función de extensión para manejar String? de forma segura
+fun Preferences.Key<String>.isTrue(prefs: Preferences): Boolean {
+    return prefs[this]?.lowercase() == "true"
+}
 
 class DataStoreManager(private val context: Context) {
 
@@ -35,7 +41,7 @@ class DataStoreManager(private val context: Context) {
             val userRol = prefs[KEY_USER_ROL]
             val username = prefs[KEY_USERNAME]
             val nombre = prefs[KEY_NOMBRE]
-            val isActive = prefs[KEY_SESSION_ACTIVE]?.lowercase() == "true"
+            val isActive = KEY_SESSION_ACTIVE.isTrue(prefs)
 
             if (userId != null && userRol != null && username != null && isActive) {
                 SessionData(userId, userRol, username, nombre)
