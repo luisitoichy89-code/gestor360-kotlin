@@ -35,7 +35,7 @@ class DataStoreManager(private val context: Context) {
             val userRol = prefs[KEY_USER_ROL]
             val username = prefs[KEY_USERNAME]
             val nombre = prefs[KEY_NOMBRE]
-            val isActive = prefs[KEY_SESSION_ACTIVE] == "true"
+            val isActive = prefs[KEY_SESSION_ACTIVE]?.lowercase() == "true"
 
             if (userId != null && userRol != null && username != null && isActive) {
                 SessionData(userId, userRol, username, nombre)
