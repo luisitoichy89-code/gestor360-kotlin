@@ -46,7 +46,10 @@ fun Gestor360App() {
             error = loginState.error
         )
     } else {
+        // Mostrar el rol en el Dashboard
         DashboardScreen(
+            userRol = loginState.userRol,
+            username = loginState.username,
             onLogout = {
                 loginViewModel.resetState()
             }

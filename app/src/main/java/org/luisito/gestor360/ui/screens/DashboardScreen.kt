@@ -18,6 +18,8 @@ import org.luisito.gestor360.ui.theme.Gestor360Theme
 
 @Composable
 fun DashboardScreen(
+    userRol: String = "",
+    username: String = "",
     onLogout: () -> Unit
 ) {
     Gestor360Theme {
@@ -38,11 +40,19 @@ fun DashboardScreen(
                     color = MaterialTheme.colorScheme.primary
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "Bienvenido a Gestor360",
+                    text = "Bienvenido, $username",
                     style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Rol: ${userRol.uppercase()}",
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onBackground
                 )
 
