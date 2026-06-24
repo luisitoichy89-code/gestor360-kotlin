@@ -38,14 +38,11 @@ class LoginViewModel(
 
     private fun listenSessionStatus() {
         viewModelScope.launch {
-            supabase.auth.sessionStatus.collect { status: SessionStatus ->
+            supabase.auth.sessionStatus.collect { status ->
                 _sessionStatus.value = status
                 when (status) {
                     is SessionStatus.Authenticated -> {
-                        _uiState.value = _uiState.value.copy(
-                            isOffline = false,
-                            error = null
-                        )
+                        _uiState.value = _uiState.value.copy(isOffline = false, error = null)
                     }
                     is SessionStatus.RefreshFailure -> {
                         _uiState.value = _uiState.value.copy(
@@ -57,14 +54,9 @@ class LoginViewModel(
                         _uiState.value = _uiState.value.copy(loading = true)
                     }
                     is SessionStatus.NotAuthenticated -> {
-                        _uiState.value = _uiState.value.copy(
-                            loading = false,
-                            isOffline = false
-                        )
+                        _uiState.value = _uiState.value.copy(loading = false, isOffline = false)
                     }
-                    else -> {
-                        // Otros estados
-                    }
+                    else -> {}
                 }
             }
         }
@@ -119,32 +111,23 @@ class LoginViewModel(
 
     fun logout() {
         viewModelScope.launch {
-            try {
-                supabase.auth.signOut()
-            } catch (e: Exception) {
-                // Si falla, igual limpiamos la sesión local
-            }
+            try { supabase.auth.signOut() } catch (_: Exception) {}
             dataStoreManager.clearSession()
             _navigationEvent.value = NavigationEvent.NavigateToLogin
         }
     }
 
-    fun clearError() {
-        _uiState.value = _uiState.value.copy(error = null)
-    }
-
-    fun clearNavigation() {
-        _navigationEvent.value = null
-    }
+    fun clearError() { _uiState.value = _uiState.value.copy(error = null) }
+    fun clearNavigation() { _navigationEvent.value = null }
 
     companion object {
-        fun provideFactory(authRepository: AuthRepository, dataStoreManager: DataStoreManager): ViewModelProvider.Factory {
-            return object : ViewModelProvider.Factory {
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    @Suppress("UNCHECKED_CAST")
-                    return LoginViewModel(authRepository, dataStoreManager) as T
-                }
-            }
+        fun provideFactory(
+            authRepository: AuthRepository,
+            dataStoreManager: DataStoreManager
+        ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                LoginViewModel(authRepository, dataStoreManager) as T
         }
     }
 }
