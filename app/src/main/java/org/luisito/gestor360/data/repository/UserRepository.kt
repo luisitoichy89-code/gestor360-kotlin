@@ -1,22 +1,21 @@
 package org.luisito.gestor360.data.repository
 
 import io.github.jan.supabase.postgrest.from
-import org.luisito.gestor360.data.SupabaseClientProvider
+import org.luisito.gestor360.data.SupabaseClient
 import org.luisito.gestor360.data.models.User
-import kotlinx.serialization.json.Json
 
 class UserRepository {
-    suspend fun getUserByAuthId(authId: String): User? {
+    private val supabase = SupabaseClient.instance
+    
+    suspend fun getCurrentUser(): User? {
         return try {
-            val supabase = SupabaseClientProvider.client
-            val result = supabase.from("usuarios")
+            val userId = supabase.auth.currentSessionOrNull()?.user?.id ?: return null
+            supabase.from("users")
                 .select {
-                    filter {
-                        eq("auth_id", authId)
-                    }
+                    filter { eq("id", userId) }
                 }
-                .decodeAs<List<User>>()
-            result.firstOrNull()
+                .decodeList<User>()
+                .firstOrNull()
         } catch (e: Exception) {
             null
         }

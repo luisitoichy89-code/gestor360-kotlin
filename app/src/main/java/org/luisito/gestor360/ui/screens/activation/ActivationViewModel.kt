@@ -4,35 +4,26 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.luisito.gestor360.data.models.LicenseStatus
 import org.luisito.gestor360.data.repository.LicenseRepository
+import org.luisito.gestor360.data.repository.LicenseStatus
+import org.luisito.gestor360.data.SupabaseClient
 
-class ActivationViewModel(
-    private val licenseRepository: LicenseRepository = LicenseRepository()
-) : ViewModel() {
-
-    private val _uiState = MutableStateFlow(ActivationUiState())
-    val uiState: StateFlow<ActivationUiState> = _uiState.asStateFlow()
-
-    fun checkLicense(deviceId: String) {
+class ActivationViewModel : ViewModel() {
+    private val licenseRepository = LicenseRepository(SupabaseClient.instance)
+    
+    private val _uiState = MutableStateFlow<LicenseStatus?>(null)
+    val uiState: StateFlow<LicenseStatus?> = _uiState
+    
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading
+    
+    fun verifyLicense(androidId: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-            val result = licenseRepository.checkLicense(deviceId)
-            _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    licenseStatus = result
-                )
-            }
+            _isLoading.value = true
+            val result = licenseRepository.verifyLicense(androidId)
+            _uiState.value = result
+            _isLoading.value = false
         }
     }
 }
-
-data class ActivationUiState(
-    val deviceId: String = "",
-    val isLoading: Boolean = false,
-    val licenseStatus: LicenseStatus = LicenseStatus.Pending
-)
