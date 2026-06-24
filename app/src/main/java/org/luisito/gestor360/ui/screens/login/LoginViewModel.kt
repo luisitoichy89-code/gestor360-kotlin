@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -37,7 +38,7 @@ class LoginViewModel(
 
     private fun listenSessionStatus() {
         viewModelScope.launch {
-            supabase.auth.sessionStatus.collect { status ->
+            supabase.auth.sessionStatus.collect { status: SessionStatus ->
                 _sessionStatus.value = status
                 when (status) {
                     is SessionStatus.Authenticated -> {
