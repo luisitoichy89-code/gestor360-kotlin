@@ -1,44 +1,59 @@
 package org.luisito.gestor360.data.repository
 
+import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.ColumnOrder
+import io.github.jan.supabase.postgrest.query.Order
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.luisito.gestor360.data.models.License
 import org.luisito.gestor360.data.models.LicenseStatus
-import org.luisito.gestor360.data.SupabaseClientProvider
 
-class LicenseRepository {
-
-    suspend fun checkLicense(deviceId: String): LicenseStatus {
-        return try {
-            val supabase = SupabaseClientProvider.client
-            val result = supabase.from("licencias")
-                .select {
-                    filter {
-                        eq("device_id", deviceId)
+class LicenseRepository(
+    private val supabase: SupabaseClient
+) {
+    
+    suspend fun verifyLicense(androidId: String): LicenseStatus {
+        return withContext(Dispatchers.IO) {
+            try {
+                val result = supabase.from("licenses")
+                    .select {
+                        filter {
+                            eq("android_id", androidId)
+                        }
                     }
+                    .decodeList<License>()
+                
+                if (result.isEmpty()) {
+                    return@withContext LicenseStatus.Error("Licencia no encontrada")
                 }
-                .decodeAs<List<Map<String, Any>>>()
-
-            if (result.isNotEmpty()) {
-                val lic = result.first()
-                val activo = lic["activo"] as? Boolean ?: false
-                val expiracion = lic["expiracion"] as? String
-
-                if (!activo) {
-                    LicenseStatus.Error("Licencia inactiva")
-                } else if (expiracion != null) {
-                    val expDate = java.time.LocalDate.parse(expiracion)
-                    val now = java.time.LocalDate.now()
-                    if (expDate.isBefore(now)) {
-                        LicenseStatus.Expired(expiracion)
-                    } else {
-                        LicenseStatus.Active
-                    }
+                
+                val license = result.first()
+                
+                if (license.isActive) {
+                    LicenseStatus.Active(license)
                 } else {
-                    LicenseStatus.Active
+                    LicenseStatus.Expired("Licencia expirada o inactiva")
                 }
-            } else {
-                LicenseStatus.Pending
+                
+            } catch (e: Exception) {
+                e.printStackTrace()
+                LicenseStatus.Error("Error al verificar licencia: ${e.message}")
             }
-        } catch (e: Exception) {
-            LicenseStatus.Error("Error: ${e.message}")
         }
     }
+}
+
+data class License(
+    val id: String,
+    val android_id: String,
+    val isActive: Boolean,
+    val expiresAt: String? = null
+)
+
+sealed class LicenseStatus {
+    data class Active(val license: License) : LicenseStatus()
+    data class Pending(val message: String) : LicenseStatus()
+    data class Expired(val message: String) : LicenseStatus()
+    data class Error(val message: String) : LicenseStatus()
 }
