@@ -13,9 +13,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.luisito.gestor360.ui.components.Gestor360Drawer
 import org.luisito.gestor360.ui.screens.DashboardScreen
+import org.luisito.gestor360.ui.screens.ProductsScreen
 import org.luisito.gestor360.ui.screens.activation.ActivationScreen
 import org.luisito.gestor360.ui.screens.login.LoginScreen
 import org.luisito.gestor360.ui.screens.login.LoginViewModel
@@ -60,21 +62,30 @@ fun Gestor360App() {
                 selectedItem = item
                 when (item) {
                     "logout" -> loginViewModel.resetState()
+                    "productos" -> {
+                        // Navegar a productos
+                    }
                 }
             }
         ) {
-            DashboardScreen(
-                userRol = loginState.userRol,
-                username = loginState.username,
-                onMenuClick = {
-                    CoroutineScope(drawerState).launch {
-                        drawerState.open()
+            when (selectedItem) {
+                "productos" -> ProductsScreen(
+                    almacenId = "1",
+                    onBack = { selectedItem = "dashboard" }
+                )
+                else -> DashboardScreen(
+                    userRol = loginState.userRol,
+                    username = loginState.username,
+                    onMenuClick = {
+                        CoroutineScope(Dispatchers.Main).launch {
+                            drawerState.open()
+                        }
+                    },
+                    onLogout = {
+                        loginViewModel.resetState()
                     }
-                },
-                onLogout = {
-                    loginViewModel.resetState()
-                }
-            )
+                )
+            }
         }
     }
 }
