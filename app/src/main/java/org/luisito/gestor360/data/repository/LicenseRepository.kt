@@ -2,12 +2,8 @@ package org.luisito.gestor360.data.repository
 
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.from
-import io.github.jan.supabase.postgrest.query.ColumnOrder
-import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.luisito.gestor360.data.models.License
-import org.luisito.gestor360.data.models.LicenseStatus
 
 class LicenseRepository(
     private val supabase: SupabaseClient
