@@ -141,7 +141,7 @@ fun SalesScreen(
                                                 )
                                             }
                                         ) {
-                                            Icon(Icons.Default.Remove, contentDescription = "Quitar")
+                                            Icon(Icons.Default.Clear, contentDescription = "Quitar")
                                         }
                                         Text(
                                             text = "${String.format("%.2f", item.subtotal)}",
