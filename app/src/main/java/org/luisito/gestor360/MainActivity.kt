@@ -17,9 +17,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.luisito.gestor360.ui.components.Gestor360Drawer
 import org.luisito.gestor360.ui.screens.DashboardScreen
+import org.luisito.gestor360.ui.screens.InventoryScreen
+import org.luisito.gestor360.ui.screens.MermaScreen
 import org.luisito.gestor360.ui.screens.ProductsScreen
 import org.luisito.gestor360.ui.screens.SalesScreen
 import org.luisito.gestor360.ui.screens.SyncScreen
+import org.luisito.gestor360.ui.screens.TracesScreen
 import org.luisito.gestor360.ui.screens.activation.ActivationScreen
 import org.luisito.gestor360.ui.screens.login.LoginScreen
 import org.luisito.gestor360.ui.screens.login.LoginViewModel
@@ -82,6 +85,16 @@ fun Gestor360App() {
                 )
                 "productos" -> ProductsScreen(
                     almacenId = "1",
+                    onBack = { selectedItem = "dashboard" }
+                )
+                "inventario" -> InventoryScreen(
+                    almacenId = "1",
+                    onBack = { selectedItem = "dashboard" }
+                )
+                "mermas" -> MermaScreen(
+                    onBack = { selectedItem = "dashboard" }
+                )
+                "trazas" -> TracesScreen(
                     onBack = { selectedItem = "dashboard" }
                 )
                 "sync" -> SyncScreen(
