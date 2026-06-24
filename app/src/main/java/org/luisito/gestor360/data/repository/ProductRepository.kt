@@ -3,6 +3,7 @@ package org.luisito.gestor360.data.repository
 import io.github.jan.supabase.postgrest.from
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.models.Product
+import kotlinx.serialization.json.Json
 
 class ProductRepository {
 

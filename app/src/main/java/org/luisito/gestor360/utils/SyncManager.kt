@@ -13,7 +13,10 @@ class SyncManager(
     suspend fun syncAll(almacenId: String): SyncResult {
         return withContext(Dispatchers.IO) {
             try {
+                // Sincronizar productos
                 val products = productRepository.getProducts(almacenId)
+                // Aquí se guardarían en Room local
+
                 SyncResult.Success
             } catch (e: Exception) {
                 SyncResult.Error(e.message ?: "Error de sincronización")

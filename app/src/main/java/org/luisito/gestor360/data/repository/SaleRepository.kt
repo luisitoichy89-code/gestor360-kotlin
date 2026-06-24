@@ -2,6 +2,8 @@ package org.luisito.gestor360.data.repository
 
 import io.github.jan.supabase.postgrest.from
 import org.luisito.gestor360.data.SupabaseClientProvider
+import org.luisito.gestor360.data.models.Sale
+import kotlinx.serialization.json.Json
 
 class SaleRepository {
 
@@ -43,6 +45,21 @@ class SaleRepository {
             true
         } catch (e: Exception) {
             false
+        }
+    }
+
+    suspend fun getSalesByAlmacen(almacenId: String): List<Sale> {
+        return try {
+            val supabase = SupabaseClientProvider.client
+            supabase.from("ventas")
+                .select {
+                    filter {
+                        eq("almacen_id", almacenId)
+                    }
+                }
+                .decodeAs<List<Sale>>()
+        } catch (e: Exception) {
+            emptyList()
         }
     }
 }
