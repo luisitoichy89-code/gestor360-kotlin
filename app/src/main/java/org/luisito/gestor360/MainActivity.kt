@@ -18,10 +18,12 @@ import kotlinx.coroutines.launch
 import org.luisito.gestor360.ui.components.Gestor360Drawer
 import org.luisito.gestor360.ui.screens.DashboardScreen
 import org.luisito.gestor360.ui.screens.ProductsScreen
+import org.luisito.gestor360.ui.screens.SyncScreen
 import org.luisito.gestor360.ui.screens.activation.ActivationScreen
 import org.luisito.gestor360.ui.screens.login.LoginScreen
 import org.luisito.gestor360.ui.screens.login.LoginViewModel
 import org.luisito.gestor360.ui.theme.Gestor360Theme
+import org.luisito.gestor360.utils.SyncManager
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,9 +40,13 @@ fun Gestor360App() {
     var isLicensed by remember { mutableStateOf(true) }
     var selectedItem by remember { mutableStateOf("dashboard") }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    var isSyncing by remember { mutableStateOf(false) }
+    var syncResult by remember { mutableStateOf<String?>(null) }
 
     val loginViewModel: LoginViewModel = viewModel()
     val loginState by loginViewModel.uiState.collectAsState()
+
+    val syncManager = remember { SyncManager(androidx.compose.ui.platform.LocalContext.current) }
 
     if (!isLicensed) {
         ActivationScreen(
@@ -62,9 +68,6 @@ fun Gestor360App() {
                 selectedItem = item
                 when (item) {
                     "logout" -> loginViewModel.resetState()
-                    "productos" -> {
-                        // Navegar a productos
-                    }
                 }
             }
         ) {
@@ -72,6 +75,24 @@ fun Gestor360App() {
                 "productos" -> ProductsScreen(
                     almacenId = "1",
                     onBack = { selectedItem = "dashboard" }
+                )
+                "sync" -> SyncScreen(
+                    onBack = { selectedItem = "dashboard" },
+                    onSync = {
+                        CoroutineScope(Dispatchers.Main).launch {
+                            isSyncing = true
+                            syncResult = null
+                            val result = syncManager.syncAll("1")
+                            isSyncing = false
+                            syncResult = if (result is SyncResult.Success) {
+                                "✅ Sincronización exitosa"
+                            } else {
+                                "❌ Error: ${(result as SyncResult.Error).message}"
+                            }
+                        }
+                    },
+                    isLoading = isSyncing,
+                    result = syncResult
                 )
                 else -> DashboardScreen(
                     userRol = loginState.userRol,
