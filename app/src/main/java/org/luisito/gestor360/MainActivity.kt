@@ -18,12 +18,14 @@ import kotlinx.coroutines.launch
 import org.luisito.gestor360.ui.components.Gestor360Drawer
 import org.luisito.gestor360.ui.screens.DashboardScreen
 import org.luisito.gestor360.ui.screens.ProductsScreen
+import org.luisito.gestor360.ui.screens.SalesScreen
 import org.luisito.gestor360.ui.screens.SyncScreen
 import org.luisito.gestor360.ui.screens.activation.ActivationScreen
 import org.luisito.gestor360.ui.screens.login.LoginScreen
 import org.luisito.gestor360.ui.screens.login.LoginViewModel
 import org.luisito.gestor360.ui.theme.Gestor360Theme
 import org.luisito.gestor360.utils.SyncManager
+import org.luisito.gestor360.utils.SyncResult
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,7 +48,8 @@ fun Gestor360App() {
     val loginViewModel: LoginViewModel = viewModel()
     val loginState by loginViewModel.uiState.collectAsState()
 
-    val syncManager = remember { SyncManager(androidx.compose.ui.platform.LocalContext.current) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val syncManager = remember { SyncManager(context) }
 
     if (!isLicensed) {
         ActivationScreen(
@@ -72,6 +75,11 @@ fun Gestor360App() {
             }
         ) {
             when (selectedItem) {
+                "ventas" -> SalesScreen(
+                    almacenId = "1",
+                    usuarioId = 1,
+                    onBack = { selectedItem = "dashboard" }
+                )
                 "productos" -> ProductsScreen(
                     almacenId = "1",
                     onBack = { selectedItem = "dashboard" }
@@ -84,10 +92,9 @@ fun Gestor360App() {
                             syncResult = null
                             val result = syncManager.syncAll("1")
                             isSyncing = false
-                            syncResult = if (result is SyncResult.Success) {
-                                "✅ Sincronización exitosa"
-                            } else {
-                                "❌ Error: ${(result as SyncResult.Error).message}"
+                            syncResult = when (result) {
+                                is SyncResult.Success -> "✅ Sincronización exitosa"
+                                is SyncResult.Error -> "❌ Error: ${result.message}"
                             }
                         }
                     },

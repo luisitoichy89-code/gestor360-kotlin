@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Button
@@ -40,17 +39,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.luisito.gestor360.data.models.Product
-import org.luisito.gestor360.ui.viewmodels.SalesViewModel
 import org.luisito.gestor360.ui.components.PaymentDialog
+import org.luisito.gestor360.ui.viewmodels.SalesViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SalesScreen(
     almacenId: String = "1",
     usuarioId: Int = 1,
-    onBack: () -> Unit,
-    viewModel: SalesViewModel = viewModel()
+    onBack: () -> Unit
 ) {
+    val viewModel: SalesViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
     var showPaymentDialog by remember { mutableStateOf(false) }
 
@@ -96,7 +95,6 @@ fun SalesScreen(
             } else if (uiState.error != null) {
                 Text(text = uiState.error ?: "Error", color = MaterialTheme.colorScheme.error)
             } else {
-                // Lista de productos
                 LazyColumn(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -109,7 +107,6 @@ fun SalesScreen(
                     }
                 }
 
-                // Carrito
                 if (uiState.cart.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Card(
