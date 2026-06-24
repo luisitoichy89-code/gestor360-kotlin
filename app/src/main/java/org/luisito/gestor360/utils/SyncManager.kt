@@ -4,24 +4,18 @@ import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.luisito.gestor360.data.repository.ProductRepository
-import org.luisito.gestor360.data.repository.SaleRepository
 
 class SyncManager(
     private val context: Context,
-    private val productRepository: ProductRepository = ProductRepository(),
-    private val saleRepository: SaleRepository = SaleRepository()
+    private val productRepository: ProductRepository = ProductRepository()
 ) {
 
     suspend fun syncAll(almacenId: String): SyncResult {
         return withContext(Dispatchers.IO) {
             try {
-                // 1. Sincronizar productos
+                // Sincronizar productos
                 val products = productRepository.getProducts(almacenId)
                 // Aquí se guardarían en Room local
-
-                // 2. Sincronizar ventas pendientes
-                // val pendingSales = saleRepository.getPendingSales(almacenId)
-                // pendingSales.forEach { saleRepository.uploadSale(it) }
 
                 SyncResult.Success
             } catch (e: Exception) {
@@ -38,7 +32,6 @@ class SyncManager(
                 SyncAction.PRODUCT_DELETED,
                 SyncAction.SALE_CREATED,
                 SyncAction.MERMA_CREATED -> {
-                    // Sincronizar solo lo necesario
                     syncAll(almacenId)
                 }
                 else -> { /* No hacer nada */ }
