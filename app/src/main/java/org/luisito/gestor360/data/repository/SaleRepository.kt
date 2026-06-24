@@ -7,7 +7,7 @@ import org.luisito.gestor360.data.models.Sale
 class SaleRepository {
     private val supabase = SupabaseClient.instance
     
-    suspend fun getAllSales(): List<Sale> {
+    suspend fun getSales(): List<Sale> {
         return try {
             supabase.from("sales")
                 .select()

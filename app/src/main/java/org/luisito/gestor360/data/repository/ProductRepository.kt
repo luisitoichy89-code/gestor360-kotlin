@@ -7,7 +7,7 @@ import org.luisito.gestor360.data.models.Product
 class ProductRepository {
     private val supabase = SupabaseClient.instance
     
-    suspend fun getAllProducts(): List<Product> {
+    suspend fun getProducts(): List<Product> {
         return try {
             supabase.from("products")
                 .select()
@@ -27,11 +27,11 @@ class ProductRepository {
         }
     }
     
-    suspend fun updateProduct(product: Product): Boolean {
+    suspend fun updateProduct(id: String, product: Product): Boolean {
         return try {
             supabase.from("products")
                 .update(product) {
-                    filter { eq("id", product.id) }
+                    filter { eq("id", id) }
                 }
             true
         } catch (e: Exception) {
@@ -39,11 +39,11 @@ class ProductRepository {
         }
     }
     
-    suspend fun deleteProduct(productId: String): Boolean {
+    suspend fun deleteProduct(id: String): Boolean {
         return try {
             supabase.from("products")
                 .delete {
-                    filter { eq("id", productId) }
+                    filter { eq("id", id) }
                 }
             true
         } catch (e: Exception) {
