@@ -14,11 +14,9 @@ import kotlinx.coroutines.launch
 import org.luisito.gestor360.data.repository.AuthRepository
 import org.luisito.gestor360.data.repository.LoginResult
 import org.luisito.gestor360.data.SupabaseClientProvider
-import org.luisito.gestor360.utils.DataStoreManager
 
 class LoginViewModel(
     private val authRepository: AuthRepository,
-    private val dataStoreManager: DataStoreManager,
     private val supabase: SupabaseClient = SupabaseClientProvider.client
 ) : ViewModel() {
 
@@ -123,7 +121,6 @@ class LoginViewModel(
     companion object {
         fun provideFactory(
             authRepository: AuthRepository,
-            dataStoreManager: DataStoreManager
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =

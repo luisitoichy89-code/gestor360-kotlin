@@ -18,7 +18,6 @@ import org.luisito.gestor360.ui.screens.DashboardScreen
 import org.luisito.gestor360.ui.screens.login.LoginScreen
 import org.luisito.gestor360.ui.screens.login.LoginViewModel
 import org.luisito.gestor360.ui.theme.Gestor360Theme
-import org.luisito.gestor360.utils.DataStoreManager
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,7 +36,6 @@ class MainActivity : ComponentActivity() {
 fun AppNavigation() {
     val navController = rememberNavController()
     val context = androidx.compose.ui.platform.LocalContext.current
-    val dataStoreManager = DataStoreManager(context)
     val authRepository = AuthRepository()
     val loginViewModel: LoginViewModel = viewModel(
         factory = LoginViewModel.provideFactory(authRepository, dataStoreManager)
