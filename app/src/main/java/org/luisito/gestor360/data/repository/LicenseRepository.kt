@@ -1,34 +1,33 @@
 package org.luisito.gestor360.data.repository
 
-import io.github.jan.supabase.postgrest.from
-import org.luisito.gestor360.data.models.License
 import org.luisito.gestor360.data.models.LicenseStatus
 import org.luisito.gestor360.data.SupabaseClientProvider
-import java.time.LocalDate
 
 class LicenseRepository {
 
     suspend fun checkLicense(deviceId: String): LicenseStatus {
         return try {
             val supabase = SupabaseClientProvider.client
-
             val result = supabase.from("licencias")
                 .select {
                     filter {
                         eq("device_id", deviceId)
                     }
                 }
-                .decodeAs<List<License>>()
+                .decodeAs<List<Map<String, Any>>>()
 
             if (result.isNotEmpty()) {
                 val lic = result.first()
-                if (!lic.activo) {
+                val activo = lic["activo"] as? Boolean ?: false
+                val expiracion = lic["expiracion"] as? String
+
+                if (!activo) {
                     LicenseStatus.Error("Licencia inactiva")
-                } else if (lic.expiracion != null) {
-                    val expDate = LocalDate.parse(lic.expiracion)
-                    val now = LocalDate.now()
+                } else if (expiracion != null) {
+                    val expDate = java.time.LocalDate.parse(expiracion)
+                    val now = java.time.LocalDate.now()
                     if (expDate.isBefore(now)) {
-                        LicenseStatus.Expired(lic.expiracion)
+                        LicenseStatus.Expired(expiracion)
                     } else {
                         LicenseStatus.Active
                     }
@@ -39,7 +38,7 @@ class LicenseRepository {
                 LicenseStatus.Pending
             }
         } catch (e: Exception) {
-            LicenseStatus.Error(e.message ?: "Error al verificar licencia")
+            LicenseStatus.Error("Error: ${e.message}")
         }
     }
 }
