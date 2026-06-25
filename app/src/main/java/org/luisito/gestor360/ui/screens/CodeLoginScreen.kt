@@ -27,7 +27,7 @@ import org.luisito.gestor360.ui.theme.Gestor360Theme
 
 @Composable
 fun CodeLoginScreen(
-    onCodeValid: (username: String, userId: Int) -> Unit,
+    onCodeValid: (username: String, code: String) -> Unit,
     isLoading: Boolean = false,
     error: String? = null
 ) {
@@ -95,7 +95,7 @@ fun CodeLoginScreen(
                 Button(
                     onClick = {
                         if (username.isNotEmpty() && code.isNotEmpty()) {
-                            onCodeValid(username, 0) // userId se obtendrá del ViewModel
+                            onCodeValid(username, code)
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
