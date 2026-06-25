@@ -88,3 +88,50 @@ class CodeRepository {
         }
     }
 }
+
+    suspend fun createAuthUser(username: String, password: String): Boolean {
+        return try {
+            val supabase = SupabaseClientProvider.client
+            val email = "$username@gestor360.local"
+            
+            // Crear usuario en Supabase Auth usando API REST
+            val result = supabase.auth.admin.createUser(
+                email = email,
+                password = password,
+                emailConfirm = true
+            )
+            result.user != null
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    suspend fun loginWithPassword(username: String, password: String): Boolean {
+        return try {
+            val supabase = SupabaseClientProvider.client
+            val email = "$username@gestor360.local"
+            val result = supabase.auth.signInWithPassword(
+                email = email,
+                password = password
+            )
+            result.user != null
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    suspend fun getUserId(username: String): Int? {
+        return try {
+            val supabase = SupabaseClientProvider.client
+            val result = supabase.from("usuarios")
+                .select {
+                    filter {
+                        eq("username", username)
+                    }
+                }
+                .decodeAs<List<Map<String, Any>>>()
+            result.firstOrNull()?.get("id") as? Int
+        } catch (e: Exception) {
+            null
+        }
+    }
