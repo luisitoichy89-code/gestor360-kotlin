@@ -66,7 +66,6 @@ class CodeRepository {
                     }
                 }
                 .decodeAs<List<Map<String, Any>>>()
-
             result.firstOrNull()?.get("device_approved") as? Boolean ?: false
         } catch (e: Exception) {
             false
@@ -83,7 +82,6 @@ class CodeRepository {
                     }
                 }
                 .decodeAs<List<Map<String, Any>>>()
-
             result.firstOrNull()?.get("device_id_pendiente") as? String
         } catch (e: Exception) {
             null
@@ -94,11 +92,13 @@ class CodeRepository {
         return try {
             val supabase = SupabaseClientProvider.client
             val email = "$username@gestor360.local"
-            val result = supabase.auth.signUpWith(Email) {
+            // Intentar crear usuario con signUp
+            supabase.auth.signUpWith(Email) {
                 this.email = email
                 this.password = password
             }
-            result.user != null
+            // Si no lanza excepción, el usuario se creó
+            true
         } catch (e: Exception) {
             false
         }
@@ -108,11 +108,12 @@ class CodeRepository {
         return try {
             val supabase = SupabaseClientProvider.client
             val email = "$username@gestor360.local"
-            val result = supabase.auth.signInWith(Email) {
+            // Intentar login
+            supabase.auth.signInWith(Email) {
                 this.email = email
                 this.password = password
             }
-            result.user != null
+            true
         } catch (e: Exception) {
             false
         }
