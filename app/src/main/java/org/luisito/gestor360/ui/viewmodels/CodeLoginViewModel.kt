@@ -12,6 +12,19 @@ import org.luisito.gestor360.data.repository.CodeRepository
 import org.luisito.gestor360.utils.DeviceIdManager
 import org.luisito.gestor360.utils.SessionManager
 
+data class CodeLoginUiState(
+    val isLoading: Boolean = false,
+    val isCodeValid: Boolean = false,
+    val passwordCreated: Boolean = false,
+    val isDeviceSaved: Boolean = false,
+    val isLoggedIn: Boolean = false,
+    val userId: Int? = null,
+    val username: String = "",
+    val rol: String? = null,
+    val recoverySent: Boolean = false,
+    val error: String? = null
+)
+
 class CodeLoginViewModel(
     private val context: Context,
     private val codeRepository: CodeRepository = CodeRepository()
@@ -71,7 +84,6 @@ class CodeLoginViewModel(
                 val saved = codeRepository.saveDeviceId(userId, deviceId)
 
                 if (saved) {
-                    // Guardar sesión local
                     sessionManager.saveSession(userId, username, _uiState.value.rol ?: "seller")
                     _uiState.update {
                         it.copy(
@@ -104,7 +116,6 @@ class CodeLoginViewModel(
             _uiState.update { it.copy(isLoading = true, error = null) }
 
             try {
-                // 1. Autenticar en Supabase Auth
                 val authSuccess = codeRepository.loginWithPassword(username, password)
 
                 if (!authSuccess) {
@@ -117,7 +128,6 @@ class CodeLoginViewModel(
                     return@launch
                 }
 
-                // 2. Obtener userId
                 val userId = codeRepository.getUserId(username)
                 if (userId == null) {
                     _uiState.update {
@@ -129,7 +139,6 @@ class CodeLoginViewModel(
                     return@launch
                 }
 
-                // 3. Verificar Android ID
                 val deviceId = DeviceIdManager.getDeviceId(context)
                 val deviceVerified = codeRepository.verifyDevice(userId, deviceId)
 
@@ -143,7 +152,6 @@ class CodeLoginViewModel(
                     return@launch
                 }
 
-                // 4. Guardar sesión
                 val usernameSaved = _uiState.value.username.ifEmpty { username }
                 sessionManager.saveSession(userId, usernameSaved, _uiState.value.rol ?: "seller")
 
@@ -165,40 +173,6 @@ class CodeLoginViewModel(
             }
         }
     }
-
-    fun checkSession(): Boolean {
-        return sessionManager.isLoggedIn()
-    }
-
-    fun getSessionData(): Triple<Int, String, String> {
-        return Triple(
-            sessionManager.getUserId(),
-            sessionManager.getUsername(),
-            sessionManager.getRol()
-        )
-    }
-
-    fun logout() {
-        sessionManager.clear()
-        _uiState.update { CodeLoginUiState() }
-    }
-
-    fun resetState() {
-        _uiState.update { CodeLoginUiState() }
-    }
-}
-
-data class CodeLoginUiState(
-    val isLoading: Boolean = false,
-    val isCodeValid: Boolean = false,
-    val passwordCreated: Boolean = false,
-    val isDeviceSaved: Boolean = false,
-    val isLoggedIn: Boolean = false,
-    val userId: Int? = null,
-    val username: String = "",
-    val rol: String? = null,
-    val error: String? = null
-)
 
     fun requestRecovery(username: String) {
         viewModelScope.launch {
@@ -226,6 +200,28 @@ data class CodeLoginUiState(
         }
     }
 
+    fun checkSession(): Boolean {
+        return sessionManager.isLoggedIn()
+    }
+
+    fun getSessionData(): Triple<Int, String, String> {
+        return Triple(
+            sessionManager.getUserId(),
+            sessionManager.getUsername(),
+            sessionManager.getRol()
+        )
+    }
+
+    fun logout() {
+        sessionManager.clear()
+        _uiState.update { CodeLoginUiState() }
+    }
+
+    fun resetState() {
+        _uiState.update { CodeLoginUiState() }
+    }
+
     fun clearRecoveryState() {
         _uiState.update { it.copy(recoverySent = false) }
     }
+}
