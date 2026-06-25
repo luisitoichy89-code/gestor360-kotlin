@@ -1,6 +1,7 @@
 package org.luisito.gestor360.data.repository
 
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.postgrest.from
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.models.CodeValidationResult
@@ -93,11 +94,10 @@ class CodeRepository {
         return try {
             val supabase = SupabaseClientProvider.client
             val email = "$username@gestor360.local"
-            // Usar signUp con email
-            val result = supabase.auth.signUpWithEmail(
-                email = email,
-                password = password
-            )
+            val result = supabase.auth.signUpWith(Email) {
+                this.email = email
+                this.password = password
+            }
             result.user != null
         } catch (e: Exception) {
             false
@@ -108,10 +108,10 @@ class CodeRepository {
         return try {
             val supabase = SupabaseClientProvider.client
             val email = "$username@gestor360.local"
-            val result = supabase.auth.signInWithPassword(
-                email = email,
-                password = password
-            )
+            val result = supabase.auth.signInWith(Email) {
+                this.email = email
+                this.password = password
+            }
             result.user != null
         } catch (e: Exception) {
             false
