@@ -1,0 +1,90 @@
+package org.luisito.gestor360.data.repository
+
+import io.github.jan.supabase.postgrest.from
+import org.luisito.gestor360.data.SupabaseClientProvider
+import org.luisito.gestor360.data.models.CodeValidationResult
+
+class CodeRepository {
+
+    suspend fun validateCode(username: String, code: String): CodeValidationResult {
+        return try {
+            val supabase = SupabaseClientProvider.client
+            val result = supabase.from("usuarios")
+                .select {
+                    filter {
+                        eq("username", username)
+                        eq("codigo_activacion", code)
+                    }
+                }
+                .decodeAs<List<Map<String, Any>>>()
+
+            if (result.isNotEmpty()) {
+                val user = result.first()
+                CodeValidationResult(
+                    isValid = true,
+                    userId = user["id"] as? Int,
+                    username = user["username"] as? String,
+                    rol = user["rol"] as? String
+                )
+            } else {
+                CodeValidationResult(isValid = false, message = "Código inválido o usuario incorrecto")
+            }
+        } catch (e: Exception) {
+            CodeValidationResult(isValid = false, message = "Error al validar código: ${e.message}")
+        }
+    }
+
+    suspend fun saveDeviceId(userId: Int, deviceId: String): Boolean {
+        return try {
+            val supabase = SupabaseClientProvider.client
+            supabase.from("usuarios")
+                .update(
+                    mapOf(
+                        "device_id_pendiente" to deviceId,
+                        "device_approved" to false
+                    )
+                ) {
+                    filter {
+                        eq("id", userId)
+                    }
+                }
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    suspend fun checkDeviceApproved(userId: Int): Boolean {
+        return try {
+            val supabase = SupabaseClientProvider.client
+            val result = supabase.from("usuarios")
+                .select {
+                    filter {
+                        eq("id", userId)
+                    }
+                }
+                .decodeAs<List<Map<String, Any>>>()
+
+            result.firstOrNull()?.get("device_approved") as? Boolean ?: false
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    suspend fun getDeviceIdPendiente(userId: Int): String? {
+        return try {
+            val supabase = SupabaseClientProvider.client
+            val result = supabase.from("usuarios")
+                .select {
+                    filter {
+                        eq("id", userId)
+                    }
+                }
+                .decodeAs<List<Map<String, Any>>>()
+
+            result.firstOrNull()?.get("device_id_pendiente") as? String
+        } catch (e: Exception) {
+            null
+        }
+    }
+}
