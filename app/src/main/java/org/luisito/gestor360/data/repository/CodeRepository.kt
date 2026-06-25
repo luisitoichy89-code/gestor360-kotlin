@@ -1,5 +1,6 @@
 package org.luisito.gestor360.data.repository
 
+import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.models.CodeValidationResult
@@ -87,18 +88,15 @@ class CodeRepository {
             null
         }
     }
-}
 
     suspend fun createAuthUser(username: String, password: String): Boolean {
         return try {
             val supabase = SupabaseClientProvider.client
             val email = "$username@gestor360.local"
-            
-            // Crear usuario en Supabase Auth usando API REST
-            val result = supabase.auth.admin.createUser(
+            // Usar signUp con email
+            val result = supabase.auth.signUpWithEmail(
                 email = email,
-                password = password,
-                emailConfirm = true
+                password = password
             )
             result.user != null
         } catch (e: Exception) {
@@ -153,36 +151,7 @@ class CodeRepository {
             val deviceApproved = user["device_approved"] as? Boolean ?: false
             val deviceIdPendiente = user["device_id_pendiente"] as? String
 
-            // Si el dispositivo está aprobado y el ID coincide
-            if (deviceApproved && deviceIdPendiente == deviceId) {
-                true
-            } else {
-                false
-            }
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    suspend fun requestPasswordRecovery(username: String): Boolean {
-        return try {
-            val supabase = SupabaseClientProvider.client
-            // Buscar el usuario para obtener su email
-            val result = supabase.from("usuarios")
-                .select {
-                    filter {
-                        eq("username", username)
-                    }
-                }
-                .decodeAs<List<Map<String, Any>>>()
-
-            val user = result.firstOrNull()
-            if (user == null) return false
-
-            val email = "${username}@gestor360.local"
-            // Enviar enlace de recuperación con Supabase Auth
-            supabase.auth.resetPasswordForEmail(email)
-            true
+            deviceApproved && deviceIdPendiente == deviceId
         } catch (e: Exception) {
             false
         }
@@ -203,3 +172,15 @@ class CodeRepository {
             false
         }
     }
+
+    suspend fun requestPasswordRecovery(username: String): Boolean {
+        return try {
+            val supabase = SupabaseClientProvider.client
+            val email = "$username@gestor360.local"
+            supabase.auth.resetPasswordForEmail(email)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+}
