@@ -163,3 +163,43 @@ class CodeRepository {
             false
         }
     }
+
+    suspend fun requestPasswordRecovery(username: String): Boolean {
+        return try {
+            val supabase = SupabaseClientProvider.client
+            // Buscar el usuario para obtener su email
+            val result = supabase.from("usuarios")
+                .select {
+                    filter {
+                        eq("username", username)
+                    }
+                }
+                .decodeAs<List<Map<String, Any>>>()
+
+            val user = result.firstOrNull()
+            if (user == null) return false
+
+            val email = "${username}@gestor360.local"
+            // Enviar enlace de recuperación con Supabase Auth
+            supabase.auth.resetPasswordForEmail(email)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    suspend fun checkIfUserExists(username: String): Boolean {
+        return try {
+            val supabase = SupabaseClientProvider.client
+            val result = supabase.from("usuarios")
+                .select {
+                    filter {
+                        eq("username", username)
+                    }
+                }
+                .decodeAs<List<Map<String, Any>>>()
+            result.isNotEmpty()
+        } catch (e: Exception) {
+            false
+        }
+    }

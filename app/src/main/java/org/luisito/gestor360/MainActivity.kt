@@ -43,6 +43,8 @@ fun Gestor360App() {
     var currentUsername by remember { mutableStateOf("") }
     var currentUserId by remember { mutableStateOf(0) }
     var isLoading by remember { mutableStateOf(true) }
+    var loginUsername by remember { mutableStateOf("") }
+    var loginPassword by remember { mutableStateOf("") }
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val sessionManager = remember { SessionManager(context) }
@@ -123,15 +125,14 @@ fun Gestor360App() {
     } else if (!isLoggedIn && !isFirstLogin) {
         LoginScreen(
             onLoginSuccess = {
-                // Obtener username y password del estado
-                // TODO: Conectar con ViewModel
-                isLoggedIn = true
+                codeLoginViewModel.loginWithPassword(loginUsername, loginPassword)
             },
             onRecovery = {
-                // TODO: Implementar recuperación
+                codeLoginViewModel.requestRecovery(loginUsername)
             },
             isLoading = uiState.isLoading,
-            error = uiState.error
+            error = uiState.error,
+            recoverySent = uiState.recoverySent
         )
     } else {
         DashboardScreen(

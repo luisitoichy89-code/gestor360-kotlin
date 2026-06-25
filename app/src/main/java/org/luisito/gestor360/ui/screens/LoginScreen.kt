@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -32,10 +33,13 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     onRecovery: () -> Unit,
     isLoading: Boolean = false,
-    error: String? = null
+    error: String? = null,
+    recoverySent: Boolean = false
 ) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var showRecoveryDialog by remember { mutableStateOf(false) }
+    var recoveryUsername by remember { mutableStateOf("") }
 
     Gestor360Theme {
         Surface(
@@ -94,6 +98,15 @@ fun LoginScreen(
                     )
                 }
 
+                if (recoverySent) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "✅ Solicitud de recuperación enviada. Revisa tu correo.",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Button(
@@ -118,11 +131,49 @@ fun LoginScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 TextButton(
-                    onClick = onRecovery
+                    onClick = { showRecoveryDialog = true }
                 ) {
                     Text("¿Olvidaste tu contraseña?")
                 }
             }
         }
+    }
+
+    // Diálogo de recuperación
+    if (showRecoveryDialog) {
+        AlertDialog(
+            onDismissRequest = { showRecoveryDialog = false },
+            title = { Text("🔐 Recuperar contraseña") },
+            text = {
+                Column {
+                    Text("Ingresa tu usuario para recibir un enlace de recuperación:")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = recoveryUsername,
+                        onValueChange = { recoveryUsername = it },
+                        label = { Text("Usuario") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (recoveryUsername.isNotEmpty()) {
+                            onRecovery()
+                            showRecoveryDialog = false
+                        }
+                    }
+                ) {
+                    Text("Enviar enlace")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRecoveryDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 }

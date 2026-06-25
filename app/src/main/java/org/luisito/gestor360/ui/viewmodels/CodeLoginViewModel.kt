@@ -199,3 +199,33 @@ data class CodeLoginUiState(
     val rol: String? = null,
     val error: String? = null
 )
+
+    fun requestRecovery(username: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+
+            val userExists = codeRepository.checkIfUserExists(username)
+            if (!userExists) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "Usuario no encontrado"
+                    )
+                }
+                return@launch
+            }
+
+            val success = codeRepository.requestPasswordRecovery(username)
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    recoverySent = success,
+                    error = if (!success) "Error al enviar la solicitud de recuperación" else null
+                )
+            }
+        }
+    }
+
+    fun clearRecoveryState() {
+        _uiState.update { it.copy(recoverySent = false) }
+    }
