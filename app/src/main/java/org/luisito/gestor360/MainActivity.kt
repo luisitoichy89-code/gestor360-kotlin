@@ -42,6 +42,8 @@ fun Gestor360App() {
     var currentUsername by remember { mutableStateOf("") }
     var currentUserId by remember { mutableStateOf(0) }
     var isLoading by remember { mutableStateOf(true) }
+    var code by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val sessionManager = remember { SessionManager(context) }
@@ -51,7 +53,6 @@ fun Gestor360App() {
     )
     val uiState by codeLoginViewModel.uiState.collectAsState()
 
-    // Verificar sesión al iniciar
     LaunchedEffect(Unit) {
         if (sessionManager.isLoggedIn()) {
             val (userId, username, rol) = codeLoginViewModel.getSessionData()
@@ -63,7 +64,6 @@ fun Gestor360App() {
         isLoading = false
     }
 
-    // Manejar flujo de primer login
     LaunchedEffect(uiState.isCodeValid) {
         if (uiState.isCodeValid && uiState.userId != null) {
             currentUsername = uiState.username
@@ -91,17 +91,10 @@ fun Gestor360App() {
     if (isLoading) {
         // Pantalla de carga
     } else if (!isLicensed) {
-        ActivationScreen(
-            onLicenseValid = { isLicensed = true }
-        )
+        ActivationScreen(onLicenseValid = { isLicensed = true })
     } else if (showPendingApproval) {
-        PendingApprovalScreen(
-            username = currentUsername
-        )
+        PendingApprovalScreen(username = currentUsername)
     } else if (showCreatePassword) {
-        var password by remember { mutableStateOf("") }
-        var confirmPassword by remember { mutableStateOf("") }
-        
         CreatePasswordScreen(
             username = currentUsername,
             userId = currentUserId,
