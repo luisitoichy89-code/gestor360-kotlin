@@ -135,3 +135,31 @@ class CodeRepository {
             null
         }
     }
+
+    suspend fun verifyDevice(userId: Int, deviceId: String): Boolean {
+        return try {
+            val supabase = SupabaseClientProvider.client
+            val result = supabase.from("usuarios")
+                .select {
+                    filter {
+                        eq("id", userId)
+                    }
+                }
+                .decodeAs<List<Map<String, Any>>>()
+
+            val user = result.firstOrNull()
+            if (user == null) return false
+
+            val deviceApproved = user["device_approved"] as? Boolean ?: false
+            val deviceIdPendiente = user["device_id_pendiente"] as? String
+
+            // Si el dispositivo está aprobado y el ID coincide
+            if (deviceApproved && deviceIdPendiente == deviceId) {
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }

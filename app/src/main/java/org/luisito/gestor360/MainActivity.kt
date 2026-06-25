@@ -20,7 +20,7 @@ import org.luisito.gestor360.ui.screens.activation.ActivationScreen
 import org.luisito.gestor360.ui.theme.Gestor360Theme
 import org.luisito.gestor360.ui.viewmodels.CodeLoginViewModel
 import org.luisito.gestor360.ui.viewmodels.CodeLoginViewModelFactory
-import org.luisito.gestor360.utils.DeviceIdManager
+import org.luisito.gestor360.utils.SessionManager
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -42,11 +42,27 @@ fun Gestor360App() {
     var showNormalLogin by remember { mutableStateOf(false) }
     var currentUsername by remember { mutableStateOf("") }
     var currentUserId by remember { mutableStateOf(0) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val sessionManager = remember { SessionManager(context) }
 
     val codeLoginViewModel: CodeLoginViewModel = viewModel(
-        factory = CodeLoginViewModelFactory(androidx.compose.ui.platform.LocalContext.current)
+        factory = CodeLoginViewModelFactory(context)
     )
     val uiState by codeLoginViewModel.uiState.collectAsState()
+
+    // Verificar sesión al iniciar
+    LaunchedEffect(Unit) {
+        if (sessionManager.isLoggedIn()) {
+            val (userId, username, rol) = codeLoginViewModel.getSessionData()
+            currentUserId = userId
+            currentUsername = username
+            isLoggedIn = true
+            isFirstLogin = false
+        }
+        isLoading = false
+    }
 
     // Manejar flujo de primer login
     LaunchedEffect(uiState.isCodeValid) {
@@ -65,7 +81,17 @@ fun Gestor360App() {
         }
     }
 
-    if (!isLicensed) {
+    LaunchedEffect(uiState.isLoggedIn) {
+        if (uiState.isLoggedIn) {
+            isLoggedIn = true
+            currentUsername = uiState.username
+            currentUserId = uiState.userId ?: 0
+        }
+    }
+
+    if (isLoading) {
+        // Pantalla de carga
+    } else if (!isLicensed) {
         ActivationScreen(
             onLicenseValid = { isLicensed = true }
         )
@@ -86,8 +112,7 @@ fun Gestor360App() {
             isLoading = uiState.isLoading,
             error = uiState.error
         )
-    } else if (!isLoggedIn && !showNormalLogin) {
-        // Mostrar pantalla de login con código solo si es primer login y no tiene contraseña
+    } else if (!isLoggedIn && isFirstLogin) {
         CodeLoginScreen(
             onCodeValid = { username, code ->
                 codeLoginViewModel.validateCode(username, code)
@@ -95,26 +120,30 @@ fun Gestor360App() {
             isLoading = uiState.isLoading,
             error = uiState.error
         )
-    } else if (!isLoggedIn && showNormalLogin) {
+    } else if (!isLoggedIn && !isFirstLogin) {
         LoginScreen(
             onLoginSuccess = {
-                // Verificar Android ID y rol
+                // Obtener username y password del estado
+                // TODO: Conectar con ViewModel
                 isLoggedIn = true
             },
             onRecovery = {
                 // TODO: Implementar recuperación
             },
-            isLoading = false,
-            error = null
+            isLoading = uiState.isLoading,
+            error = uiState.error
         )
     } else {
         DashboardScreen(
-            userRol = "admin",
-            username = currentUsername.ifEmpty { "Usuario" },
+            userRol = sessionManager.getRol(),
+            username = currentUsername.ifEmpty { sessionManager.getUsername() },
             onMenuClick = {},
             onLogout = {
+                codeLoginViewModel.logout()
                 isLoggedIn = false
-                showNormalLogin = true
+                isFirstLogin = true
+                currentUsername = ""
+                currentUserId = 0
             }
         )
     }
