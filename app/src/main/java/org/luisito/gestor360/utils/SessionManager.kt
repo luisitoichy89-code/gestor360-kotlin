@@ -6,30 +6,31 @@ import android.content.SharedPreferences
 class SessionManager(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("gestor360_session", Context.MODE_PRIVATE)
 
-    fun saveSession(userId: Int, username: String, rol: String) {
+    fun saveSession(userId: Long, username: String, rol: String, almacenId: String, clienteId: String, nombre: String? = null) {
         prefs.edit()
             .putBoolean("is_logged_in", true)
-            .putInt("user_id", userId)
+            .putLong("user_id", userId)
             .putString("username", username)
             .putString("rol", rol)
+            .putString("almacen_id", almacenId)
+            .putString("cliente_id", clienteId)
+            .putString("nombre", nombre ?: username)
             .apply()
     }
 
-    fun isLoggedIn(): Boolean {
-        return prefs.getBoolean("is_logged_in", false)
-    }
+    fun isLoggedIn(): Boolean = prefs.getBoolean("is_logged_in", false)
 
-    fun getUserId(): Int {
-        return prefs.getInt("user_id", 0)
-    }
+    fun getUserId(): Long = prefs.getLong("user_id", 0L)
 
-    fun getUsername(): String {
-        return prefs.getString("username", "") ?: ""
-    }
+    fun getUsername(): String = prefs.getString("username", "") ?: ""
 
-    fun getRol(): String {
-        return prefs.getString("rol", "seller") ?: "seller"
-    }
+    fun getNombre(): String = prefs.getString("nombre", "") ?: ""
+
+    fun getRol(): String = prefs.getString("rol", "seller") ?: "seller"
+
+    fun getAlmacenId(): String = prefs.getString("almacen_id", "1") ?: "1"
+
+    fun getClienteId(): String = prefs.getString("cliente_id", "") ?: ""
 
     fun clear() {
         prefs.edit().clear().apply()
