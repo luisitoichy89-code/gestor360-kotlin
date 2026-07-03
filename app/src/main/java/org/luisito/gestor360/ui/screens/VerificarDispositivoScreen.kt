@@ -45,9 +45,7 @@ fun VerificarDispositivoScreen(
             modifier = Modifier.size(64.dp),
             tint = MaterialTheme.colorScheme.primary
         )
-        Spacer(modifier = Modifier.height(16.dp))
         Text("Gestor360°", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(16.dp))
         Image(painter = painterResource(id = R.drawable.ic_logo), contentDescription = "Gestor360", modifier = Modifier.size(100.dp))
         Spacer(modifier = Modifier.height(8.dp))
         Text("Verifica este dispositivo para continuar", style = MaterialTheme.typography.bodyMedium)
@@ -75,7 +73,6 @@ fun VerificarDispositivoScreen(
         }
 
         uiState.mensajeError?.let { error ->
-            Spacer(modifier = Modifier.height(16.dp))
             Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
                 Text(
                     error,
