@@ -15,53 +15,81 @@ import org.luisito.gestor360.data.models.User
 import org.luisito.gestor360.ui.viewmodels.AccesoViewModel
 import org.luisito.gestor360.utils.DeviceIdManager
 
+/**
+ * Primera pantalla que ve cualquier usuario (admin o vendedor) al abrir la app:
+ * su Android ID y un botón "Verificar". Si el dispositivo está autorizado y la
+ * licencia del negocio está vigente, pasa a la pantalla de PIN.
+ */
 @Composable
 fun VerificarDispositivoScreen(
-    onVerificado: (User) -> Unit
+    onDispositivoAutorizado: (User) -> Unit,
+    viewModel: AccesoViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val viewModel: AccesoViewModel = viewModel()
+    val androidId = remember { DeviceIdManager.getFormattedDeviceId(context) }
+    val androidIdCrudo = remember { DeviceIdManager.getDeviceId(context) }
     val uiState by viewModel.uiState.collectAsState()
-    val deviceId = remember { DeviceIdManager.getDeviceId(context) }
 
-    LaunchedEffect(Unit) {
-        viewModel.verificarDispositivo(deviceId)
+    LaunchedEffect(uiState.usuarioVerificado) {
+        uiState.usuarioVerificado?.let { onDispositivoAutorizado(it) }
     }
 
-    Box(
+    Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
-        contentAlignment = Alignment.Center
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Icon(Icons.Default.PhoneAndroid, null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Gestor360°", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Verifica este dispositivo para continuar", style = MaterialTheme.typography.bodyMedium)
-                Spacer(modifier = Modifier.height(24.dp))
+        Icon(
+            Icons.Default.PhoneAndroid,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text("Gestor360°", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(8.dp))
+        Text("Verifica este dispositivo para continuar", style = MaterialTheme.typography.bodyMedium)
+        Spacer(modifier = Modifier.height(24.dp))
 
-                Text("ID del dispositivo:", style = MaterialTheme.typography.labelMedium)
-                Text(deviceId, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                when {
-                    uiState.isLoading -> CircularProgressIndicator()
-                    uiState.error != null -> Text(uiState.error!!, color = MaterialTheme.colorScheme.error)
-                    uiState.usuario != null -> {
-                        LaunchedEffect(uiState.usuario) {
-                            uiState.usuario?.let { onVerificado(it) }
-                        }
-                    }
-                    else -> Button(onClick = { viewModel.verificarDispositivo(deviceId) }) {
-                        Text("Verificar")
-                    }
-                }
+        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp)) {
+                Text("Android ID de este dispositivo", style = MaterialTheme.typography.labelMedium)
+                Spacer(modifier = Modifier.height(4.dp))
+                SelectionContainerCompat(androidId)
             }
         }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        if (uiState.verificando) {
+            CircularProgressIndicator()
+        } else {
+            Button(
+                onClick = { viewModel.verificarDispositivo(androidIdCrudo) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Verificar")
+            }
+        }
+
+        uiState.mensajeError?.let { error ->
+            Spacer(modifier = Modifier.height(16.dp))
+            Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    error,
+                    modifier = Modifier.padding(12.dp),
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SelectionContainerCompat(texto: String) {
+    // SelectionContainer permite copiar el Android ID fácilmente para pasárselo al admin.
+    androidx.compose.foundation.text.selection.SelectionContainer {
+        Text(texto, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
     }
 }
