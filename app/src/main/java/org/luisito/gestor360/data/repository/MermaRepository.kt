@@ -1,15 +1,16 @@
 package org.luisito.gestor360.data.repository
 
 import io.github.jan.supabase.postgrest.postgrest
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.models.MermaPendiente
 
 class MermaRepository {
-
     suspend fun getMermasPendientes(androidId: String): Result<List<MermaPendiente>> {
         return try {
             val mermas = SupabaseClientProvider.client.postgrest.rpc(
-                "get_mermas_pendientes", mapOf("p_android_id" to androidId)
+                "get_mermas_pendientes", buildJsonObject { put("p_android_id", androidId) }
             ).decodeList<MermaPendiente>()
             Result.success(mermas)
         } catch (e: Exception) { Result.failure(e) }
@@ -19,12 +20,12 @@ class MermaRepository {
         return try {
             SupabaseClientProvider.client.postgrest.rpc(
                 "crear_merma",
-                mapOf(
-                    "p_android_id" to androidId, "p_producto_id" to productoId,
-                    "p_producto_nombre" to productoNombre, "p_cantidad" to cantidad,
-                    "p_motivo" to motivo, "p_almacen_id" to almacenId,
-                    "p_solicitado_por" to solicitadoPor, "p_solicitado_por_nombre" to solicitadoPorNombre
-                )
+                buildJsonObject {
+                    put("p_android_id", androidId); put("p_producto_id", productoId)
+                    put("p_producto_nombre", productoNombre); put("p_cantidad", cantidad)
+                    put("p_motivo", motivo); put("p_almacen_id", almacenId)
+                    put("p_solicitado_por", solicitadoPor); put("p_solicitado_por_nombre", solicitadoPorNombre)
+                }
             )
             Result.success(Unit)
         } catch (e: Exception) { Result.failure(e) }
@@ -34,7 +35,7 @@ class MermaRepository {
         return try {
             SupabaseClientProvider.client.postgrest.rpc(
                 "resolver_merma",
-                mapOf("p_android_id" to androidId, "p_merma_id" to mermaId, "p_estado" to estado, "p_aprobado_por" to aprobadoPor)
+                buildJsonObject { put("p_android_id", androidId); put("p_merma_id", mermaId); put("p_estado", estado); put("p_aprobado_por", aprobadoPor) }
             )
             Result.success(Unit)
         } catch (e: Exception) { Result.failure(e) }

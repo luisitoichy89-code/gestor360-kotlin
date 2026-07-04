@@ -1,15 +1,16 @@
 package org.luisito.gestor360.data.repository
 
 import io.github.jan.supabase.postgrest.postgrest
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.models.Product
 
 class ProductRepository {
-
     suspend fun getProducts(androidId: String, almacenId: String): Result<List<Product>> {
         return try {
             val productos = SupabaseClientProvider.client.postgrest.rpc(
-                "get_productos", mapOf("p_android_id" to androidId)
+                "get_productos", buildJsonObject { put("p_android_id", androidId) }
             ).decodeList<Product>().filter { it.almacen_id == almacenId }
             Result.success(productos)
         } catch (e: Exception) { Result.failure(e) }
@@ -19,7 +20,7 @@ class ProductRepository {
         return try {
             SupabaseClientProvider.client.postgrest.rpc(
                 "crear_producto",
-                mapOf("p_android_id" to androidId, "p_nombre" to nombre, "p_precio" to precio, "p_stock" to stock, "p_almacen_id" to almacenId)
+                buildJsonObject { put("p_android_id", androidId); put("p_nombre", nombre); put("p_precio", precio); put("p_stock", stock); put("p_almacen_id", almacenId) }
             )
             Result.success(Unit)
         } catch (e: Exception) { Result.failure(e) }
@@ -29,7 +30,7 @@ class ProductRepository {
         return try {
             SupabaseClientProvider.client.postgrest.rpc(
                 "actualizar_producto",
-                mapOf("p_android_id" to androidId, "p_id" to id, "p_nombre" to nombre, "p_precio" to precio, "p_stock" to stock)
+                buildJsonObject { put("p_android_id", androidId); put("p_id", id); put("p_nombre", nombre); put("p_precio", precio); put("p_stock", stock) }
             )
             Result.success(Unit)
         } catch (e: Exception) { Result.failure(e) }
@@ -38,7 +39,7 @@ class ProductRepository {
     suspend fun deleteProduct(id: Long, androidId: String): Result<Unit> {
         return try {
             SupabaseClientProvider.client.postgrest.rpc(
-                "eliminar_producto", mapOf("p_android_id" to androidId, "p_id" to id)
+                "eliminar_producto", buildJsonObject { put("p_android_id", androidId); put("p_id", id) }
             )
             Result.success(Unit)
         } catch (e: Exception) { Result.failure(e) }

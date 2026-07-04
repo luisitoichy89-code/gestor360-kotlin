@@ -1,15 +1,16 @@
 package org.luisito.gestor360.data.repository
 
 import io.github.jan.supabase.postgrest.postgrest
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.models.Tarjeta
 
 class TarjetaRepository {
-
     suspend fun getTarjetas(androidId: String): Result<List<Tarjeta>> {
         return try {
             val tarjetas = SupabaseClientProvider.client.postgrest.rpc(
-                "get_tarjetas", mapOf("p_android_id" to androidId)
+                "get_tarjetas", buildJsonObject { put("p_android_id", androidId) }
             ).decodeList<Tarjeta>()
             Result.success(tarjetas)
         } catch (e: Exception) { Result.failure(e) }
@@ -19,7 +20,7 @@ class TarjetaRepository {
         return try {
             SupabaseClientProvider.client.postgrest.rpc(
                 "crear_tarjeta",
-                mapOf("p_android_id" to androidId, "p_banco" to banco, "p_numero" to numero, "p_titular" to titular, "p_almacen_id" to almacenId)
+                buildJsonObject { put("p_android_id", androidId); put("p_banco", banco); put("p_numero", numero); put("p_titular", titular); put("p_almacen_id", almacenId) }
             )
             Result.success(Unit)
         } catch (e: Exception) { Result.failure(e) }
