@@ -1,7 +1,6 @@
 package org.luisito.gestor360.data.repository
 
 import io.github.jan.supabase.postgrest.postgrest
-import io.github.jan.supabase.postgrest.from
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.luisito.gestor360.data.SupabaseClientProvider
@@ -21,8 +20,7 @@ class TurnoRepository {
     suspend fun abrirTurno(androidId: String, efectivoInicial: Double, usuarioId: Long, almacenId: String): Result<Unit> {
         return try {
             SupabaseClientProvider.client.postgrest.rpc(
-                "abrir_turno",
-                buildJsonObject {
+                "abrir_turno", buildJsonObject {
                     put("p_android_id", androidId)
                     put("p_efectivo_inicial", efectivoInicial)
                     put("p_usuario_id", usuarioId)
@@ -36,8 +34,7 @@ class TurnoRepository {
     suspend fun cerrarTurno(androidId: String, turnoId: Long): Result<Turno> {
         return try {
             val result = SupabaseClientProvider.client.postgrest.rpc(
-                "cerrar_turno",
-                buildJsonObject { put("p_android_id", androidId); put("p_turno_id", turnoId) }
+                "cerrar_turno", buildJsonObject { put("p_android_id", androidId); put("p_turno_id", turnoId) }
             ).decodeSingle<Turno>()
             Result.success(result)
         } catch (e: Exception) { Result.failure(e) }

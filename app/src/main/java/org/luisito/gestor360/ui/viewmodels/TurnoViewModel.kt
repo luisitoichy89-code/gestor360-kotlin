@@ -39,7 +39,6 @@ class TurnoViewModel(
 
     fun abrirTurno(efectivoInicial: Double, usuarioId: Long, almacenId: String) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
             repository.abrirTurno(androidIdActual, efectivoInicial, usuarioId, almacenId)
                 .onSuccess { cargar(androidIdActual); _uiState.value = _uiState.value.copy(mensaje = "Turno abierto") }
                 .onFailure { _uiState.value = _uiState.value.copy(error = it.message) }
@@ -48,7 +47,6 @@ class TurnoViewModel(
 
     fun cerrarTurno(turnoId: Long) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
             repository.cerrarTurno(androidIdActual, turnoId)
                 .onSuccess { _uiState.value = _uiState.value.copy(resumenCierre = it, turnoAbierto = null, mensaje = "Turno cerrado"); cargar(androidIdActual) }
                 .onFailure { _uiState.value = _uiState.value.copy(error = it.message) }

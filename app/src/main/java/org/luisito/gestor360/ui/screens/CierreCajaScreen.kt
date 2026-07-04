@@ -7,7 +7,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -48,7 +47,7 @@ fun CierreCajaScreen(
                     }
                 }
                 else -> {
-                    Text("No hay turno abierto", style = MaterialTheme.typography.bodyLarge)
+                    Text("No hay turno abierto")
                     Spacer(modifier = Modifier.height(8.dp))
                     Button(onClick = { mostrarAbrirDialog = true }, modifier = Modifier.fillMaxWidth()) { Text("Abrir Turno") }
                 }
@@ -72,14 +71,16 @@ fun CierreCajaScreen(
             Spacer(modifier = Modifier.height(16.dp))
             Text("Historial", style = MaterialTheme.typography.titleSmall)
             if (uiState.historial.isEmpty()) Text("Sin turnos anteriores")
-            else LazyColumn { items(uiState.historial) { t ->
-                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text("${t.apertura?.take(10)} - ${t.cierre?.take(10) ?: "Abierto"}")
-                        Text("Ventas: ${t.total_ventas} CUP · Dif: ${t.diferencia} CUP", style = MaterialTheme.typography.bodySmall)
+            else LazyColumn {
+                items(uiState.historial) { t ->
+                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text("${t.apertura?.take(10)} - ${t.cierre?.take(10) ?: "Abierto"}")
+                            Text("Ventas: ${t.total_ventas} CUP · Dif: ${t.diferencia} CUP", style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                 }
-            }}
+            }
         }
     }
 
