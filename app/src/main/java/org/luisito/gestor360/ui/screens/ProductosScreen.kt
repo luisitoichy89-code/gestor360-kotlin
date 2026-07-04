@@ -2,11 +2,14 @@ package org.luisito.gestor360.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Inventory2
@@ -30,13 +33,8 @@ import org.luisito.gestor360.ui.components.EstadoVacio
 import org.luisito.gestor360.ui.viewmodels.MermaViewModel
 import org.luisito.gestor360.ui.viewmodels.ProductViewModel
 
-/**
- * CRUD de productos/inventario para el local activo.
- * El manejo de merma depende del rol:
- *  - admin: registra la merma directamente (descuenta stock al instante).
- *  - seller: solo "propone" la merma; queda pendiente hasta que el admin la
- *    aprueba desde AprobacionesScreen (no descuenta stock todavía).
- */
+private const val PRODUCTOS_POR_PAGINA = 25
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductosScreen(
@@ -51,6 +49,8 @@ fun ProductosScreen(
     val mermaUiState by mermaViewModel.uiState.collectAsState()
 
     var query by remember { mutableStateOf("") }
+    var categoriaSeleccionada by remember { mutableStateOf<String?>(null) }
+    var pagina by remember { mutableStateOf(0) }
     var productoEnEdicion by remember { mutableStateOf<Product?>(null) }
     var mostrarFormulario by remember { mutableStateOf(false) }
     var productoParaMerma by remember { mutableStateOf<Product?>(null) }
@@ -58,10 +58,26 @@ fun ProductosScreen(
 
     LaunchedEffect(androidId) { viewModel.cargar(androidId) }
 
-    val filtrados = remember(uiState.productos, query) {
-        if (query.isBlank()) uiState.productos
-        else uiState.productos.filter { it.nombre.contains(query, ignoreCase = true) }
+    val categorias = remember(uiState.productos) {
+        uiState.productos.mapNotNull { it.categoria?.takeIf { c -> c.isNotBlank() } }.distinct().sorted()
     }
+
+    val filtrados = remember(uiState.productos, query, categoriaSeleccionada) {
+        uiState.productos.filter { producto ->
+            val coincideNombre = query.isBlank() || producto.nombre.contains(query, ignoreCase = true)
+            val coincideCategoria = categoriaSeleccionada == null || producto.categoria == categoriaSeleccionada
+            coincideNombre && coincideCategoria
+        }
+    }
+
+    // Si el filtro cambia y la página actual queda fuera de rango, vuelve a la primera.
+    LaunchedEffect(query, categoriaSeleccionada, uiState.productos) {
+        pagina = 0
+    }
+
+    val totalPaginas = maxOf(1, (filtrados.size + PRODUCTOS_POR_PAGINA - 1) / PRODUCTOS_POR_PAGINA)
+    val paginaSegura = pagina.coerceIn(0, totalPaginas - 1)
+    val pagina0 = filtrados.drop(paginaSegura * PRODUCTOS_POR_PAGINA).take(PRODUCTOS_POR_PAGINA)
 
     Scaffold(
         topBar = {
@@ -69,7 +85,12 @@ fun ProductosScreen(
                 title = { Text("Productos") },
                 navigationIcon = {
                     if (onBack != null) {
-                        IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Volver") }
+                        IconButton(onClick = {
+                            // La flecha de arriba sale de la paginación primero, no de la pantalla.
+                            if (paginaSegura > 0) pagina = 0 else onBack()
+                        }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+                        }
                     }
                 },
                 actions = {
@@ -89,27 +110,51 @@ fun ProductosScreen(
             }
         }
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
 
-            mermaUiState.mensaje?.let { mensaje ->
-                Surface(color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                    Text(mensaje, modifier = Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Column(modifier = Modifier.padding(16.dp)) {
+                mermaUiState.mensaje?.let { mensaje ->
+                    Surface(color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                        Text(mensaje, modifier = Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    }
+                    LaunchedEffect(mensaje) {
+                        kotlinx.coroutines.delay(2500)
+                        mermaViewModel.clearMensaje()
+                    }
                 }
-                LaunchedEffect(mensaje) {
-                    kotlinx.coroutines.delay(2500)
-                    mermaViewModel.clearMensaje()
+
+                BuscadorField(query = query, onQueryChange = { query = it }, placeholder = "Buscar producto...")
+
+                if (categorias.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item {
+                            FilterChip(
+                                selected = categoriaSeleccionada == null,
+                                onClick = { categoriaSeleccionada = null },
+                                label = { Text("Todas") }
+                            )
+                        }
+                        items(categorias) { categoria ->
+                            FilterChip(
+                                selected = categoriaSeleccionada == categoria,
+                                onClick = { categoriaSeleccionada = if (categoriaSeleccionada == categoria) null else categoria },
+                                label = { Text(categoria) }
+                            )
+                        }
+                    }
                 }
             }
-
-            BuscadorField(query = query, onQueryChange = { query = it }, placeholder = "Buscar producto...")
-            Spacer(modifier = Modifier.height(12.dp))
 
             when {
                 uiState.isLoading -> EstadoCargando()
                 uiState.error != null -> EstadoError(uiState.error ?: "Error desconocido") { viewModel.refrescar() }
-                filtrados.isEmpty() -> EstadoVacio(if (query.isBlank()) "Aún no hay productos en este local" else "Sin resultados para \"$query\"")
-                else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(filtrados, key = { it.id }) { producto ->
+                filtrados.isEmpty() -> EstadoVacio(if (query.isBlank() && categoriaSeleccionada == null) "Aún no hay productos en este local" else "Sin resultados")
+                else -> LazyColumn(
+                    modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(pagina0, key = { it.id }) { producto ->
                         ProductoCard(
                             producto = producto,
                             esAdmin = esAdmin,
@@ -118,8 +163,31 @@ fun ProductosScreen(
                             onEliminar = { productoAEliminar = producto }
                         )
                     }
-                    item { Spacer(modifier = Modifier.height(72.dp)) }
+                    item { Spacer(modifier = Modifier.height(8.dp)) }
                 }
+            }
+
+            if (filtrados.isNotEmpty() && totalPaginas > 1) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = { if (paginaSegura > 0) pagina = paginaSegura - 1 }, enabled = paginaSegura > 0) {
+                        Icon(Icons.Default.ChevronLeft, contentDescription = null)
+                        Text("Anterior")
+                    }
+                    Text("Página ${paginaSegura + 1} de $totalPaginas", style = MaterialTheme.typography.bodySmall)
+                    TextButton(
+                        onClick = { if (paginaSegura < totalPaginas - 1) pagina = paginaSegura + 1 },
+                        enabled = paginaSegura < totalPaginas - 1
+                    ) {
+                        Text("Siguiente")
+                        Icon(Icons.Default.ChevronRight, contentDescription = null)
+                    }
+                }
+            } else {
+                Spacer(modifier = Modifier.height(72.dp))
             }
         }
     }
@@ -127,12 +195,13 @@ fun ProductosScreen(
     if (mostrarFormulario && esAdmin) {
         ProductoFormDialog(
             producto = productoEnEdicion,
+            categoriasExistentes = categorias,
             isSaving = uiState.isSaving,
             onDismiss = { mostrarFormulario = false },
-            onGuardar = { nombre, precio, stock ->
+            onGuardar = { nombre, precio, stock, ubicacion, categoria ->
                 val existente = productoEnEdicion
-                if (existente == null) viewModel.crear(nombre, precio, stock)
-                else viewModel.editar(existente.id, nombre, precio, stock)
+                if (existente == null) viewModel.crear(nombre, precio, stock, ubicacion, categoria)
+                else viewModel.editar(existente.id, nombre, precio, stock, ubicacion, categoria)
                 mostrarFormulario = false
             }
         )
@@ -202,6 +271,16 @@ private fun ProductoCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(producto.nombre, style = MaterialTheme.typography.titleMedium)
                 Text("${producto.precio} CUP", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                if (!producto.ubicacion.isNullOrBlank() || !producto.categoria.isNullOrBlank()) {
+                    Text(
+                        listOfNotNull(
+                            producto.ubicacion?.takeIf { it.isNotBlank() }?.let { "📍 $it" },
+                            producto.categoria?.takeIf { it.isNotBlank() }
+                        ).joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Spacer(modifier = Modifier.height(4.dp))
                 EstadoChip(
                     activo = !sinStock,
@@ -240,20 +319,30 @@ private fun ProductoCard(
 private fun formatearCantidad(valor: Double): String =
     if (valor == valor.toLong().toDouble()) valor.toLong().toString() else valor.toString()
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProductoFormDialog(
     producto: Product?,
+    categoriasExistentes: List<String>,
     isSaving: Boolean,
     onDismiss: () -> Unit,
-    onGuardar: (nombre: String, precio: Double, stock: Double) -> Unit
+    onGuardar: (nombre: String, precio: Double, stock: Double, ubicacion: String, categoria: String) -> Unit
 ) {
     var nombre by remember { mutableStateOf(producto?.nombre ?: "") }
     var precioTexto by remember { mutableStateOf(producto?.precio?.toString() ?: "") }
     var stockTexto by remember { mutableStateOf(producto?.stock?.toString() ?: "") }
+    var ubicacion by remember { mutableStateOf(producto?.ubicacion ?: "") }
+    var categoria by remember { mutableStateOf(producto?.categoria ?: "") }
+    var menuCategoriaAbierto by remember { mutableStateOf(false) }
 
     val precio = precioTexto.toDoubleOrNull()
     val stock = stockTexto.toDoubleOrNull()
     val valido = nombre.isNotBlank() && precio != null && precio > 0 && stock != null && stock >= 0
+
+    val sugerencias = remember(categoria, categoriasExistentes) {
+        if (categoria.isBlank()) categoriasExistentes
+        else categoriasExistentes.filter { it.contains(categoria, ignoreCase = true) && it != categoria }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -278,12 +367,43 @@ private fun ProductoFormDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth()
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = ubicacion, onValueChange = { ubicacion = it.uppercase() },
+                    label = { Text("Ubicación (ej: A-03-12)") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                ExposedDropdownMenuBox(
+                    expanded = menuCategoriaAbierto && sugerencias.isNotEmpty(),
+                    onExpandedChange = { menuCategoriaAbierto = it }
+                ) {
+                    OutlinedTextField(
+                        value = categoria,
+                        onValueChange = { categoria = it; menuCategoriaAbierto = true },
+                        label = { Text("Categoría") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().menuAnchor()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = menuCategoriaAbierto && sugerencias.isNotEmpty(),
+                        onDismissRequest = { menuCategoriaAbierto = false }
+                    ) {
+                        sugerencias.forEach { sugerencia ->
+                            DropdownMenuItem(
+                                text = { Text(sugerencia) },
+                                onClick = { categoria = sugerencia; menuCategoriaAbierto = false }
+                            )
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
-            TextButton(enabled = valido && !isSaving, onClick = { onGuardar(nombre.trim(), precio ?: 0.0, stock ?: 0.0) }) {
-                Text(if (isSaving) "Guardando..." else "Guardar")
-            }
+            TextButton(
+                enabled = valido && !isSaving,
+                onClick = { onGuardar(nombre.trim(), precio ?: 0.0, stock ?: 0.0, ubicacion.trim(), categoria.trim()) }
+            ) { Text(if (isSaving) "Guardando..." else "Guardar") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
     )

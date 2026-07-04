@@ -39,20 +39,20 @@ class ProductViewModel(
         if (androidIdActual.isNotBlank()) cargar(androidIdActual)
     }
 
-    fun crear(nombre: String, precio: Double, stock: Double) {
+    fun crear(nombre: String, precio: Double, stock: Double, ubicacion: String, categoria: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
-            repository.createProduct(androidIdActual, nombre, precio, stock)
+            repository.createProduct(androidIdActual, nombre, precio, stock, ubicacion, categoria)
                 .onSuccess { refrescar() }
                 .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.message) }
             _uiState.value = _uiState.value.copy(isSaving = false)
         }
     }
 
-    fun editar(id: Long, nombre: String, precio: Double, stock: Double) {
+    fun editar(id: Long, nombre: String, precio: Double, stock: Double, ubicacion: String, categoria: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
-            repository.updateProduct(androidIdActual, id, nombre, precio, stock)
+            repository.updateProduct(androidIdActual, id, nombre, precio, stock, ubicacion, categoria)
                 .onSuccess { refrescar() }
                 .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.message) }
             _uiState.value = _uiState.value.copy(isSaving = false)

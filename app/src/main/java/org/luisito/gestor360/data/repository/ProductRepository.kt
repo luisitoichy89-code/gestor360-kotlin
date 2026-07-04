@@ -7,15 +7,10 @@ import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.models.Product
 
 /**
- * Todo pasa por RPC (get_productos, crear_producto, actualizar_producto, eliminar_producto).
- * Cada función recibe p_android_id y resuelve el cliente_id/almacen del negocio del lado
- * del servidor — el cliente ya no lee/escribe tablas directamente ni maneja cliente_id.
- *
- * OJO: si alguna llamada falla con "Could not find the function...", significa que el
- * nombre de parámetro que uso aquí no coincide exactamente con tu firma real en Postgres.
- * Postgres/PostgREST resuelve el RPC por nombre de función + nombres de parámetros, así
- * que debe calzar carácter por carácter. Mándame el `\df+ nombre_funcion` o el CREATE
- * FUNCTION real si alguna de estas no pega.
+ * Todo pasa por RPC. Le agregué p_ubicacion y p_categoria a crear_producto y
+ * actualizar_producto para las nuevas mejoras — necesitas actualizar esas dos
+ * funciones en Postgres para que acepten y guarden estos dos parámetros nuevos
+ * (columnas ubicacion/categoria en la tabla productos). Te doy el SQL aparte.
  */
 class ProductRepository {
 
@@ -30,7 +25,6 @@ class ProductRepository {
         }
     }
 
-    /** Sin RPC de búsqueda dedicado: se filtra en memoria sobre get_productos. */
     suspend fun searchProducts(androidId: String, query: String): Result<List<Product>> {
         return getProducts(androidId).map { lista ->
             if (query.isBlank()) lista
@@ -38,13 +32,22 @@ class ProductRepository {
         }
     }
 
-    suspend fun createProduct(androidId: String, nombre: String, precio: Double, stock: Double): Result<Unit> {
+    suspend fun createProduct(
+        androidId: String,
+        nombre: String,
+        precio: Double,
+        stock: Double,
+        ubicacion: String,
+        categoria: String
+    ): Result<Unit> {
         return try {
             val params = buildJsonObject {
                 put("p_android_id", androidId)
                 put("p_nombre", nombre)
                 put("p_precio", precio)
                 put("p_stock", stock)
+                put("p_ubicacion", ubicacion)
+                put("p_categoria", categoria)
             }
             SupabaseClientProvider.client.postgrest.rpc("crear_producto", params)
             Result.success(Unit)
@@ -53,7 +56,15 @@ class ProductRepository {
         }
     }
 
-    suspend fun updateProduct(androidId: String, id: Long, nombre: String, precio: Double, stock: Double): Result<Unit> {
+    suspend fun updateProduct(
+        androidId: String,
+        id: Long,
+        nombre: String,
+        precio: Double,
+        stock: Double,
+        ubicacion: String,
+        categoria: String
+    ): Result<Unit> {
         return try {
             val params = buildJsonObject {
                 put("p_android_id", androidId)
@@ -61,6 +72,8 @@ class ProductRepository {
                 put("p_nombre", nombre)
                 put("p_precio", precio)
                 put("p_stock", stock)
+                put("p_ubicacion", ubicacion)
+                put("p_categoria", categoria)
             }
             SupabaseClientProvider.client.postgrest.rpc("actualizar_producto", params)
             Result.success(Unit)
@@ -69,10 +82,12 @@ class ProductRepository {
         }
     }
 
-    /** Merma directa (rol admin): reduce stock de una vez vía actualizar_producto. */
     suspend fun registrarMerma(androidId: String, producto: Product, cantidad: Double): Result<Unit> {
         val nuevoStock = (producto.stock - cantidad).coerceAtLeast(0.0)
-        return updateProduct(androidId, producto.id, producto.nombre, producto.precio, nuevoStock)
+        return updateProduct(
+            androidId, producto.id, producto.nombre, producto.precio, nuevoStock,
+            producto.ubicacion ?: "", producto.categoria ?: ""
+        )
     }
 
     suspend fun deleteProduct(androidId: String, id: Long): Result<Unit> {

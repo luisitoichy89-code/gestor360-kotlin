@@ -2,30 +2,33 @@ package org.luisito.gestor360
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
-import androidx.compose.material3.Divider
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Text
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.PointOfSale
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.luisito.gestor360.data.models.User
 import org.luisito.gestor360.ui.screens.AprobacionesScreen
@@ -50,10 +53,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/**
- * Pantallas internas una vez logueado. "Home" es tu DashboardScreen existente;
- * las demás son las nuevas pantallas de POS.
- */
 private sealed class PantallaInterna {
     object Home : PantallaInterna()
     object Ventas : PantallaInterna()
@@ -62,7 +61,6 @@ private sealed class PantallaInterna {
     object Aprobaciones : PantallaInterna()
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Gestor360App() {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -74,8 +72,8 @@ fun Gestor360App() {
     var usuarioParaPin by remember { mutableStateOf<User?>(null) }
     var pantalla by remember { mutableStateOf<PantallaInterna>(PantallaInterna.Home) }
     var mostrarMenu by remember { mutableStateOf(false) }
+    var mostrarConfirmarSalir by remember { mutableStateOf(false) }
 
-    // Sesión ya guardada de una apertura anterior: entra directo, sin volver a pedir PIN.
     LaunchedEffect(Unit) {
         isLoggedIn = sessionManager.isLoggedIn()
         isLoading = false
@@ -89,9 +87,38 @@ fun Gestor360App() {
         pantalla = PantallaInterna.Home
     }
 
+    // Botón físico "atrás": nunca cierra la app de golpe.
+    // - Si estás en una pantalla interna (Ventas/Productos/Tarjetas/Aprobaciones), vuelve al Dashboard.
+    // - Si estás en el Dashboard, pide confirmación antes de salir.
+    if (isLoggedIn) {
+        BackHandler(enabled = true) {
+            if (pantalla != PantallaInterna.Home) {
+                pantalla = PantallaInterna.Home
+            } else {
+                mostrarConfirmarSalir = true
+            }
+        }
+    }
+
+    if (mostrarConfirmarSalir) {
+        AlertDialog(
+            onDismissRequest = { mostrarConfirmarSalir = false },
+            title = { Text("¿Salir de Gestor360?") },
+            text = { Text("Vas a cerrar la aplicación.") },
+            confirmButton = {
+                TextButton(onClick = { (context as? ComponentActivity)?.finish() }) {
+                    Text("Salir")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { mostrarConfirmarSalir = false }) { Text("Cancelar") }
+            }
+        )
+    }
+
     when {
         isLoading -> {
-            // Pantalla de carga (puedes reemplazar por un splash si prefieres)
+            // Pantalla de carga
         }
 
         !isLoggedIn && usuarioParaPin == null -> {
@@ -160,53 +187,58 @@ fun Gestor360App() {
                 }
             }
 
+            // Diálogo simple en vez de ModalBottomSheet: más estable, evita el
+            // crash que daba al abrir el menú hamburguesa.
             if (mostrarMenu) {
-                ModalBottomSheet(onDismissRequest = { mostrarMenu = false }) {
-                    ListItem(
-                        headlineContent = { Text("Ventas") },
-                        leadingContent = { Icon(Icons.Default.PointOfSale, contentDescription = null) },
-                        modifier = Modifier.fillMaxWidth().clickable {
-                            pantalla = PantallaInterna.Ventas
-                            mostrarMenu = false
-                        }
-                    )
-                    ListItem(
-                        headlineContent = { Text("Productos") },
-                        leadingContent = { Icon(Icons.Default.Inventory2, contentDescription = null) },
-                        modifier = Modifier.fillMaxWidth().clickable {
-                            pantalla = PantallaInterna.Productos
-                            mostrarMenu = false
-                        }
-                    )
-                    if (esAdmin) {
-                        ListItem(
-                            headlineContent = { Text("Tarjetas") },
-                            leadingContent = { Icon(Icons.Default.CreditCard, contentDescription = null) },
-                            modifier = Modifier.fillMaxWidth().clickable {
-                                pantalla = PantallaInterna.Tarjetas
+                AlertDialog(
+                    onDismissRequest = { mostrarMenu = false },
+                    title = { Text("Menú") },
+                    text = {
+                        Column {
+                            OpcionMenu(Icons.Default.PointOfSale, "Ventas") {
+                                pantalla = PantallaInterna.Ventas
                                 mostrarMenu = false
                             }
-                        )
-                        ListItem(
-                            headlineContent = { Text("Aprobaciones de merma") },
-                            leadingContent = { Icon(Icons.Default.FactCheck, contentDescription = null) },
-                            modifier = Modifier.fillMaxWidth().clickable {
-                                pantalla = PantallaInterna.Aprobaciones
+                            OpcionMenu(Icons.Default.Inventory2, "Productos") {
+                                pantalla = PantallaInterna.Productos
                                 mostrarMenu = false
                             }
-                        )
+                            if (esAdmin) {
+                                OpcionMenu(Icons.Default.CreditCard, "Tarjetas") {
+                                    pantalla = PantallaInterna.Tarjetas
+                                    mostrarMenu = false
+                                }
+                                OpcionMenu(Icons.Default.FactCheck, "Aprobaciones de merma") {
+                                    pantalla = PantallaInterna.Aprobaciones
+                                    mostrarMenu = false
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { mostrarMenu = false; cerrarSesion() }) {
+                            Icon(Icons.Default.Logout, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                            Text("Cerrar sesión")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { mostrarMenu = false }) { Text("Cerrar") }
                     }
-                    Divider()
-                    ListItem(
-                        headlineContent = { Text("Cerrar sesión") },
-                        leadingContent = { Icon(Icons.Default.Logout, contentDescription = null) },
-                        modifier = Modifier.fillMaxWidth().clickable {
-                            mostrarMenu = false
-                            cerrarSesion()
-                        }
-                    )
-                }
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun OpcionMenu(icono: ImageVector, texto: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 10.dp)
+            .clickable(onClick = onClick)
+    ) {
+        Icon(icono, contentDescription = null)
+        Text(texto, modifier = Modifier.padding(start = 12.dp))
     }
 }
