@@ -28,7 +28,6 @@ import org.luisito.gestor360.data.models.MetodoPago
 import org.luisito.gestor360.data.models.Product
 import org.luisito.gestor360.data.models.Tarjeta
 import org.luisito.gestor360.data.repository.SaleRepository
-import org.luisito.gestor360.data.repository.TopVendido
 import org.luisito.gestor360.ui.viewmodels.SaleViewModel
 import org.luisito.gestor360.ui.viewmodels.TarjetaViewModel
 import kotlin.math.max
@@ -104,12 +103,9 @@ fun VentasScreen(
             }
 
             Column(modifier = Modifier.padding(16.dp)) {
-                if (uiState.top5.isNotEmpty() && uiState.carrito.isEmpty()) {
                     Text("🏆 Top 5 más vendidos", style = MaterialTheme.typography.labelLarge)
                     Spacer(modifier = Modifier.height(8.dp))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(uiState.top5) { top ->
-                            Top5Chip(top) {
                                 query = top.producto_nombre
                                 viewModel.buscarProducto(query)
                             }
@@ -251,7 +247,6 @@ fun VentasScreen(
 }
 
 @Composable
-private fun Top5Chip(top: TopVendido, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = MaterialTheme.shapes.medium,

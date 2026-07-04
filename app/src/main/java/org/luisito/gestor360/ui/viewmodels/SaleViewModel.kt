@@ -10,13 +10,11 @@ import org.luisito.gestor360.data.models.CartItem
 import org.luisito.gestor360.data.models.Product
 import org.luisito.gestor360.data.repository.ProductRepository
 import org.luisito.gestor360.data.repository.SaleRepository
-import org.luisito.gestor360.data.repository.TopVendido
 
 data class SaleUiState(
     val isSearching: Boolean = false,
     val resultadosBusqueda: List<Product> = emptyList(),
     val carrito: List<CartItem> = emptyList(),
-    val top5: List<TopVendido> = emptyList(),
     val isSaving: Boolean = false,
     val error: String? = null,
     val ventaConfirmada: Double? = null
@@ -54,8 +52,6 @@ class SaleViewModel(
 
     private fun cargarTop5() {
         viewModelScope.launch {
-            saleRepository.getTop5Vendidos(androidIdActual).onSuccess { lista ->
-                _uiState.value = _uiState.value.copy(top5 = lista)
             }
         }
     }
