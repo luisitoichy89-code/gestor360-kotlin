@@ -7,7 +7,9 @@ import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.models.MermaPendiente
 
 /** RPC: get_mermas_pendientes, crear_merma, resolver_merma. */
-class MermaRepository {
+class MermaRepository(
+    private val trazaRepository: TrazaRepository = TrazaRepository()
+) {
 
     suspend fun solicitar(
         androidId: String,
@@ -23,6 +25,7 @@ class MermaRepository {
                 put("p_motivo", motivo)
             }
             SupabaseClientProvider.client.postgrest.rpc("crear_merma", params)
+            trazaRepository.registrar(androidId, "proponer_merma", "producto_id=$productoId cantidad=$cantidad")
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -49,6 +52,7 @@ class MermaRepository {
                 put("p_estado", estado)
             }
             SupabaseClientProvider.client.postgrest.rpc("resolver_merma", params)
+            trazaRepository.registrar(androidId, "resolver_merma", "merma_id=$mermaId estado=$estado")
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

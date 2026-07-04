@@ -12,7 +12,9 @@ import org.luisito.gestor360.data.models.Tarjeta
  * supuestos ("editar_tarjeta", "eliminar_tarjeta", "activar_tarjeta") — coméntamelos o
  * dame los nombres reales si ya existen, o créalos si aún no.
  */
-class TarjetaRepository {
+class TarjetaRepository(
+    private val trazaRepository: TrazaRepository = TrazaRepository()
+) {
 
     suspend fun getTarjetas(androidId: String): Result<List<Tarjeta>> {
         return try {
@@ -38,6 +40,7 @@ class TarjetaRepository {
                 put("p_titular", titular)
             }
             SupabaseClientProvider.client.postgrest.rpc("crear_tarjeta", params)
+            trazaRepository.registrar(androidId, "crear_tarjeta", "$banco $numero")
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

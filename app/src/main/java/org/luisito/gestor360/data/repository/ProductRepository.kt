@@ -12,7 +12,9 @@ import org.luisito.gestor360.data.models.Product
  * funciones en Postgres para que acepten y guarden estos dos parámetros nuevos
  * (columnas ubicacion/categoria en la tabla productos). Te doy el SQL aparte.
  */
-class ProductRepository {
+class ProductRepository(
+    private val trazaRepository: TrazaRepository = TrazaRepository()
+) {
 
     suspend fun getProducts(androidId: String): Result<List<Product>> {
         return try {
@@ -32,13 +34,18 @@ class ProductRepository {
         }
     }
 
+    /**
+     * OJO: crear_producto exige p_almacen_id (uuid) en Postgres. Por ahora mando null
+     * porque no tengo claro a qué debe apuntar ese uuid en tu esquema — ver pregunta aparte.
+     */
     suspend fun createProduct(
         androidId: String,
         nombre: String,
         precio: Double,
         stock: Double,
         ubicacion: String,
-        categoria: String
+        categoria: String,
+        almacenId: String? = null
     ): Result<Unit> {
         return try {
             val params = buildJsonObject {
@@ -46,10 +53,12 @@ class ProductRepository {
                 put("p_nombre", nombre)
                 put("p_precio", precio)
                 put("p_stock", stock)
+                put("p_almacen_id", almacenId)
                 put("p_ubicacion", ubicacion)
                 put("p_categoria", categoria)
             }
             SupabaseClientProvider.client.postgrest.rpc("crear_producto", params)
+            trazaRepository.registrar(androidId, "crear_producto", nombre)
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -76,6 +85,7 @@ class ProductRepository {
                 put("p_categoria", categoria)
             }
             SupabaseClientProvider.client.postgrest.rpc("actualizar_producto", params)
+            trazaRepository.registrar(androidId, "actualizar_producto", "$nombre (id=$id)")
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -97,6 +107,7 @@ class ProductRepository {
                 put("p_id", id)
             }
             SupabaseClientProvider.client.postgrest.rpc("eliminar_producto", params)
+            trazaRepository.registrar(androidId, "eliminar_producto", "id=$id")
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

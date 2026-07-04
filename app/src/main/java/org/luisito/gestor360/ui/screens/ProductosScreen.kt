@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.RemoveCircleOutline
@@ -21,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.luisito.gestor360.data.models.Product
@@ -32,6 +34,7 @@ import org.luisito.gestor360.ui.components.EstadoError
 import org.luisito.gestor360.ui.components.EstadoVacio
 import org.luisito.gestor360.ui.viewmodels.MermaViewModel
 import org.luisito.gestor360.ui.viewmodels.ProductViewModel
+import org.luisito.gestor360.utils.CsvExporter
 
 private const val PRODUCTOS_POR_PAGINA = 25
 
@@ -45,6 +48,7 @@ fun ProductosScreen(
     mermaViewModel: MermaViewModel = viewModel()
 ) {
     val esAdmin = rol == "admin"
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val mermaUiState by mermaViewModel.uiState.collectAsState()
 
@@ -94,6 +98,9 @@ fun ProductosScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { CsvExporter.exportarProductos(context, filtrados) }) {
+                        Icon(Icons.Default.FileDownload, contentDescription = "Exportar CSV")
+                    }
                     IconButton(onClick = { viewModel.refrescar() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refrescar")
                     }

@@ -22,7 +22,9 @@ data class TopVendido(val producto_nombre: String, val total: Double)
  * [{ "producto_id": 1, "cantidad": 2, "precio_unit": 10.0 }, ...]
  * Si tu función espera otros nombres de campos dentro del array, dímelo y ajusto el mapeo.
  */
-class SaleRepository {
+class SaleRepository(
+    private val trazaRepository: TrazaRepository = TrazaRepository()
+) {
 
     data class DatosCliente(val ci: String, val telefono: String, val nombre: String, val banco: String)
 
@@ -59,6 +61,7 @@ class SaleRepository {
             }
 
             SupabaseClientProvider.client.postgrest.rpc("registrar_venta", params)
+            trazaRepository.registrar(androidId, "registrar_venta", "Total: $${carrito.sumOf { it.subtotal }} ($metodo)")
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
