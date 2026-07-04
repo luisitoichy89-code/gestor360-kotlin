@@ -3,15 +3,12 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
-    id("kotlin-kapt")
+    id("com.google.devtools.ksp")
 }
 
-// ✅ CORRECTO: configurations.all va AQUÍ, fuera de android
-configurations.all {
-    resolutionStrategy {
-        force("org.jetbrains.kotlin:kotlin-metadata-jvm:2.3.0-Beta1")
-    }
-}
+// El force() a kotlin-metadata-jvm:2.3.0-Beta1 se quitó al migrar de kapt a KSP:
+// era un parche para el mismo conflicto kapt + plugin de serialización bajo K2.
+// Si algo de metadata vuelve a fallar, es la primera línea a revisar.
 
 android {
     namespace = "org.luisito.gestor360"
@@ -87,7 +84,7 @@ dependencies {
 
     implementation("androidx.room:room-runtime:2.7.1")
     implementation("androidx.room:room-ktx:2.7.1")
-    kapt("androidx.room:room-compiler:2.7.1")
+    ksp("androidx.room:room-compiler:2.7.1")
 
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     testImplementation("junit:junit:4.13.2")
