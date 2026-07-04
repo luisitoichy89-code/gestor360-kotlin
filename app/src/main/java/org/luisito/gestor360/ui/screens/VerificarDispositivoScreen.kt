@@ -15,11 +15,6 @@ import org.luisito.gestor360.data.models.User
 import org.luisito.gestor360.ui.viewmodels.AccesoViewModel
 import org.luisito.gestor360.utils.DeviceIdManager
 
-/**
- * Primera pantalla que ve cualquier usuario (admin o vendedor) al abrir la app:
- * su Android ID y un botón "Verificar". Si el dispositivo está autorizado y la
- * licencia del negocio está vigente, pasa a la pantalla de PIN.
- */
 @Composable
 fun VerificarDispositivoScreen(
     onDispositivoAutorizado: (User) -> Unit,
@@ -27,7 +22,6 @@ fun VerificarDispositivoScreen(
 ) {
     val context = LocalContext.current
     val androidId = remember { DeviceIdManager.getFormattedDeviceId(context) }
-    val androidIdCrudo = remember { DeviceIdManager.getDeviceId(context) }
     val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(uiState.usuarioVerificado) {
@@ -65,7 +59,7 @@ fun VerificarDispositivoScreen(
             CircularProgressIndicator()
         } else {
             Button(
-                onClick = { viewModel.verificarDispositivo(androidIdCrudo) },
+                onClick = { viewModel.verificarDispositivo(androidId) },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Verificar")
@@ -88,7 +82,6 @@ fun VerificarDispositivoScreen(
 
 @Composable
 private fun SelectionContainerCompat(texto: String) {
-    // SelectionContainer permite copiar el Android ID fácilmente para pasárselo al admin.
     androidx.compose.foundation.text.selection.SelectionContainer {
         Text(texto, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
     }
