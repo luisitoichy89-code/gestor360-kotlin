@@ -13,70 +13,55 @@ data class ProductUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val productos: List<Product> = emptyList(),
-    val error: String? = null,
-    val mensaje: String? = null
+    val error: String? = null
 )
 
 class ProductViewModel(
     private val repository: ProductRepository = ProductRepository()
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(ProductUiState())
     val uiState: StateFlow<ProductUiState> = _uiState.asStateFlow()
-
     private var almacenIdActual: String = ""
+    private var androidIdActual: String = ""
 
-    fun cargar(almacenId: String) {
+    fun cargar(androidId: String, almacenId: String) {
+        androidIdActual = androidId
         almacenIdActual = almacenId
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-            repository.getProducts(almacenId)
-                .onSuccess { lista -> _uiState.value = _uiState.value.copy(isLoading = false, productos = lista) }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.message ?: "Error al cargar productos") }
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            repository.getProducts(androidId, almacenId)
+                .onSuccess { _uiState.value = _uiState.value.copy(isLoading = false, productos = it) }
+                .onFailure { _uiState.value = _uiState.value.copy(isLoading = false, error = it.message) }
         }
-    }
-
-    fun refrescar() {
-        if (almacenIdActual.isNotBlank()) cargar(almacenIdActual)
     }
 
     fun crear(nombre: String, precio: Double, stock: Double) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isSaving = true, error = null)
-            repository.createProduct(nombre, precio, stock, almacenIdActual)
-                .onSuccess { refrescar() }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.message) }
+            _uiState.value = _uiState.value.copy(isSaving = true)
+            repository.createProduct(nombre, precio, stock, almacenIdActual, androidIdActual)
+                .onSuccess { cargar(androidIdActual, almacenIdActual) }
+                .onFailure { _uiState.value = _uiState.value.copy(error = it.message) }
             _uiState.value = _uiState.value.copy(isSaving = false)
         }
     }
 
     fun editar(id: Long, nombre: String, precio: Double, stock: Double) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isSaving = true, error = null)
-            repository.updateProduct(id, nombre, precio, stock)
-                .onSuccess { refrescar() }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.message) }
+            _uiState.value = _uiState.value.copy(isSaving = true)
+            repository.updateProduct(id, nombre, precio, stock, androidIdActual)
+                .onSuccess { cargar(androidIdActual, almacenIdActual) }
+                .onFailure { _uiState.value = _uiState.value.copy(error = it.message) }
             _uiState.value = _uiState.value.copy(isSaving = false)
-        }
-    }
-
-    fun registrarMerma(producto: Product, cantidad: Double) {
-        viewModelScope.launch {
-            repository.registrarMerma(producto.id, producto.stock, cantidad)
-                .onSuccess { refrescar() }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.message) }
         }
     }
 
     fun eliminar(id: Long) {
         viewModelScope.launch {
-            repository.deleteProduct(id)
-                .onSuccess { refrescar() }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.message) }
+            repository.deleteProduct(id, androidIdActual)
+                .onSuccess { cargar(androidIdActual, almacenIdActual) }
+                .onFailure { _uiState.value = _uiState.value.copy(error = it.message) }
         }
     }
 
-    fun clearError() {
-        _uiState.value = _uiState.value.copy(error = null)
-    }
+    fun clearError() { _uiState.value = _uiState.value.copy(error = null) }
 }
