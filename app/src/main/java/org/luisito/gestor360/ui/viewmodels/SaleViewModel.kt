@@ -10,132 +10,55 @@ import org.luisito.gestor360.data.models.CartItem
 import org.luisito.gestor360.data.models.Product
 import org.luisito.gestor360.data.repository.ProductRepository
 import org.luisito.gestor360.data.repository.SaleRepository
-import org.luisito.gestor360.data.repository.TopVendido
 
 data class SaleUiState(
-    val isSearching: Boolean = false,
-    val resultadosBusqueda: List<Product> = emptyList(),
+    val isLoading: Boolean = false,
+    val productos: List<Product> = emptyList(),
     val carrito: List<CartItem> = emptyList(),
-    val top5: List<TopVendido> = emptyList(),
-    val isSaving: Boolean = false,
     val error: String? = null,
-    val ventaConfirmada: Double? = null
-) {
-    val total: Double get() = carrito.sumOf { it.subtotal }
-}
+    val ventaConfirmada: Boolean = false
+)
 
 class SaleViewModel(
     private val productRepository: ProductRepository = ProductRepository(),
     private val saleRepository: SaleRepository = SaleRepository()
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(SaleUiState())
     val uiState: StateFlow<SaleUiState> = _uiState.asStateFlow()
-
     private var androidIdActual: String = ""
 
     fun iniciar(androidId: String) {
         androidIdActual = androidId
-        cargarTop5()
-    }
-
-    fun buscarProducto(query: String) {
-        if (query.isBlank()) {
-            _uiState.value = _uiState.value.copy(resultadosBusqueda = emptyList())
-            return
-        }
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isSearching = true)
-            productRepository.searchProducts(androidIdActual, query)
-                .onSuccess { lista -> _uiState.value = _uiState.value.copy(isSearching = false, resultadosBusqueda = lista) }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(isSearching = false, error = e.message) }
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            productRepository.getProducts(androidId)
+                .onSuccess { _uiState.value = _uiState.value.copy(isLoading = false, productos = it) }
+                .onFailure { _uiState.value = _uiState.value.copy(isLoading = false, error = it.message) }
         }
     }
 
-    private fun cargarTop5() {
-        viewModelScope.launch {
-            saleRepository.getTop5Vendidos(androidIdActual).onSuccess { lista ->
-                _uiState.value = _uiState.value.copy(top5 = lista)
-            }
-        }
-    }
-
-    fun limpiarBusqueda() {
-        _uiState.value = _uiState.value.copy(resultadosBusqueda = emptyList())
-    }
-
-    fun agregarAlCarrito(producto: Product, cantidad: Double): String? {
-        if (producto.stock <= 0) return "Sin stock disponible"
-
-        val carritoActual = _uiState.value.carrito.toMutableList()
-        val indiceExistente = carritoActual.indexOfFirst { it.productId == producto.id }
-
-        if (indiceExistente >= 0) {
-            val existente = carritoActual[indiceExistente]
-            val nuevaCantidad = existente.cantidad + cantidad
-            if (nuevaCantidad > producto.stock) return "Stock insuficiente (${producto.stock} disponibles)"
-            carritoActual[indiceExistente] = existente.copy(cantidad = nuevaCantidad)
-        } else {
-            if (cantidad > producto.stock) return "Stock insuficiente (${producto.stock} disponibles)"
-            carritoActual.add(
-                CartItem(
-                    productId = producto.id,
-                    nombre = producto.nombre,
-                    precio = producto.precio,
-                    cantidad = cantidad,
-                    stockDisponible = producto.stock
-                )
-            )
-        }
-
-        _uiState.value = _uiState.value.copy(carrito = carritoActual, resultadosBusqueda = emptyList())
-        return null
+    fun agregarAlCarrito(producto: Product, cantidad: Double) {
+        val carrito = _uiState.value.carrito.toMutableList()
+        val existente = carrito.find { it.productId == producto.id }
+        if (existente != null) existente.cantidad += cantidad
+        else carrito.add(CartItem(product.id, producto.nombre, producto.precio, cantidad))
+        _uiState.value = _uiState.value.copy(carrito = carrito)
     }
 
     fun quitarDelCarrito(index: Int) {
-        val carritoActual = _uiState.value.carrito.toMutableList()
-        if (index in carritoActual.indices) carritoActual.removeAt(index)
-        _uiState.value = _uiState.value.copy(carrito = carritoActual)
+        val carrito = _uiState.value.carrito.toMutableList()
+        if (index in carrito.indices) { carrito.removeAt(index); _uiState.value = _uiState.value.copy(carrito = carrito) }
     }
 
-    fun limpiarCarrito() {
-        _uiState.value = _uiState.value.copy(carrito = emptyList())
-    }
+    fun limpiarCarrito() { _uiState.value = _uiState.value.copy(carrito = emptyList()) }
 
-    fun confirmarVenta(
-        metodo: String,
-        montoEfectivo: Double,
-        montoTransferencia: Double,
-        cliente: SaleRepository.DatosCliente? = null
-    ) {
-        val carrito = _uiState.value.carrito
-        if (carrito.isEmpty()) return
-
+    fun confirmarVenta(metodo: String, efectivo: Double, transferencia: Double, usuarioId: Long, cliente: SaleRepository.DatosCliente?) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isSaving = true, error = null)
-            val totalVenta = _uiState.value.total
-            saleRepository.guardarVenta(
-                androidId = androidIdActual,
-                carrito = carrito,
-                metodo = metodo,
-                montoEfectivo = montoEfectivo,
-                montoTransferencia = montoTransferencia,
-                cliente = cliente
-            ).onSuccess {
-                _uiState.value = _uiState.value.copy(carrito = emptyList(), ventaConfirmada = totalVenta)
-                cargarTop5()
-            }.onFailure { e ->
-                _uiState.value = _uiState.value.copy(error = e.message ?: "Error al guardar la venta")
-            }
-            _uiState.value = _uiState.value.copy(isSaving = false)
+            saleRepository.guardarVenta(androidIdActual, _uiState.value.carrito, metodo, efectivo, transferencia, cliente)
+            _uiState.value = _uiState.value.copy(carrito = emptyList(), ventaConfirmada = true)
         }
     }
 
-    fun limpiarVentaConfirmada() {
-        _uiState.value = _uiState.value.copy(ventaConfirmada = null)
-    }
-
-    fun clearError() {
-        _uiState.value = _uiState.value.copy(error = null)
-    }
+    fun limpiarVentaConfirmada() { _uiState.value = _uiState.value.copy(ventaConfirmada = false) }
+    fun clearError() { _uiState.value = _uiState.value.copy(error = null) }
 }
