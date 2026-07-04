@@ -31,13 +31,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.luisito.gestor360.data.models.User
-import org.luisito.gestor360.ui.screens.AprobacionesScreen
-import org.luisito.gestor360.ui.screens.DashboardScreen
-import org.luisito.gestor360.ui.screens.PinLoginScreen
-import org.luisito.gestor360.ui.screens.ProductosScreen
-import org.luisito.gestor360.ui.screens.TarjetasScreen
-import org.luisito.gestor360.ui.screens.VentasScreen
-import org.luisito.gestor360.ui.screens.VerificarDispositivoScreen
+import org.luisito.gestor360.ui.screens.*
 import org.luisito.gestor360.ui.theme.Gestor360Theme
 import org.luisito.gestor360.ui.viewmodels.AccesoViewModel
 import org.luisito.gestor360.utils.SessionManager
@@ -45,11 +39,7 @@ import org.luisito.gestor360.utils.SessionManager
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            Gestor360Theme {
-                Gestor360App()
-            }
-        }
+        setContent { Gestor360Theme { Gestor360App() } }
     }
 }
 
@@ -58,6 +48,7 @@ private sealed class PantallaInterna {
     object Ventas : PantallaInterna()
     object Productos : PantallaInterna()
     object Tarjetas : PantallaInterna()
+    object CierreCaja : PantallaInterna()
     object Aprobaciones : PantallaInterna()
 }
 
@@ -66,7 +57,6 @@ fun Gestor360App() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val sessionManager = remember { SessionManager(context) }
     val accesoViewModel: AccesoViewModel = viewModel()
-
     var isLoading by remember { mutableStateOf(true) }
     var isLoggedIn by remember { mutableStateOf(false) }
     var usuarioParaPin by remember { mutableStateOf<User?>(null) }
@@ -87,16 +77,10 @@ fun Gestor360App() {
         pantalla = PantallaInterna.Home
     }
 
-    // Botón físico "atrás": nunca cierra la app de golpe.
-    // - Si estás en una pantalla interna (Ventas/Productos/Tarjetas/Aprobaciones), vuelve al Dashboard.
-    // - Si estás en el Dashboard, pide confirmación antes de salir.
     if (isLoggedIn) {
         BackHandler(enabled = true) {
-            if (pantalla != PantallaInterna.Home) {
-                pantalla = PantallaInterna.Home
-            } else {
-                mostrarConfirmarSalir = true
-            }
+            if (pantalla != PantallaInterna.Home) pantalla = PantallaInterna.Home
+            else mostrarConfirmarSalir = true
         }
     }
 
@@ -105,52 +89,30 @@ fun Gestor360App() {
             onDismissRequest = { mostrarConfirmarSalir = false },
             title = { Text("¿Salir de Gestor360?") },
             text = { Text("Vas a cerrar la aplicación.") },
-            confirmButton = {
-                TextButton(onClick = { (context as? ComponentActivity)?.finish() }) {
-                    Text("Salir")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { mostrarConfirmarSalir = false }) { Text("Cancelar") }
-            }
+            confirmButton = { TextButton(onClick = { (context as? ComponentActivity)?.finish() }) { Text("Salir") } },
+            dismissButton = { TextButton(onClick = { mostrarConfirmarSalir = false }) { Text("Cancelar") } }
         )
     }
 
     when {
-        isLoading -> {
-            // Pantalla de carga
-        }
-
-        !isLoggedIn && usuarioParaPin == null -> {
-            VerificarDispositivoScreen(
-                onDispositivoAutorizado = { usuario -> usuarioParaPin = usuario },
-                viewModel = accesoViewModel
-            )
-        }
-
-        !isLoggedIn && usuarioParaPin != null -> {
-            PinLoginScreen(
-                usuario = usuarioParaPin!!,
-                onLoginExitoso = { usuario ->
-                    sessionManager.saveSession(
-                        userId = usuario.id,
-                        username = usuario.username,
-                        rol = usuario.rol,
-                        almacenId = usuario.almacen_id ?: "1",
-                        clienteId = usuario.cliente_id,
-                        androidId = usuario.android_id ?: "",
-                        nombre = usuario.nombre
-                    )
-                    isLoggedIn = true
-                },
-                onCambiarDispositivo = {
-                    usuarioParaPin = null
-                    accesoViewModel.reiniciar()
-                },
-                viewModel = accesoViewModel
-            )
-        }
-
+        isLoading -> {}
+        !isLoggedIn && usuarioParaPin == null -> VerificarDispositivoScreen(
+            onDispositivoAutorizado = { usuario -> usuarioParaPin = usuario },
+            viewModel = accesoViewModel
+        )
+        !isLoggedIn && usuarioParaPin != null -> PinLoginScreen(
+            usuario = usuarioParaPin!!,
+            onLoginExitoso = { usuario ->
+                sessionManager.saveSession(
+                    userId = usuario.id, username = usuario.username, rol = usuario.rol,
+                    almacenId = usuario.almacen_id ?: "1", clienteId = usuario.cliente_id,
+                    androidId = usuario.android_id ?: "", nombre = usuario.nombre
+                )
+                isLoggedIn = true
+            },
+            onCambiarDispositivo = { usuarioParaPin = null; accesoViewModel.reiniciar() },
+            viewModel = accesoViewModel
+        )
         else -> {
             val rol = sessionManager.getRol()
             val androidId = sessionManager.getAndroidId()
@@ -158,72 +120,38 @@ fun Gestor360App() {
 
             when (pantalla) {
                 is PantallaInterna.Home -> DashboardScreen(
-                    userRol = rol,
-                    username = sessionManager.getNombre().ifEmpty { sessionManager.getUsername() },
-                    onMenuClick = { mostrarMenu = true },
-                    onLogout = { cerrarSesion() }
+                    userRol = rol, username = sessionManager.getNombre().ifEmpty { sessionManager.getUsername() },
+                    onMenuClick = { mostrarMenu = true }, onLogout = { cerrarSesion() }
                 )
-                is PantallaInterna.Ventas -> VentasScreen(
+                is PantallaInterna.Ventas -> VentasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
+                is PantallaInterna.Productos -> ProductosScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home })
+                is PantallaInterna.Tarjetas -> if (esAdmin) TarjetasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
+                is PantallaInterna.CierreCaja -> CierreCajaScreen(
                     androidId = androidId,
+                    usuarioId = sessionManager.getUserId(),
+                    almacenId = sessionManager.getAlmacenId(),
                     onBack = { pantalla = PantallaInterna.Home }
                 )
-                is PantallaInterna.Productos -> ProductosScreen(
-                    androidId = androidId,
-                    rol = rol,
-                    onBack = { pantalla = PantallaInterna.Home }
-                )
-                is PantallaInterna.Tarjetas -> if (esAdmin) {
-                    TarjetasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
-                } else {
-                    LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
-                }
-                is PantallaInterna.Aprobaciones -> if (esAdmin) {
-                    AprobacionesScreen(
-                        androidId = androidId,
-                        onBack = { pantalla = PantallaInterna.Home }
-                    )
-                } else {
-                    LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
-                }
+                is PantallaInterna.Aprobaciones -> if (esAdmin) AprobacionesScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
             }
 
-            // Diálogo simple en vez de ModalBottomSheet: más estable, evita el
-            // crash que daba al abrir el menú hamburguesa.
             if (mostrarMenu) {
                 AlertDialog(
                     onDismissRequest = { mostrarMenu = false },
                     title = { Text("Menú") },
                     text = {
                         Column {
-                            OpcionMenu(Icons.Default.PointOfSale, "Ventas") {
-                                pantalla = PantallaInterna.Ventas
-                                mostrarMenu = false
-                            }
-                            OpcionMenu(Icons.Default.Inventory2, "Productos") {
-                                pantalla = PantallaInterna.Productos
-                                mostrarMenu = false
-                            }
+                            OpcionMenu(Icons.Default.PointOfSale, "Ventas") { pantalla = PantallaInterna.Ventas; mostrarMenu = false }
+                            OpcionMenu(Icons.Default.Inventory2, "Productos") { pantalla = PantallaInterna.Productos; mostrarMenu = false }
+                            OpcionMenu(Icons.Default.FactCheck, "Cierre de Caja") { pantalla = PantallaInterna.CierreCaja; mostrarMenu = false }
                             if (esAdmin) {
-                                OpcionMenu(Icons.Default.CreditCard, "Tarjetas") {
-                                    pantalla = PantallaInterna.Tarjetas
-                                    mostrarMenu = false
-                                }
-                                OpcionMenu(Icons.Default.FactCheck, "Aprobaciones de merma") {
-                                    pantalla = PantallaInterna.Aprobaciones
-                                    mostrarMenu = false
-                                }
+                                OpcionMenu(Icons.Default.CreditCard, "Tarjetas") { pantalla = PantallaInterna.Tarjetas; mostrarMenu = false }
+                                OpcionMenu(Icons.Default.FactCheck, "Aprobaciones de merma") { pantalla = PantallaInterna.Aprobaciones; mostrarMenu = false }
                             }
                         }
                     },
-                    confirmButton = {
-                        TextButton(onClick = { mostrarMenu = false; cerrarSesion() }) {
-                            Icon(Icons.Default.Logout, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
-                            Text("Cerrar sesión")
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { mostrarMenu = false }) { Text("Cerrar") }
-                    }
+                    confirmButton = { TextButton(onClick = { mostrarMenu = false; cerrarSesion() }) { Icon(Icons.Default.Logout, null, Modifier.padding(end = 4.dp)); Text("Cerrar sesión") } },
+                    dismissButton = { TextButton(onClick = { mostrarMenu = false }) { Text("Cerrar") } }
                 )
             }
         }
@@ -232,12 +160,7 @@ fun Gestor360App() {
 
 @Composable
 private fun OpcionMenu(icono: ImageVector, texto: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 10.dp)
-            .clickable(onClick = onClick)
-    ) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp).clickable(onClick = onClick)) {
         Icon(icono, contentDescription = null)
         Text(texto, modifier = Modifier.padding(start = 12.dp))
     }
