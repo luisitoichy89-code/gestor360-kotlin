@@ -39,9 +39,13 @@ class SaleViewModel(
 
     fun agregarAlCarrito(producto: Product, cantidad: Double) {
         val carrito = _uiState.value.carrito.toMutableList()
-        val existente = carrito.find { it.productId == producto.id }
-        if (existente != null) existente.cantidad += cantidad
-        else carrito.add(CartItem(product.id, producto.nombre, producto.precio, cantidad, producto.stock))
+        val index = carrito.indexOfFirst { it.productId == producto.id }
+        if (index >= 0) {
+            val item = carrito[index]
+            carrito[index] = item.copy(cantidad = item.cantidad + cantidad)
+        } else {
+            carrito.add(CartItem(producto.id, producto.nombre, producto.precio, cantidad, producto.stock))
+        }
         _uiState.value = _uiState.value.copy(carrito = carrito)
     }
 
