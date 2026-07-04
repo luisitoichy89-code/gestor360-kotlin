@@ -41,7 +41,7 @@ class SaleViewModel(
         val carrito = _uiState.value.carrito.toMutableList()
         val existente = carrito.find { it.productId == producto.id }
         if (existente != null) existente.cantidad += cantidad
-        else carrito.add(CartItem(product.id, producto.nombre, producto.precio, cantidad))
+        else carrito.add(CartItem(product.id, producto.nombre, producto.precio, cantidad, producto.stock))
         _uiState.value = _uiState.value.copy(carrito = carrito)
     }
 
