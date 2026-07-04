@@ -1,28 +1,91 @@
 package org.luisito.gestor360.data.repository
 
-import io.github.jan.supabase.postgrest.postgrest
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import io.github.jan.supabase.postgrest.from
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.models.Tarjeta
 
+/**
+ * Cuentas/tarjetas destino para cobrar por transferencia. Solo el admin las
+ * gestiona (crear/editar/eliminar); el vendedor solo las lee para elegir una al cobrar.
+ */
 class TarjetaRepository {
-    suspend fun getTarjetas(androidId: String): Result<List<Tarjeta>> {
+
+    suspend fun getTarjetas(clienteId: String): Result<List<Tarjeta>> {
         return try {
-            val tarjetas = SupabaseClientProvider.client.postgrest.rpc(
-                "get_tarjetas", buildJsonObject { put("p_android_id", androidId) }
-            ).decodeList<Tarjeta>()
+            val tarjetas = SupabaseClientProvider.client
+                .from("tarjetas")
+                .select { filter { eq("cliente_id", clienteId) } }
+                .decodeList<Tarjeta>()
             Result.success(tarjetas)
-        } catch (e: Exception) { Result.failure(e) }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
-    suspend fun crearTarjeta(androidId: String, banco: String, numero: String, titular: String, almacenId: String): Result<Unit> {
+    suspend fun getTarjetasActivas(clienteId: String): Result<List<Tarjeta>> {
         return try {
-            SupabaseClientProvider.client.postgrest.rpc(
-                "crear_tarjeta",
-                buildJsonObject { put("p_android_id", androidId); put("p_banco", banco); put("p_numero", numero); put("p_titular", titular); put("p_almacen_id", almacenId) }
+            val tarjetas = SupabaseClientProvider.client
+                .from("tarjetas")
+                .select {
+                    filter {
+                        eq("cliente_id", clienteId)
+                        eq("activo", true)
+                    }
+                }
+                .decodeList<Tarjeta>()
+            Result.success(tarjetas)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun crearTarjeta(clienteId: String, banco: String, numero: String, titular: String): Result<Unit> {
+        return try {
+            SupabaseClientProvider.client.from("tarjetas").insert(
+                mapOf(
+                    "cliente_id" to clienteId,
+                    "banco" to banco,
+                    "numero" to numero,
+                    "titular" to titular
+                )
             )
             Result.success(Unit)
-        } catch (e: Exception) { Result.failure(e) }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun editarTarjeta(id: Long, banco: String, numero: String, titular: String): Result<Unit> {
+        return try {
+            SupabaseClientProvider.client.from("tarjetas").update(
+                mapOf(
+                    "banco" to banco,
+                    "numero" to numero,
+                    "titular" to titular
+                )
+            ) { filter { eq("id", id) } }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun setActivo(id: Long, activo: Boolean): Result<Unit> {
+        return try {
+            SupabaseClientProvider.client.from("tarjetas")
+                .update(mapOf("activo" to activo)) { filter { eq("id", id) } }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun eliminarTarjeta(id: Long): Result<Unit> {
+        return try {
+            SupabaseClientProvider.client.from("tarjetas").delete { filter { eq("id", id) } }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }
