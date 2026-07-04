@@ -24,6 +24,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.luisito.gestor360.data.models.Product
+import android.util.Log
+import org.luisito.gestor360.utils.ExportManager
 import org.luisito.gestor360.ui.components.BuscadorField
 import org.luisito.gestor360.ui.components.ConfirmarEliminarDialog
 import org.luisito.gestor360.ui.components.EstadoCargando
@@ -96,6 +98,31 @@ fun ProductosScreen(
                 actions = {
                     IconButton(onClick = { viewModel.refrescar() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refrescar")
+                    }
+                    var mostrarConfirmarDescarga by remember { mutableStateOf(false) }
+                    if (mostrarConfirmarDescarga) {
+                        AlertDialog(
+                            onDismissRequest = { mostrarConfirmarDescarga = false },
+                            title = { Text("Descargar productos") },
+                            text = { Text("Se descargará un archivo CSV con la lista de productos.") },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    val uri = ExportManager.exportarProductosCSV(context, uiState.productos)
+                                    uri?.let { ExportManager.compartir(context, it, "Productos") }
+                                    mostrarConfirmarDescarga = false
+                                }) { Text("Descargar") }
+                            },
+                            dismissButton = { TextButton(onClick = { mostrarConfirmarDescarga = false }) { Text("Cancelar") } }
+                        )
+                    }
+                    IconButton(onClick = { mostrarConfirmarDescarga = true }) {
+                        Icon(Icons.Default.Download, contentDescription = "Descargar")
+                    }
+                    IconButton(onClick = {
+                        val uri = ExportManager.exportarProductosCSV(context, uiState.productos)
+                        uri?.let { ExportManager.compartir(context, it, "Productos") }
+                    }) {
+                        Icon(Icons.Default.Download, contentDescription = "Descargar")
                     }
                 }
             )
