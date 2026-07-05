@@ -47,6 +47,7 @@ import org.luisito.gestor360.data.models.User
 import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.data.sync.SyncWorker
 import org.luisito.gestor360.ui.components.SyncStatusBar
+import org.luisito.gestor360.ui.components.VerificarActualizacion
 import org.luisito.gestor360.ui.screens.AprobacionesScreen
 import org.luisito.gestor360.ui.screens.CierreCajaScreen
 import org.luisito.gestor360.ui.screens.ConflictosScreen
@@ -93,6 +94,7 @@ private sealed class PantallaInterna {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Gestor360App() {
+    VerificarActualizacion()
     val context = androidx.compose.ui.platform.LocalContext.current
     val sessionManager = remember { SessionManager(context) }
     val accesoViewModel: AccesoViewModel = viewModel()
