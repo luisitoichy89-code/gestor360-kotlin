@@ -2,19 +2,10 @@ package org.luisito.gestor360.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CreditCard
-import androidx.compose.material.icons.filled.Payments
-import androidx.compose.material.icons.filled.Percent
-import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,447 +14,110 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import org.luisito.gestor360.data.models.CartItem
-import org.luisito.gestor360.data.models.MetodoPago
-import org.luisito.gestor360.data.models.Product
 import org.luisito.gestor360.data.models.Tarjeta
+import org.luisito.gestor360.data.models.Product
 import org.luisito.gestor360.data.repository.SaleRepository
-import org.luisito.gestor360.data.repository.TopVendido
 import org.luisito.gestor360.ui.viewmodels.SaleViewModel
 import org.luisito.gestor360.ui.viewmodels.TarjetaViewModel
-import kotlin.math.max
 
-/**
- * Pantalla de ventas tipo POS: buscar producto, agregarlo con cantidad al carrito y cobrar
- * en efectivo, transferencia o mixto. Equivalente a la ruta /ventas del backend Flask.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VentasScreen(
-    androidId: String,
-    onBack: (() -> Unit)? = null,
+    androidId: String, onBack: () -> Unit,
     viewModel: SaleViewModel = viewModel(),
     tarjetaViewModel: TarjetaViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val tarjetaUiState by tarjetaViewModel.uiState.collectAsState()
-    var query by remember { mutableStateOf("") }
-    var productoSeleccionado by remember { mutableStateOf<Product?>(null) }
-    var mostrarTransferencia by remember { mutableStateOf(false) }
-    var mostrarMixto by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedProduct by remember { mutableStateOf<Product?>(null) }
+    var cantidad by remember { mutableStateOf("") }
+    var showEfectivoConfirm by remember { mutableStateOf(false) }
+    var showTransferenciaDialog by remember { mutableStateOf(false) }
+    var showMixtoDialog by remember { mutableStateOf(false) }
+    var showMixtoTransferencia by remember { mutableStateOf(false) }
     var montoEfectivoMixto by remember { mutableStateOf(0.0) }
+    var clienteCi by remember { mutableStateOf("") }
+    var clienteTel by remember { mutableStateOf("") }
+    var clienteNombre by remember { mutableStateOf("") }
+    var tarjetaSeleccionada by remember { mutableStateOf<Tarjeta?>(null) }
+    var menuTarjetasAbierto by remember { mutableStateOf(false) }
 
-    LaunchedEffect(androidId) { viewModel.iniciar(androidId) }
-    LaunchedEffect(androidId) { tarjetaViewModel.cargar(androidId) }
+    LaunchedEffect(androidId) { viewModel.iniciar(androidId); tarjetaViewModel.cargar(androidId) }
 
-    LaunchedEffect(uiState.ventaConfirmada) {
-        if (uiState.ventaConfirmada != null) {
-            kotlinx.coroutines.delay(2500)
-            viewModel.limpiarVentaConfirmada()
-        }
-    }
+    val productosFiltrados = uiState.productos.filter { searchQuery.isBlank() || it.nombre.contains(searchQuery, true) }
+    val totalCarrito = uiState.carrito.sumOf { it.subtotal }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Ventas") },
-                navigationIcon = {
-                    if (onBack != null) {
-                        IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Volver") }
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-
-            uiState.ventaConfirmada?.let { total ->
-                Surface(color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        "✅ Venta registrada: $total CUP",
-                        modifier = Modifier.padding(12.dp),
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            uiState.error?.let { error ->
-                Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.padding(12.dp).fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(error, color = MaterialTheme.colorScheme.onErrorContainer)
-                        IconButton(onClick = { viewModel.clearError() }) {
-                            Icon(Icons.Default.Close, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
+    Scaffold(topBar = { TopAppBar(title = { Text("Ventas") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Volver") } }) }) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+            OutlinedTextField(searchQuery, { searchQuery = it }, label = { Text("Buscar producto") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(8.dp))
+            LazyColumn(Modifier.weight(1f)) {
+                items(productosFiltrados) { p ->
+                    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp), onClick = { selectedProduct = p; cantidad = "" }) {
+                        Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) { Text(p.nombre, style = MaterialTheme.typography.titleMedium); Text("Stock: ${p.stock.toInt()}", style = MaterialTheme.typography.bodySmall) }
+                            Text("${p.precio} CUP", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
-
-            Column(modifier = Modifier.padding(16.dp)) {
-                if (uiState.top5.isNotEmpty() && uiState.carrito.isEmpty()) {
-                    Text("🏆 Top 5 más vendidos", style = MaterialTheme.typography.labelLarge)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(uiState.top5) { top ->
-                            Top5Chip(top) {
-                                query = top.producto_nombre
-                                viewModel.buscarProducto(query)
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it; viewModel.buscarProducto(it) },
-                    label = { Text("Buscar producto...") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            if (uiState.resultadosBusqueda.isNotEmpty()) {
-                LazyColumn(modifier = Modifier.weight(1f, fill = false).padding(horizontal = 16.dp)) {
-                    items(uiState.resultadosBusqueda, key = { it.id }) { producto ->
-                        ProductoResultadoItem(producto) {
-                            productoSeleccionado = producto
-                            query = ""
-                            viewModel.limpiarBusqueda()
-                        }
-                    }
-                }
-            }
-
-            productoSeleccionado?.let { producto ->
-                SelectorCantidadCard(
-                    producto = producto,
-                    onCancelar = { productoSeleccionado = null },
-                    onAgregar = { cantidad ->
-                        val error = viewModel.agregarAlCarrito(producto, cantidad)
-                        if (error == null) productoSeleccionado = null
-                    }
-                )
-            }
-
-            LazyColumn(
-                modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                itemsIndexed(uiState.carrito) { index, item ->
-                    CarritoItemRow(item) { viewModel.quitarDelCarrito(index) }
-                }
-            }
-
             if (uiState.carrito.isNotEmpty()) {
-                Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Total de la venta", style = MaterialTheme.typography.bodyMedium)
-                            Text("${uiState.total} CUP", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                            Button(
-                                onClick = { viewModel.confirmarVenta(MetodoPago.EFECTIVO.valor, uiState.total, 0.0) },
-                                enabled = !uiState.isSaving,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(Icons.Default.Payments, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Efectivo")
-                            }
-                            OutlinedButton(
-                                onClick = { mostrarTransferencia = true },
-                                enabled = !uiState.isSaving,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(Icons.Default.CreditCard, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Transf.")
-                            }
-                            OutlinedButton(
-                                onClick = { mostrarMixto = true },
-                                enabled = !uiState.isSaving,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(Icons.Default.Percent, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Mixto")
-                            }
-                        }
+                Divider()
+                Text("Carrito (${uiState.carrito.size} items)", style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.height(8.dp))
+                LazyColumn(Modifier.heightIn(max = 200.dp)) {
+                    items(uiState.carrito.size) { i -> val item = uiState.carrito[i]
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) { Text("${item.nombre} x${item.cantidad.toInt()} = ${item.subtotal} CUP", Modifier.weight(1f)); IconButton(onClick = { viewModel.quitarDelCarrito(i) }) { Icon(Icons.Default.Delete, "Quitar") } }
                     }
                 }
-            }
-        }
-    }
-
-    if (mostrarTransferencia) {
-        DatosClienteDialog(
-            titulo = "Transferencia",
-            montoATransferir = uiState.total,
-            isSaving = uiState.isSaving,
-            tarjetas = tarjetaUiState.tarjetas.filter { it.activo },
-            onDismiss = { mostrarTransferencia = false },
-            onConfirmar = { cliente ->
-                viewModel.confirmarVenta(MetodoPago.TRANSFERENCIA.valor, 0.0, uiState.total, cliente)
-                mostrarTransferencia = false
-            }
-        )
-    }
-
-    if (mostrarMixto) {
-        MontoEfectivoDialog(
-            total = uiState.total,
-            onDismiss = { mostrarMixto = false },
-            onContinuar = { efectivo ->
-                montoEfectivoMixto = efectivo
-                mostrarMixto = false
-                mostrarTransferencia = true
-            }
-        )
-    }
-
-    // Si el monto mixto ya fue definido, el diálogo de transferencia siguiente confirma con "mixed".
-    if (mostrarTransferencia && montoEfectivoMixto > 0.0) {
-        DatosClienteDialog(
-            titulo = "Pago mixto",
-            montoATransferir = max(0.0, uiState.total - montoEfectivoMixto),
-            isSaving = uiState.isSaving,
-            tarjetas = tarjetaUiState.tarjetas.filter { it.activo },
-            onDismiss = { mostrarTransferencia = false; montoEfectivoMixto = 0.0 },
-            onConfirmar = { cliente ->
-                viewModel.confirmarVenta(
-                    MetodoPago.MIXTO.valor,
-                    montoEfectivoMixto,
-                    max(0.0, uiState.total - montoEfectivoMixto),
-                    cliente
-                )
-                mostrarTransferencia = false
-                montoEfectivoMixto = 0.0
-            }
-        )
-    }
-}
-
-@Composable
-private fun Top5Chip(top: TopVendido, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.secondaryContainer
-    ) {
-        Column(modifier = Modifier.padding(10.dp)) {
-            Text(top.producto_nombre, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-            Text("${top.total.toInt()} vendidos", style = MaterialTheme.typography.labelSmall)
-        }
-    }
-}
-
-@Composable
-private fun ProductoResultadoItem(producto: Product, onClick: () -> Unit) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), onClick = onClick) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(producto.nombre, fontWeight = FontWeight.Bold)
-                Text("Stock: ${producto.stock}", style = MaterialTheme.typography.bodySmall)
-            }
-            Text("${producto.precio} CUP", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-@Composable
-private fun SelectorCantidadCard(producto: Product, onCancelar: () -> Unit, onAgregar: (Double) -> Unit) {
-    var cantidad by remember(producto.id) { mutableStateOf(1.0) }
-
-    ElevatedCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column {
-                    Text(producto.nombre, style = MaterialTheme.typography.titleMedium)
-                    Text("${producto.precio} CUP · Disponible: ${producto.stock}", style = MaterialTheme.typography.bodySmall)
-                }
-                IconButton(onClick = onCancelar) { Icon(Icons.Default.Close, contentDescription = "Cancelar") }
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                IconButton(onClick = { if (cantidad > 1) cantidad -= 1 }) { Icon(Icons.Default.Remove, contentDescription = null) }
-                OutlinedTextField(
-                    value = if (cantidad == cantidad.toLong().toDouble()) cantidad.toLong().toString() else cantidad.toString(),
-                    onValueChange = { it.toDoubleOrNull()?.let { v -> if (v in 0.0..producto.stock) cantidad = v } },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-                )
-                IconButton(onClick = { if (cantidad < producto.stock) cantidad += 1 }) { Icon(Icons.Default.Add, contentDescription = null) }
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-            Button(
-                onClick = { onAgregar(cantidad) },
-                enabled = cantidad > 0 && cantidad <= producto.stock,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Default.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Agregar al carrito")
-            }
-        }
-    }
-}
-
-@Composable
-private fun CarritoItemRow(item: CartItem, onEliminar: () -> Unit) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(item.nombre, fontWeight = FontWeight.Bold)
-                Text("${item.cantidad} × ${item.precio} CUP", style = MaterialTheme.typography.bodySmall)
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("${item.subtotal} CUP", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                IconButton(onClick = onEliminar) { Icon(Icons.Default.Close, contentDescription = "Quitar") }
-            }
-        }
-    }
-}
-
-@Composable
-private fun MontoEfectivoDialog(total: Double, onDismiss: () -> Unit, onContinuar: (Double) -> Unit) {
-    var montoTexto by remember { mutableStateOf("") }
-    val monto = montoTexto.toDoubleOrNull()
-    val valido = monto != null && monto >= 0 && monto <= total
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Pago mixto") },
-        text = {
-            Column {
-                Text("Total: $total CUP")
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = montoTexto,
-                    onValueChange = { montoTexto = it },
-                    label = { Text("Monto en efectivo") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                if (monto != null) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Restante por transferencia: ${max(0.0, total - monto)} CUP", style = MaterialTheme.typography.bodySmall)
+                Spacer(Modifier.height(8.dp))
+                Text("Total: $totalCarrito CUP", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Button({ showEfectivoConfirm = true }, Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("EFECTIVO", style = MaterialTheme.typography.labelSmall) }
+                    Button({ showTransferenciaDialog = true }, Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("TRANSFER", style = MaterialTheme.typography.labelSmall) }
+                    Button({ showMixtoDialog = true }, Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("MIXTO", style = MaterialTheme.typography.labelSmall) }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(enabled = valido, onClick = { onContinuar(monto ?: 0.0) }) { Text("Continuar") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
-    )
+        }
+    }
+
+    if (selectedProduct != null) {
+        AlertDialog(onDismissRequest = { selectedProduct = null }, title = { Text(selectedProduct!!.nombre) }, text = { Column { Text("Stock: ${selectedProduct!!.stock.toInt()} unidades"); Spacer(Modifier.height(8.dp)); OutlinedTextField(cantidad, { cantidad = it.filter { c -> c.isDigit() || c == '.' } }, label = { Text("Cantidad") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true) } }, confirmButton = { TextButton(onClick = { val c = cantidad.toDoubleOrNull() ?: 0.0; val err = viewModel.agregarAlCarrito(selectedProduct!!, c); if (err == null) { selectedProduct = null; cantidad = "" } }) { Text("Agregar") } }, dismissButton = { TextButton(onClick = { selectedProduct = null }) { Text("Cancelar") } })
+    }
+
+    if (showEfectivoConfirm) AlertDialog(onDismissRequest = { showEfectivoConfirm = false }, title = { Text("Confirmar venta") }, text = { Text("Total: $totalCarrito CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) }, confirmButton = { TextButton(onClick = { viewModel.confirmarVenta("cash", totalCarrito, 0.0, 0L, null); showEfectivoConfirm = false }) { Text("Aceptar") } }, dismissButton = { TextButton(onClick = { showEfectivoConfirm = false }) { Text("Cancelar") } })
+
+    if (showTransferenciaDialog) DatosClienteDialog("Transferencia", totalCarrito, tarjetaUiState.tarjetas, { showTransferenciaDialog = false }) { ci, tel, nombre, tarjeta ->
+        viewModel.confirmarVenta("transfer", 0.0, totalCarrito, 0L, SaleRepository.DatosCliente(ci, tel, nombre, "${tarjeta.banco} · ${tarjeta.numero}")); showTransferenciaDialog = false
+    }
+
+    if (showMixtoDialog) {
+        var efTexto by remember { mutableStateOf("") }
+        AlertDialog(onDismissRequest = { showMixtoDialog = false }, title = { Text("Pago mixto") }, text = { Column { Text("Total: $totalCarrito CUP"); OutlinedTextField(efTexto, { efTexto = it.filter { c -> c.isDigit() } }, label = { Text("Monto en efectivo") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true); val ef = efTexto.toDoubleOrNull() ?: 0.0; if (ef > 0) Text("Restante: ${totalCarrito - ef} CUP") } }, confirmButton = { val ef = efTexto.toDoubleOrNull() ?: 0.0; TextButton(enabled = ef > 0 && ef < totalCarrito, onClick = { montoEfectivoMixto = ef; showMixtoDialog = false; showMixtoTransferencia = true }) { Text("Continuar") } }, dismissButton = { TextButton(onClick = { showMixtoDialog = false }) { Text("Cancelar") } })
+    }
+
+    if (showMixtoTransferencia) DatosClienteDialog("Mixto - Transferencia", totalCarrito - montoEfectivoMixto, tarjetaUiState.tarjetas, { showMixtoTransferencia = false; showMixtoDialog = true }) { ci, tel, nombre, tarjeta ->
+        viewModel.confirmarVenta("mixed", montoEfectivoMixto, totalCarrito - montoEfectivoMixto, 0L, SaleRepository.DatosCliente(ci, tel, nombre, "${tarjeta.banco} · ${tarjeta.numero}")); showMixtoTransferencia = false
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DatosClienteDialog(
-    titulo: String,
-    montoATransferir: Double,
-    isSaving: Boolean,
-    tarjetas: List<Tarjeta>,
-    onDismiss: () -> Unit,
-    onConfirmar: (SaleRepository.DatosCliente) -> Unit
-) {
-    var ci by remember { mutableStateOf("") }
-    var telefono by remember { mutableStateOf("") }
-    var nombre by remember { mutableStateOf("") }
-    var tarjetaSeleccionada by remember { mutableStateOf<Tarjeta?>(tarjetas.firstOrNull()) }
-    var menuTarjetasAbierto by remember { mutableStateOf(false) }
-
-    val valido = ci.isNotBlank() && telefono.isNotBlank() && nombre.isNotBlank() && tarjetaSeleccionada != null
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(titulo) },
-        text = {
-            Column {
-                Text("Monto a transferir: $montoATransferir CUP", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(12.dp))
-
-                if (tarjetas.isEmpty()) {
-                    Text(
-                        "El admin aún no ha agregado ninguna cuenta en Tarjetas.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                } else {
-                    ExposedDropdownMenuBox(expanded = menuTarjetasAbierto, onExpandedChange = { menuTarjetasAbierto = it }) {
-                        OutlinedTextField(
-                            value = tarjetaSeleccionada?.let { "${it.banco} · ${it.numero}" } ?: "",
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Cuenta destino") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = menuTarjetasAbierto) },
-                            modifier = Modifier.fillMaxWidth().menuAnchor()
-                        )
-                        ExposedDropdownMenu(expanded = menuTarjetasAbierto, onDismissRequest = { menuTarjetasAbierto = false }) {
-                            tarjetas.forEach { tarjeta ->
-                                DropdownMenuItem(
-                                    text = { Text("${tarjeta.banco} · ${tarjeta.numero}") },
-                                    onClick = { tarjetaSeleccionada = tarjeta; menuTarjetasAbierto = false }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = ci,
-                    onValueChange = { ci = it.filter { c -> c.isDigit() } },
-                    label = { Text("CI del cliente") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = telefono,
-                    onValueChange = { telefono = it.filter { c -> c.isDigit() } },
-                    label = { Text("Teléfono") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = nombre,
-                    onValueChange = { nombre = it.uppercase() },
-                    label = { Text("Nombre del cliente") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                enabled = valido && !isSaving,
-                onClick = {
-                    val tarjeta = tarjetaSeleccionada!!
-                    onConfirmar(SaleRepository.DatosCliente(ci, telefono, nombre, "${tarjeta.banco} · ${tarjeta.numero}"))
-                }
-            ) { Text(if (isSaving) "Guardando..." else "Confirmar") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
-    )
+private fun DatosClienteDialog(titulo: String, monto: Double, tarjetas: List<Tarjeta>, onDismiss: () -> Unit, onConfirmar: (String, String, String, Tarjeta) -> Unit) {
+    var ci by remember { mutableStateOf("") }; var tel by remember { mutableStateOf("") }; var nombre by remember { mutableStateOf("") }
+    var tarjetaSel by remember { mutableStateOf(tarjetas.firstOrNull()) }; var menuAbierto by remember { mutableStateOf(false) }
+    AlertDialog(onDismissRequest = onDismiss, title = { Text(titulo) }, text = { Column {
+        Text("Monto: $monto CUP", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(12.dp))
+        if (tarjetas.isEmpty()) Text("No hay tarjetas", color = MaterialTheme.colorScheme.error) else ExposedDropdownMenuBox(menuAbierto, { menuAbierto = it }) {
+            OutlinedTextField(tarjetaSel?.let { "${it.banco} · ${it.numero}" } ?: "Seleccionar", {}, readOnly = true, label = { Text("Cuenta destino") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(menuAbierto) }, modifier = Modifier.fillMaxWidth().menuAnchor())
+            ExposedDropdownMenu(menuAbierto, { menuAbierto = false }) { tarjetas.forEach { t -> DropdownMenuItem(text = { Text("${t.banco} · ${t.numero}") }, onClick = { tarjetaSel = t; menuAbierto = false }) } }
+        }
+        Spacer(Modifier.height(8.dp))
+        OutlinedTextField(ci, { ci = it.filter { c -> c.isDigit() } }, label = { Text("CI") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(tel, { tel = it.filter { c -> c.isDigit() } }, label = { Text("Teléfono") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(nombre, { nombre = it.uppercase() }, label = { Text("Nombre") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    } }, confirmButton = { TextButton(enabled = ci.isNotBlank() && tel.isNotBlank() && nombre.isNotBlank() && tarjetaSel != null, onClick = { onConfirmar(ci, tel, nombre, tarjetaSel!!) }) { Text("Confirmar") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } })
 }
