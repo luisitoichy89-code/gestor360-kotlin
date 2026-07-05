@@ -29,8 +29,8 @@ fun SplashScreen(onFinished: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Gestor360°", fontSize = 48.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.alpha(alpha))
-            Text("Sistema de gestión comercial", fontSize = 16.sp, color = Color.White.copy(alpha = 0.8f), modifier = Modifier.alpha(alpha))
+            Text("Gestor360°", fontSize = 48.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier)
+            Text("Sistema de gestión comercial", fontSize = 16.sp, color = Color.White.copy(alpha = 0.8f), modifier = Modifier)
         }
     }
 }
