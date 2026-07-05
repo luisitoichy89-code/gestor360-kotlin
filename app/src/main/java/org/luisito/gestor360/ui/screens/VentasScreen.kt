@@ -94,9 +94,9 @@ fun VentasScreen(
                 Text("Total: $totalCarrito CUP", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { showEfectivoConfirm = true }, modifier = Modifier.weight(1f)) { Text("💵 Efectivo") }
-                    Button(onClick = { showTransferenciaDialog = true }, modifier = Modifier.weight(1f)) { Text("📲 Transfer.") }
-                    Button(onClick = { showMixtoDialog = true }, modifier = Modifier.weight(1f)) { Text("💱 Mixto") }
+                    Button(onClick = { showEfectivoConfirm = true }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) { Text("EFECTIVO") }
+                    Button(onClick = { showTransferenciaDialog = true }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) { Text("TRANSFER.") }
+                    Button(onClick = { showMixtoDialog = true }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) { Text("MIXTO") }
                 }
             }
         }
