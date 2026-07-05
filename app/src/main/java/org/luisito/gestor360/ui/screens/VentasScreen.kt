@@ -40,10 +40,11 @@ fun VentasScreen(
     var clienteCi by remember { mutableStateOf("") }
     var clienteTel by remember { mutableStateOf("") }
     var clienteNombre by remember { mutableStateOf("") }
-    var tarjetaSeleccionada by remember { mutableStateOf<Tarjeta?>(null) }
-    var menuTarjetasAbierto by remember { mutableStateOf(false) }
 
-    LaunchedEffect(androidId) { viewModel.iniciar(androidId); tarjetaViewModel.cargar(androidId, "") }
+    LaunchedEffect(androidId) {
+        viewModel.iniciar(androidId)
+        tarjetaViewModel.cargar(androidId)
+    }
 
     val productosFiltrados = uiState.productos.filter { searchQuery.isBlank() || it.nombre.contains(searchQuery, true) }
     val totalCarrito = uiState.carrito.sumOf { it.subtotal }
@@ -52,11 +53,14 @@ fun VentasScreen(
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
             OutlinedTextField(searchQuery, { searchQuery = it }, label = { Text("Buscar producto") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(modifier = Modifier.height(8.dp))
-            LazyColumn(Modifier.weight(1f)) {
+            LazyColumn(modifier = Modifier.weight(1f)) {
                 items(productosFiltrados) { p ->
-                    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp), onClick = { selectedProduct = p; cantidad = "" }) {
-                        Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) { Text(p.nombre, style = MaterialTheme.typography.titleMedium); Text("Stock: ${p.stock.toInt()}", style = MaterialTheme.typography.bodySmall) }
+                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), onClick = { selectedProduct = p; cantidad = "" }) {
+                        Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(p.nombre, style = MaterialTheme.typography.titleMedium)
+                                Text("Stock: ${p.stock.toInt()}", style = MaterialTheme.typography.bodySmall)
+                            }
                             Text("${p.precio} CUP", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                         }
                     }
@@ -66,28 +70,50 @@ fun VentasScreen(
                 Divider()
                 Text("Carrito (${uiState.carrito.size} items)", style = MaterialTheme.typography.titleSmall)
                 Spacer(modifier = Modifier.height(8.dp))
-                LazyColumn(Modifier.heightIn(max = 200.dp)) {
-                    items(uiState.carrito.size) { i -> val item = uiState.carrito[i]
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) { Text("${item.nombre} x${item.cantidad.toInt()} = ${item.subtotal} CUP", Modifier.weight(1f)); IconButton(onClick = { viewModel.quitarDelCarrito(i) }) { Icon(Icons.Default.Delete, "Quitar") } }
+                LazyColumn(modifier = Modifier.heightIn(max = 200.dp)) {
+                    items(uiState.carrito.size) { i ->
+                        val item = uiState.carrito[i]
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
+                            Text("${item.nombre} x${item.cantidad.toInt()} = ${item.subtotal} CUP", modifier = Modifier.weight(1f))
+                            IconButton(onClick = { viewModel.quitarDelCarrito(i) }) { Icon(Icons.Default.Delete, "Quitar") }
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Total: $totalCarrito CUP", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Button({ showEfectivoConfirm = true }, Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("EFECTIVO", style = MaterialTheme.typography.labelSmall) }
-                    Button({ showTransferenciaDialog = true }, Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("TRANSFER", style = MaterialTheme.typography.labelSmall) }
-                    Button({ showMixtoDialog = true }, Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("MIXTO", style = MaterialTheme.typography.labelSmall) }
+                    Button(onClick = { showEfectivoConfirm = true }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("EFECTIVO", style = MaterialTheme.typography.labelSmall) }
+                    Button(onClick = { showTransferenciaDialog = true }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("TRANSFER", style = MaterialTheme.typography.labelSmall) }
+                    Button(onClick = { showMixtoDialog = true }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("MIXTO", style = MaterialTheme.typography.labelSmall) }
                 }
             }
         }
     }
 
     if (selectedProduct != null) {
-        AlertDialog(onDismissRequest = { selectedProduct = null }, title = { Text(selectedProduct!!.nombre) }, text = { Column { Text("Stock: ${selectedProduct!!.stock.toInt()} unidades"); Spacer(modifier = Modifier.height(8.dp)); OutlinedTextField(cantidad, { cantidad = it.filter { c -> c.isDigit() || c == '.' } }, label = { Text("Cantidad") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true) } }, confirmButton = { TextButton(onClick = { val c = cantidad.toDoubleOrNull() ?: 0.0; val err = viewModel.agregarAlCarrito(selectedProduct!!, c); if (err == null) { selectedProduct = null; cantidad = "" } }) { Text("Agregar") } }, dismissButton = { TextButton(onClick = { selectedProduct = null }) { Text("Cancelar") } })
+        AlertDialog(
+            onDismissRequest = { selectedProduct = null },
+            title = { Text(selectedProduct!!.nombre) },
+            text = {
+                Column {
+                    Text("Stock: ${selectedProduct!!.stock.toInt()} unidades")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(cantidad, { cantidad = it.filter { c -> c.isDigit() || c == '.' } }, label = { Text("Cantidad") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
+                }
+            },
+            confirmButton = { TextButton(onClick = { val c = cantidad.toDoubleOrNull() ?: 0.0; val err = viewModel.agregarAlCarrito(selectedProduct!!, c); if (err == null) { selectedProduct = null; cantidad = "" } }) { Text("Agregar") } },
+            dismissButton = { TextButton(onClick = { selectedProduct = null }) { Text("Cancelar") } }
+        )
     }
 
-    if (showEfectivoConfirm) AlertDialog(onDismissRequest = { showEfectivoConfirm = false }, title = { Text("Confirmar venta") }, text = { Text("Total: $totalCarrito CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) }, confirmButton = { TextButton(onClick = { viewModel.confirmarVenta("cash", totalCarrito, 0.0, 0L, null); showEfectivoConfirm = false }) { Text("Aceptar") } }, dismissButton = { TextButton(onClick = { showEfectivoConfirm = false }) { Text("Cancelar") } })
+    if (showEfectivoConfirm) AlertDialog(
+        onDismissRequest = { showEfectivoConfirm = false },
+        title = { Text("Confirmar venta") },
+        text = { Text("Total: $totalCarrito CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) },
+        confirmButton = { TextButton(onClick = { viewModel.confirmarVenta("cash", totalCarrito, 0.0, 0L, null); showEfectivoConfirm = false }) { Text("Aceptar") } },
+        dismissButton = { TextButton(onClick = { showEfectivoConfirm = false }) { Text("Cancelar") } }
+    )
 
     if (showTransferenciaDialog) DatosClienteDialog("Transferencia", totalCarrito, tarjetaUiState.tarjetas, { showTransferenciaDialog = false }) { ci, tel, nombre, tarjeta ->
         viewModel.confirmarVenta("transfer", 0.0, totalCarrito, 0L, SaleRepository.DatosCliente(ci, tel, nombre, "${tarjeta.banco} · ${tarjeta.numero}")); showTransferenciaDialog = false
