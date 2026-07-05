@@ -14,9 +14,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import org.luisito.gestor360.data.models.CartItem
-import org.luisito.gestor360.data.models.Product
 import org.luisito.gestor360.data.models.Tarjeta
+import org.luisito.gestor360.data.models.Product
 import org.luisito.gestor360.data.repository.SaleRepository
 import org.luisito.gestor360.ui.viewmodels.SaleViewModel
 import org.luisito.gestor360.ui.viewmodels.TarjetaViewModel
@@ -33,7 +32,7 @@ fun VentasScreen(
     val tarjetaUiState by tarjetaViewModel.uiState.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     var selectedProduct by remember { mutableStateOf<Product?>(null) }
-    var cantidad by remember { mutableStateOf(0.0) }
+    var cantidad by remember { mutableStateOf("") }
     var showEfectivoConfirm by remember { mutableStateOf(false) }
     var showTransferenciaDialog by remember { mutableStateOf(false) }
     var showMixtoDialog by remember { mutableStateOf(false) }
@@ -53,19 +52,15 @@ fun VentasScreen(
     val productosFiltrados = uiState.productos.filter {
         searchQuery.isBlank() || it.nombre.contains(searchQuery, true)
     }
-
     val totalCarrito = uiState.carrito.sumOf { it.subtotal }
 
-    Scaffold(
-        topBar = { TopAppBar(title = { Text("Ventas") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Volver") } }) }
-    ) { padding ->
+    Scaffold(topBar = { TopAppBar(title = { Text("Ventas") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Volver") } }) }) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
             OutlinedTextField(value = searchQuery, onValueChange = { searchQuery = it }, label = { Text("Buscar producto") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(modifier = Modifier.height(8.dp))
-
             LazyColumn(modifier = Modifier.weight(1f)) {
                 items(productosFiltrados) { producto ->
-                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), onClick = { selectedProduct = producto; cantidad = 0.0 }) {
+                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), onClick = { selectedProduct = producto; cantidad = "" }) {
                         Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(producto.nombre, style = MaterialTheme.typography.titleMedium)
@@ -76,7 +71,6 @@ fun VentasScreen(
                     }
                 }
             }
-
             if (uiState.carrito.isNotEmpty()) {
                 Divider()
                 Text("Carrito (${uiState.carrito.size} items)", style = MaterialTheme.typography.titleSmall)
@@ -93,16 +87,15 @@ fun VentasScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Total: $totalCarrito CUP", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { showEfectivoConfirm = true }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) { Text("EFECTIVO") }
-                    Button(onClick = { showTransferenciaDialog = true }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) { Text("TRANSFER.") }
-                    Button(onClick = { showMixtoDialog = true }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) { Text("MIXTO") }
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Button(onClick = { showEfectivoConfirm = true }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("EFECTIVO", style = MaterialTheme.typography.labelSmall) }
+                    Button(onClick = { showTransferenciaDialog = true }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("TRANSFER", style = MaterialTheme.typography.labelSmall) }
+                    Button(onClick = { showMixtoDialog = true }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("MIXTO", style = MaterialTheme.typography.labelSmall) }
                 }
             }
         }
     }
 
-    // Selector de cantidad
     if (selectedProduct != null) {
         AlertDialog(
             onDismissRequest = { selectedProduct = null },
@@ -111,52 +104,32 @@ fun VentasScreen(
                 Column {
                     Text("Stock: ${selectedProduct!!.stock.toInt()} unidades")
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = if (cantidad == cantidad.toLong().toDouble()) cantidad.toLong().toString() else cantidad.toString(),
-                        onValueChange = { cantidad = it.toDoubleOrNull() ?: 0.0 },
-                        label = { Text("Cantidad") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true
-                    )
+                    OutlinedTextField(value = cantidad, onValueChange = { cantidad = it.filter { c -> c.isDigit() || c == '.' } }, label = { Text("Cantidad") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
                 }
             },
-            confirmButton = { TextButton(onClick = { val error = viewModel.agregarAlCarrito(selectedProduct!!, cantidad); if (error == null) { selectedProduct = null; cantidad = 1.0 } else { /* mostrar error */ } }) { Text("Agregar") } },
+            confirmButton = { TextButton(onClick = { val c = cantidad.toDoubleOrNull() ?: 0.0; val err = viewModel.agregarAlCarrito(selectedProduct!!, c); if (err == null) { selectedProduct = null; cantidad = "" } }) { Text("Agregar") } },
             dismissButton = { TextButton(onClick = { selectedProduct = null }) { Text("Cancelar") } }
         )
     }
 
-    // Confirmación de efectivo
     if (showEfectivoConfirm) {
         AlertDialog(
             onDismissRequest = { showEfectivoConfirm = false },
             title = { Text("Confirmar venta") },
-            text = { Text("Total a cobrar en efectivo:", fontWeight = FontWeight.Bold) },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.confirmarVenta("cash", totalCarrito, 0.0, 0L, null)
-                    showEfectivoConfirm = false
-                }) { Text("Aceptar", color = MaterialTheme.colorScheme.primary) }
-            },
+            text = { Text("Total a cobrar en efectivo: $totalCarrito CUP", fontWeight = FontWeight.Bold) },
+            confirmButton = { TextButton(onClick = { viewModel.confirmarVenta("cash", totalCarrito, 0.0, 0L, null); showEfectivoConfirm = false }) { Text("Aceptar", color = MaterialTheme.colorScheme.primary) } },
             dismissButton = { TextButton(onClick = { showEfectivoConfirm = false }) { Text("Cancelar") } }
         )
     }
 
-    // Transferencia
     if (showTransferenciaDialog) {
-        DatosClienteDialog(
-            titulo = "Transferencia",
-            monto = totalCarrito,
-            tarjetas = tarjetaUiState.tarjetas,
-            onDismiss = { showTransferenciaDialog = false },
-            onConfirmar = { ci, tel, nombre, tarjeta ->
-                val cliente = SaleRepository.DatosCliente(ci, tel, nombre, "${tarjeta.banco} · ${tarjeta.numero}")
-                viewModel.confirmarVenta("transfer", 0.0, totalCarrito, 0L, cliente)
-                showTransferenciaDialog = false
-            }
-        )
+        DatosClienteDialog(titulo = "Transferencia", monto = totalCarrito, tarjetas = tarjetaUiState.tarjetas, onDismiss = { showTransferenciaDialog = false }, onConfirmar = { ci, tel, nombre, tarjeta ->
+            val cliente = SaleRepository.DatosCliente(ci, tel, nombre, "${tarjeta.banco} · ${tarjeta.numero}")
+            viewModel.confirmarVenta("transfer", 0.0, totalCarrito, 0L, cliente)
+            showTransferenciaDialog = false
+        })
     }
 
-    // Mixto - monto efectivo
     if (showMixtoDialog) {
         var efectivoTexto by remember { mutableStateOf("") }
         AlertDialog(
@@ -166,60 +139,29 @@ fun VentasScreen(
                 Column {
                     Text("Total: $totalCarrito CUP")
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = efectivoTexto,
-                        onValueChange = { efectivoTexto = it.filter { c -> c.isDigit() } },
-                        label = { Text("Monto en efectivo") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true
-                    )
+                    OutlinedTextField(value = efectivoTexto, onValueChange = { efectivoTexto = it.filter { c -> c.isDigit() } }, label = { Text("Monto en efectivo") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
                     val efectivo = efectivoTexto.toDoubleOrNull() ?: 0.0
-                    if (efectivo > 0) {
-                        Text("Restante transferencia: ${totalCarrito - efectivo} CUP", style = MaterialTheme.typography.bodySmall)
-                    }
+                    if (efectivo > 0) Text("Restante transferencia: ${totalCarrito - efectivo} CUP", style = MaterialTheme.typography.bodySmall)
                 }
             },
-            confirmButton = {
-                val efectivo = efectivoTexto.toDoubleOrNull() ?: 0.0
-                TextButton(enabled = efectivo > 0 && efectivo < totalCarrito, onClick = {
-                    montoEfectivoMixto = efectivo
-                    showMixtoDialog = false
-                    showMixtoTransferencia = true
-                }) { Text("Continuar") }
-            },
+            confirmButton = { val efectivo = efectivoTexto.toDoubleOrNull() ?: 0.0; TextButton(enabled = efectivo > 0 && efectivo < totalCarrito, onClick = { montoEfectivoMixto = efectivo; showMixtoDialog = false; showMixtoTransferencia = true }) { Text("Continuar") } },
             dismissButton = { TextButton(onClick = { showMixtoDialog = false }) { Text("Cancelar") } }
         )
     }
 
-    // Mixto - transferencia del restante
     if (showMixtoTransferencia) {
         val restante = totalCarrito - montoEfectivoMixto
-        DatosClienteDialog(
-            titulo = "Mixto - Transferencia",
-            monto = restante,
-            tarjetas = tarjetaUiState.tarjetas,
-            onDismiss = {
-                showMixtoTransferencia = false
-                showMixtoDialog = true // regresar al paso anterior
-            },
-            onConfirmar = { ci, tel, nombre, tarjeta ->
-                val cliente = SaleRepository.DatosCliente(ci, tel, nombre, "${tarjeta.banco} · ${tarjeta.numero}")
-                viewModel.confirmarVenta("mixed", montoEfectivoMixto, restante, 0L, cliente)
-                showMixtoTransferencia = false
-            }
-        )
+        DatosClienteDialog(titulo = "Mixto - Transferencia", monto = restante, tarjetas = tarjetaUiState.tarjetas, onDismiss = { showMixtoTransferencia = false; showMixtoDialog = true }, onConfirmar = { ci, tel, nombre, tarjeta ->
+            val cliente = SaleRepository.DatosCliente(ci, tel, nombre, "${tarjeta.banco} · ${tarjeta.numero}")
+            viewModel.confirmarVenta("mixed", montoEfectivoMixto, restante, 0L, cliente)
+            showMixtoTransferencia = false
+        })
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DatosClienteDialog(
-    titulo: String,
-    monto: Double,
-    tarjetas: List<Tarjeta>,
-    onDismiss: () -> Unit,
-    onConfirmar: (String, String, String, Tarjeta) -> Unit
-) {
+private fun DatosClienteDialog(titulo: String, monto: Double, tarjetas: List<Tarjeta>, onDismiss: () -> Unit, onConfirmar: (String, String, String, Tarjeta) -> Unit) {
     var ci by remember { mutableStateOf("") }
     var telefono by remember { mutableStateOf("") }
     var nombre by remember { mutableStateOf("") }
@@ -233,24 +175,12 @@ private fun DatosClienteDialog(
             Column {
                 Text("Monto: $monto CUP", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(12.dp))
-                if (tarjetas.isEmpty()) {
-                    Text("No hay tarjetas registradas", color = MaterialTheme.colorScheme.error)
-                } else {
+                if (tarjetas.isEmpty()) { Text("No hay tarjetas registradas", color = MaterialTheme.colorScheme.error) }
+                else {
                     ExposedDropdownMenuBox(expanded = menuTarjetasAbierto, onExpandedChange = { menuTarjetasAbierto = it }) {
-                        OutlinedTextField(
-                            value = tarjetaSeleccionada?.let { "${it.banco} · ${it.numero}" } ?: "Seleccionar tarjeta",
-                            onValueChange = {}, readOnly = true,
-                            label = { Text("Cuenta destino") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = menuTarjetasAbierto) },
-                            modifier = Modifier.fillMaxWidth().menuAnchor()
-                        )
+                        OutlinedTextField(value = tarjetaSeleccionada?.let { "${it.banco} · ${it.numero}" } ?: "Seleccionar tarjeta", onValueChange = {}, readOnly = true, label = { Text("Cuenta destino") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = menuTarjetasAbierto) }, modifier = Modifier.fillMaxWidth().menuAnchor())
                         ExposedDropdownMenu(expanded = menuTarjetasAbierto, onDismissRequest = { menuTarjetasAbierto = false }) {
-                            tarjetas.forEach { tarjeta ->
-                                DropdownMenuItem(
-                                    text = { Text("${tarjeta.banco} · ${tarjeta.numero}") },
-                                    onClick = { tarjetaSeleccionada = tarjeta; menuTarjetasAbierto = false }
-                                )
-                            }
+                            tarjetas.forEach { tarjeta -> DropdownMenuItem(text = { Text("${tarjeta.banco} · ${tarjeta.numero}") }, onClick = { tarjetaSeleccionada = tarjeta; menuTarjetasAbierto = false }) }
                         }
                     }
                 }
@@ -262,12 +192,7 @@ private fun DatosClienteDialog(
                 OutlinedTextField(value = nombre, onValueChange = { nombre = it.uppercase() }, label = { Text("Nombre del cliente") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             }
         },
-        confirmButton = {
-            TextButton(
-                enabled = ci.isNotBlank() && telefono.isNotBlank() && nombre.isNotBlank() && tarjetaSeleccionada != null,
-                onClick = { onConfirmar(ci, telefono, nombre, tarjetaSeleccionada!!) }
-            ) { Text("Confirmar") }
-        },
+        confirmButton = { TextButton(enabled = ci.isNotBlank() && telefono.isNotBlank() && nombre.isNotBlank() && tarjetaSeleccionada != null, onClick = { onConfirmar(ci, telefono, nombre, tarjetaSeleccionada!!) }) { Text("Confirmar") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
     )
 }
