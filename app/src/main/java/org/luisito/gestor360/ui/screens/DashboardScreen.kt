@@ -32,7 +32,7 @@ fun DashboardScreen(
         if (esAdmin) {
             add(SeccionDashboard("Tarjetas", Icons.Default.CreditCard, "tarjetas"))
             add(SeccionDashboard("Aprobaciones", Icons.Default.FactCheck, "aprobaciones"))
-        add(SeccionDashboard("Soporte", "Reportar un problema", Icons.Default.HeadsetMic, "soporte"))
+        add(SeccionDashboard("Soporte", Icons.Default.HeadsetMic, "soporte"))
             add(SeccionDashboard("Trazas", Icons.Default.History, "trazas"))
         }
     }
