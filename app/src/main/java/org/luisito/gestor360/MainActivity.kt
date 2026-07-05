@@ -61,11 +61,7 @@ import org.luisito.gestor360.utils.SessionManager
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            Gestor360Theme {
-                Gestor360App()
-            }
-        }
+        setContent { Gestor360Theme { Gestor360App() } }
     }
 }
 
@@ -86,12 +82,10 @@ fun Gestor360App() {
     val sessionManager = remember { SessionManager(context) }
     val accesoViewModel: AccesoViewModel = viewModel()
     val localSeleccionViewModel: LocalSeleccionViewModel = viewModel()
-
     var isLoading by remember { mutableStateOf(true) }
     var isLoggedIn by remember { mutableStateOf(false) }
     var usuarioParaPin by remember { mutableStateOf<User?>(null) }
     var pantalla by remember { mutableStateOf<PantallaInterna>(PantallaInterna.Home) }
-    var mostrarMenu by remember { mutableStateOf(false) }
     var mostrarConfirmarSalir by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -109,11 +103,8 @@ fun Gestor360App() {
 
     if (isLoggedIn) {
         BackHandler(enabled = true) {
-            if (pantalla != PantallaInterna.Home) {
-                pantalla = PantallaInterna.Home
-            } else {
-                mostrarConfirmarSalir = true
-            }
+            if (pantalla != PantallaInterna.Home) pantalla = PantallaInterna.Home
+            else mostrarConfirmarSalir = true
         }
     }
 
@@ -122,48 +113,26 @@ fun Gestor360App() {
             onDismissRequest = { mostrarConfirmarSalir = false },
             title = { Text("¿Salir de Gestor360?") },
             text = { Text("Vas a cerrar la aplicación.") },
-            confirmButton = {
-                TextButton(onClick = { (context as? ComponentActivity)?.finish() }) { Text("Salir") }
-            },
-            dismissButton = {
-                TextButton(onClick = { mostrarConfirmarSalir = false }) { Text("Cancelar") }
-            }
+            confirmButton = { TextButton(onClick = { (context as? ComponentActivity)?.finish() }) { Text("Salir") } },
+            dismissButton = { TextButton(onClick = { mostrarConfirmarSalir = false }) { Text("Cancelar") } }
         )
     }
 
     when {
-        isLoading -> { /* Pantalla de carga */ }
-
-        !isLoggedIn && usuarioParaPin == null -> {
-            VerificarDispositivoScreen(
-                onDispositivoAutorizado = { usuario -> usuarioParaPin = usuario },
-                viewModel = accesoViewModel
-            )
-        }
-
-        !isLoggedIn && usuarioParaPin != null -> {
-            PinLoginScreen(
-                usuario = usuarioParaPin!!,
-                onLoginExitoso = { usuario ->
-                    sessionManager.saveSession(
-                        userId = usuario.id,
-                        username = usuario.username,
-                        rol = usuario.rol,
-                        almacenId = usuario.almacen_id ?: "1",
-                        clienteId = usuario.cliente_id,
-                        androidId = usuario.android_id ?: "",
-                        nombre = usuario.nombre
-                    )
-                    isLoggedIn = true
-                },
-                onCambiarDispositivo = {
-                    usuarioParaPin = null
-                    accesoViewModel.reiniciar()
-                },
-                viewModel = accesoViewModel
-            )
-        }
-
+        isLoading -> {}
+        !isLoggedIn && usuarioParaPin == null -> VerificarDispositivoScreen(
+            onDispositivoAutorizado = { usuario -> usuarioParaPin = usuario },
+            viewModel = accesoViewModel
+        )
+        !isLoggedIn && usuarioParaPin != null -> PinLoginScreen(
+            usuario = usuarioParaPin!!,
+            onLoginExitoso = { usuario ->
+                sessionManager.saveSession(userId = usuario.id, username = usuario.username, rol = usuario.rol, almacenId = usuario.almacen_id ?: "1", clienteId = usuario.cliente_id, androidId = usuario.android_id ?: "", nombre = usuario.nombre)
+                isLoggedIn = true
+            },
+            onCambiarDispositivo = { usuarioParaPin = null; accesoViewModel.reiniciar() },
+            viewModel = accesoViewModel
+        )
         else -> {
             val rol = sessionManager.getRol()
             val androidId = sessionManager.getAndroidId()
@@ -171,122 +140,51 @@ fun Gestor360App() {
 
             when (pantalla) {
                 is PantallaInterna.Home -> Column {
-                    if (esAdmin) {
-                        SelectorDeLocalBar(androidId = androidId, viewModel = localSeleccionViewModel)
-                    }
+                    if (esAdmin) SelectorDeLocalBar(androidId = androidId, viewModel = localSeleccionViewModel)
                     DashboardScreen(
                         userRol = rol,
                         username = sessionManager.getNombre().ifEmpty { sessionManager.getUsername() },
-                        onMenuClick = { mostrarMenu = true },
+                        onNavigate = { ruta ->
+                            pantalla = when(ruta) {
+                                "ventas" -> PantallaInterna.Ventas
+                                "productos" -> PantallaInterna.Productos
+                                "cierrecaja" -> PantallaInterna.CierreCaja
+                                "tarjetas" -> if (esAdmin) PantallaInterna.Tarjetas else PantallaInterna.Home
+                                "aprobaciones" -> if (esAdmin) PantallaInterna.Aprobaciones else PantallaInterna.Home
+                                "trazas" -> if (esAdmin) PantallaInterna.Trazas else PantallaInterna.Home
+                                else -> PantallaInterna.Home
+                            }
+                        },
                         onLogout = { cerrarSesion() }
                     )
                 }
-                is PantallaInterna.Ventas -> VentasScreen(
-                    androidId = androidId,
-                    onBack = { pantalla = PantallaInterna.Home }
-                )
-                is PantallaInterna.Productos -> ProductosScreen(
-                    androidId = androidId,
-                    rol = rol,
-                    onBack = { pantalla = PantallaInterna.Home }
-                )
-                is PantallaInterna.CierreCaja -> CierreCajaScreen(
-                    androidId = androidId,
-                    onBack = { pantalla = PantallaInterna.Home }
-                )
-                is PantallaInterna.Tarjetas -> if (esAdmin) {
-                    TarjetasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
-                } else {
-                    LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
-                }
-                is PantallaInterna.Aprobaciones -> if (esAdmin) {
-                    AprobacionesScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
-                } else {
-                    LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
-                }
-                is PantallaInterna.Trazas -> if (esAdmin) {
-                    TrazasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
-                } else {
-                    LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
-                }
-            }
-
-            if (mostrarMenu) {
-                AlertDialog(
-                    onDismissRequest = { mostrarMenu = false },
-                    title = { Text("Menú") },
-                    text = {
-                        Column {
-                            OpcionMenu(Icons.Default.PointOfSale, "Ventas") { pantalla = PantallaInterna.Ventas; mostrarMenu = false }
-                            OpcionMenu(Icons.Default.Inventory2, "Productos") { pantalla = PantallaInterna.Productos; mostrarMenu = false }
-                            OpcionMenu(Icons.Default.ReceiptLong, "Cierre de caja") { pantalla = PantallaInterna.CierreCaja; mostrarMenu = false }
-                            if (esAdmin) {
-                                OpcionMenu(Icons.Default.CreditCard, "Tarjetas") { pantalla = PantallaInterna.Tarjetas; mostrarMenu = false }
-                                OpcionMenu(Icons.Default.FactCheck, "Aprobaciones de merma") { pantalla = PantallaInterna.Aprobaciones; mostrarMenu = false }
-                                OpcionMenu(Icons.Default.History, "Historial de actividad") { pantalla = PantallaInterna.Trazas; mostrarMenu = false }
-                            }
-                        }
-                    },
-                    confirmButton = {
-                        TextButton(onClick = { mostrarMenu = false; cerrarSesion() }) {
-                            Icon(Icons.Default.Logout, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
-                            Text("Cerrar sesión")
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { mostrarMenu = false }) { Text("Cerrar") }
-                    }
-                )
+                is PantallaInterna.Ventas -> VentasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
+                is PantallaInterna.Productos -> ProductosScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home })
+                is PantallaInterna.CierreCaja -> CierreCajaScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
+                is PantallaInterna.Tarjetas -> if (esAdmin) TarjetasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
+                is PantallaInterna.Aprobaciones -> if (esAdmin) AprobacionesScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
+                is PantallaInterna.Trazas -> if (esAdmin) TrazasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
             }
         }
     }
 }
 
 @Composable
-private fun OpcionMenu(icono: ImageVector, texto: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp).clickable(onClick = onClick)
-    ) {
-        Icon(icono, contentDescription = null)
-        Text(texto, modifier = Modifier.padding(start = 12.dp))
-    }
-}
-
-/**
- * Barra informativa sobre el Dashboard: qué local tiene seleccionado el admin.
- * Por ahora es solo para orientarse (no filtra productos/ventas todavía — ver
- * nota en get_locales.sql sobre por qué).
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
 private fun SelectorDeLocalBar(androidId: String, viewModel: LocalSeleccionViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     var menuAbierto by remember { mutableStateOf(false) }
-
     LaunchedEffect(androidId) { viewModel.cargar(androidId) }
-
-    if (uiState.locales.size <= 1) return // Sin nada que elegir, no mostrar la barra.
-
+    if (uiState.locales.size <= 1) return
     Surface(color = MaterialTheme.colorScheme.secondaryContainer) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Storefront, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
             Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                uiState.localSeleccionado?.nombre ?: "Selecciona un local",
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.weight(1f)
-            )
+            Text(uiState.localSeleccionado?.nombre ?: "Selecciona un local", color = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.weight(1f))
             Box {
                 TextButton(onClick = { menuAbierto = true }) { Text("Cambiar") }
                 DropdownMenu(expanded = menuAbierto, onDismissRequest = { menuAbierto = false }) {
                     uiState.locales.forEach { local ->
-                        DropdownMenuItem(
-                            text = { Text(local.nombre) },
-                            onClick = { viewModel.seleccionar(local); menuAbierto = false }
-                        )
+                        DropdownMenuItem(text = { Text(local.nombre) }, onClick = { viewModel.seleccionar(local); menuAbierto = false })
                     }
                 }
             }
