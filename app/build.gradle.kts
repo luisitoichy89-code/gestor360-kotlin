@@ -61,6 +61,7 @@ kotlin {
 }
 
 dependencies {
+    implementation("com.google.firebase:firebase-messaging-ktx:24.1.0")
     implementation("androidx.work:work-runtime-ktx:2.10.0")
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
@@ -94,6 +95,7 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
 dependencies {
+    implementation("com.google.firebase:firebase-messaging-ktx:24.1.0")
     implementation("androidx.work:work-runtime-ktx:2.10.0")
     implementation("com.russhwolf:multiplatform-settings:1.2.0")
     implementation("com.russhwolf:multiplatform-settings-coroutines:1.2.0")

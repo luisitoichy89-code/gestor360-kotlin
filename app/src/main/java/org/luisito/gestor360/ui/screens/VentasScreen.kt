@@ -20,6 +20,7 @@ import org.luisito.gestor360.data.models.Product
 import org.luisito.gestor360.data.repository.SaleRepository
 import org.luisito.gestor360.ui.viewmodels.SaleViewModel
 import org.luisito.gestor360.ui.viewmodels.TarjetaViewModel
+import org.luisito.gestor360.utils.SoundManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -119,6 +120,7 @@ fun VentasScreen(
             title = { Text("Confirmar venta") },
             text = { Text("Total a cobrar en efectivo: $totalCarrito CUP", fontWeight = FontWeight.Bold) },
             confirmButton = { TextButton(onClick = { viewModel.confirmarVenta("cash", totalCarrito, 0.0, 0L, null); showEfectivoConfirm = false }) { Text("Aceptar", color = MaterialTheme.colorScheme.primary) } },
+                        SoundManager.playVentaConfirmada(context)
             dismissButton = { TextButton(onClick = { showEfectivoConfirm = false }) { Text("Cancelar") } }
         )
     }

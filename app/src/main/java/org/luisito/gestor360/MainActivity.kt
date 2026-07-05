@@ -32,12 +32,19 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.animation.*
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.*
 import androidx.compose.runtime.collectAsState
+import androidx.compose.animation.*
 import androidx.compose.runtime.getValue
+import androidx.compose.animation.*
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.animation.*
 import androidx.compose.runtime.remember
+import androidx.compose.animation.*
 import androidx.compose.runtime.setValue
+import androidx.compose.animation.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -76,6 +83,8 @@ class MainActivity : ComponentActivity() {
         SyncWorker.programarPeriodico(applicationContext)
 
         setContent { Gestor360Theme { Gestor360App() } }
+        var mostrarSplash by remember { mutableStateOf(true) }
+        if (mostrarSplash) { SplashScreen { mostrarSplash = false }; return }
     }
 }
 
@@ -94,6 +103,9 @@ private sealed class PantallaInterna {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Gestor360App() {
+    var mostrarSplash by remember { mutableStateOf(true) }
+    if (mostrarSplash) { SplashScreen(onFinished = { mostrarSplash = false }); return }
+    var mostrarSplash by remember { mutableStateOf(true) }
     VerificarActualizacion()
     val context = androidx.compose.ui.platform.LocalContext.current
     val sessionManager = remember { SessionManager(context) }
