@@ -63,6 +63,13 @@ class SaleViewModel(
         }
     }
 
+    fun anularVenta(ventaId: String) {
+        viewModelScope.launch {
+            saleRepository.anularVenta(androidIdActual, ventaId)
+                .onFailure { _uiState.value = _uiState.value.copy(error = it.message) }
+        }
+    }
+
     fun limpiarVentaConfirmada() { _uiState.value = _uiState.value.copy(ventaConfirmada = false) }
     fun clearError() { _uiState.value = _uiState.value.copy(error = null) }
 }

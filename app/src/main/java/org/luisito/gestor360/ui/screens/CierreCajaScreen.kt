@@ -6,7 +6,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
@@ -23,14 +22,7 @@ import org.luisito.gestor360.ui.components.EstadoCargando
 import org.luisito.gestor360.ui.components.EstadoError
 import org.luisito.gestor360.ui.components.EstadoVacio
 import org.luisito.gestor360.ui.viewmodels.CierreCajaViewModel
-import org.luisito.gestor360.utils.CsvExporter
 
-/**
- * Arqueo de caja: si no hay turno abierto, pide el monto inicial para abrirlo.
- * Si hay uno abierto, muestra en vivo lo vendido desde que se abrió (efectivo/
- * transferencia/mixto + productos) y permite cerrarlo contando el efectivo real;
- * el servidor calcula la diferencia (sobra/falta).
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CierreCajaScreen(
@@ -39,47 +31,40 @@ fun CierreCajaScreen(
     viewModel: CierreCajaViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
     var mostrarAbrirTurno by remember { mutableStateOf(false) }
     var mostrarCerrarTurno by remember { mutableStateOf(false) }
 
     LaunchedEffect(androidId) { viewModel.cargar(androidId) }
 
+    // Confirmación al abrir turno
+    LaunchedEffect(uiState.mensaje) {
+        if (uiState.mensaje != null) {
+            kotlinx.coroutines.delay(2000)
+            viewModel.clearMensaje()
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Cierre de caja") },
-                navigationIcon = {
-                    if (onBack != null) {
-                        IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Volver") }
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.refrescar() }) { Icon(Icons.Default.Refresh, contentDescription = "Refrescar") }
-                    if (uiState.turnoActivo != null) {
-                        IconButton(onClick = {
-                            CsvExporter.exportarCierreCaja(
-                                context,
-                                uiState.turnoActivo?.created_at?.take(10) ?: "",
-                                uiState.productosVendidos,
-                                uiState.totalEfectivo,
-                                uiState.totalTransferencia,
-                                uiState.totalMixto
-                            )
-                        }) { Icon(Icons.Default.FileDownload, contentDescription = "Exportar CSV") }
-                    }
-                }
+                navigationIcon = { if (onBack != null) { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Volver") } } },
+                actions = { IconButton(onClick = { viewModel.refrescar() }) { Icon(Icons.Default.Refresh, contentDescription = "Refrescar") } }
             )
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+            // Mensaje de éxito
+            uiState.mensaje?.let { mensaje ->
+                Surface(color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                    Text(mensaje, modifier = Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
+            }
+
             when {
                 uiState.isLoading -> EstadoCargando()
                 uiState.error != null -> EstadoError(uiState.error ?: "Error desconocido") { viewModel.refrescar() }
-                uiState.turnoActivo == null -> TurnoCerradoPanel(
-                    isSaving = uiState.isSaving,
-                    onAbrir = { mostrarAbrirTurno = true }
-                )
+                uiState.turnoActivo == null -> TurnoCerradoPanel(isSaving = uiState.isSaving, onAbrir = { mostrarAbrirTurno = true })
                 else -> TurnoAbiertoPanel(
                     apertura = uiState.turnoActivo!!.apertura,
                     productosVendidos = uiState.productosVendidos,
@@ -93,20 +78,11 @@ fun CierreCajaScreen(
     }
 
     if (mostrarAbrirTurno) {
-        AbrirTurnoDialog(
-            isSaving = uiState.isSaving,
-            onDismiss = { mostrarAbrirTurno = false },
-            onAbrir = { apertura -> viewModel.abrirTurno(apertura); mostrarAbrirTurno = false }
-        )
+        AbrirTurnoDialog(isSaving = uiState.isSaving, onDismiss = { mostrarAbrirTurno = false }, onAbrir = { apertura -> viewModel.abrirTurno(apertura); mostrarAbrirTurno = false })
     }
 
     if (mostrarCerrarTurno) {
-        CerrarTurnoDialog(
-            efectivoEsperado = (uiState.turnoActivo?.apertura ?: 0.0) + uiState.totalEfectivo,
-            isSaving = uiState.isSaving,
-            onDismiss = { mostrarCerrarTurno = false },
-            onCerrar = { cierre -> viewModel.cerrarTurno(cierre); mostrarCerrarTurno = false }
-        )
+        CerrarTurnoDialog(efectivoEsperado = (uiState.turnoActivo?.apertura ?: 0.0) + uiState.totalEfectivo, isSaving = uiState.isSaving, onDismiss = { mostrarCerrarTurno = false }, onCerrar = { cierre -> viewModel.cerrarTurno(cierre); mostrarCerrarTurno = false })
     }
 
     uiState.turnoRecienCerrado?.let { turno ->
@@ -125,28 +101,18 @@ fun CierreCajaScreen(
                             else -> "Cuadra exacto ✅"
                         },
                         fontWeight = FontWeight.Bold,
-                        color = when {
-                            diferencia > 0 -> MaterialTheme.colorScheme.tertiary
-                            diferencia < 0 -> MaterialTheme.colorScheme.error
-                            else -> MaterialTheme.colorScheme.primary
-                        }
+                        color = when { diferencia > 0 -> MaterialTheme.colorScheme.tertiary; diferencia < 0 -> MaterialTheme.colorScheme.error; else -> MaterialTheme.colorScheme.primary }
                     )
                 }
             },
-            confirmButton = {
-                TextButton(onClick = { viewModel.limpiarTurnoRecienCerrado() }) { Text("Entendido") }
-            }
+            confirmButton = { TextButton(onClick = { viewModel.limpiarTurnoRecienCerrado() }) { Text("Entendido") } }
         )
     }
 }
 
 @Composable
 private fun TurnoCerradoPanel(isSaving: Boolean, onAbrir: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
+    Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Icon(Icons.Default.LockOpen, contentDescription = null, modifier = Modifier.size(56.dp), tint = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(12.dp))
         Text("No tienes un turno abierto", style = MaterialTheme.typography.titleMedium)
@@ -156,14 +122,7 @@ private fun TurnoCerradoPanel(isSaving: Boolean, onAbrir: () -> Unit) {
 }
 
 @Composable
-private fun TurnoAbiertoPanel(
-    apertura: Double,
-    productosVendidos: List<Pair<String, Double>>,
-    totalEfectivo: Double,
-    totalTransferencia: Double,
-    totalMixto: Double,
-    onCerrar: () -> Unit
-) {
+private fun TurnoAbiertoPanel(apertura: Double, productosVendidos: List<Pair<String, Double>>, totalEfectivo: Double, totalTransferencia: Double, totalMixto: Double, onCerrar: () -> Unit) {
     Column(modifier = Modifier.fillMaxSize()) {
         ElevatedCard(modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
@@ -178,29 +137,17 @@ private fun TurnoAbiertoPanel(
         Spacer(modifier = Modifier.height(16.dp))
         Text("Productos vendidos en este turno", style = MaterialTheme.typography.labelLarge)
         Spacer(modifier = Modifier.height(8.dp))
-
-        if (productosVendidos.isEmpty()) {
-            EstadoVacio("Aún no hay ventas en este turno")
-        } else {
-            LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(productosVendidos) { (nombre, cantidad) ->
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(nombre)
-                        Text(
-                            if (cantidad == cantidad.toLong().toDouble()) cantidad.toLong().toString() else cantidad.toString(),
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+        if (productosVendidos.isEmpty()) EstadoVacio("Aún no hay ventas en este turno")
+        else LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            items(productosVendidos) { (nombre, cantidad) ->
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(nombre)
+                    Text(if (cantidad == cantidad.toLong().toDouble()) cantidad.toLong().toString() else cantidad.toString(), fontWeight = FontWeight.Bold)
                 }
             }
         }
-
         Spacer(modifier = Modifier.height(12.dp))
-        Button(
-            onClick = onCerrar,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-        ) {
+        Button(onClick = onCerrar, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
             Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(6.dp))
             Text("Cerrar turno")
@@ -212,12 +159,7 @@ private fun TurnoAbiertoPanel(
 private fun FilaResumen(etiqueta: String, valor: Double, destacado: Boolean = false) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(etiqueta, style = if (destacado) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium)
-        Text(
-            "$valor CUP",
-            style = if (destacado) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
-            fontWeight = if (destacado) FontWeight.Bold else FontWeight.Normal,
-            color = if (destacado) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-        )
+        Text("$valor CUP", style = if (destacado) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium, fontWeight = if (destacado) FontWeight.Bold else FontWeight.Normal, color = if (destacado) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
     }
 }
 
@@ -225,25 +167,13 @@ private fun FilaResumen(etiqueta: String, valor: Double, destacado: Boolean = fa
 private fun AbrirTurnoDialog(isSaving: Boolean, onDismiss: () -> Unit, onAbrir: (Double) -> Unit) {
     var monto by remember { mutableStateOf("") }
     val apertura = monto.toDoubleOrNull()
-
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Abrir turno") },
         text = {
-            OutlinedTextField(
-                value = monto,
-                onValueChange = { monto = it },
-                label = { Text("Efectivo inicial en caja") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.fillMaxWidth()
-            )
+            OutlinedTextField(value = monto, onValueChange = { monto = it.filter { c -> c.isDigit() } }, label = { Text("Efectivo inicial en caja") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
         },
-        confirmButton = {
-            TextButton(enabled = apertura != null && apertura >= 0 && !isSaving, onClick = { onAbrir(apertura ?: 0.0) }) {
-                Text(if (isSaving) "Abriendo..." else "Abrir")
-            }
-        },
+        confirmButton = { TextButton(enabled = apertura != null && apertura >= 0 && !isSaving, onClick = { onAbrir(apertura ?: 0.0) }) { Text(if (isSaving) "Abriendo..." else "Abrir") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
     )
 }
@@ -252,7 +182,6 @@ private fun AbrirTurnoDialog(isSaving: Boolean, onDismiss: () -> Unit, onAbrir: 
 private fun CerrarTurnoDialog(efectivoEsperado: Double, isSaving: Boolean, onDismiss: () -> Unit, onCerrar: (Double) -> Unit) {
     var monto by remember { mutableStateOf("") }
     val contado = monto.toDoubleOrNull()
-
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Cerrar turno") },
@@ -260,21 +189,10 @@ private fun CerrarTurnoDialog(efectivoEsperado: Double, isSaving: Boolean, onDis
             Column {
                 Text("Efectivo esperado en caja: $efectivoEsperado CUP", style = MaterialTheme.typography.bodyMedium)
                 Spacer(modifier = Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = monto,
-                    onValueChange = { monto = it },
-                    label = { Text("Efectivo contado (real)") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                OutlinedTextField(value = monto, onValueChange = { monto = it.filter { c -> c.isDigit() } }, label = { Text("Efectivo contado (real)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
             }
         },
-        confirmButton = {
-            TextButton(enabled = contado != null && contado >= 0 && !isSaving, onClick = { onCerrar(contado ?: 0.0) }) {
-                Text(if (isSaving) "Cerrando..." else "Cerrar turno")
-            }
-        },
+        confirmButton = { TextButton(enabled = contado != null && contado >= 0 && !isSaving, onClick = { onCerrar(contado ?: 0.0) }) { Text(if (isSaving) "Cerrando..." else "Cerrar turno") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
     )
 }
