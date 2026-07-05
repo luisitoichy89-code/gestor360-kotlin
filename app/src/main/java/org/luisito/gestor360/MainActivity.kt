@@ -55,6 +55,7 @@ import org.luisito.gestor360.ui.screens.PinLoginScreen
 import org.luisito.gestor360.ui.screens.ProductosScreen
 import org.luisito.gestor360.ui.screens.TarjetasScreen
 import org.luisito.gestor360.ui.screens.TrazasScreen
+import org.luisito.gestor360.ui.screens.TicketsClienteScreen
 import org.luisito.gestor360.ui.screens.VentasScreen
 import org.luisito.gestor360.ui.screens.VerificarDispositivoScreen
 import org.luisito.gestor360.ui.theme.Gestor360Theme
@@ -83,6 +84,7 @@ private sealed class PantallaInterna {
     object Productos : PantallaInterna()
     object Tarjetas : PantallaInterna()
     object Aprobaciones : PantallaInterna()
+    object TicketsSoporte : PantallaInterna()
     object CierreCaja : PantallaInterna()
     object Trazas : PantallaInterna()
     object Conflictos : PantallaInterna()
@@ -175,6 +177,7 @@ fun Gestor360App() {
                                 "cierrecaja" -> PantallaInterna.CierreCaja
                                 "tarjetas" -> if (esAdmin) PantallaInterna.Tarjetas else PantallaInterna.Home
                                 "aprobaciones" -> if (esAdmin) PantallaInterna.Aprobaciones else PantallaInterna.Home
+                                "soporte" -> PantallaInterna.TicketsSoporte
                                 "trazas" -> if (esAdmin) PantallaInterna.Trazas else PantallaInterna.Home
                                 else -> PantallaInterna.Home
                             }
@@ -187,6 +190,7 @@ fun Gestor360App() {
                 is PantallaInterna.CierreCaja -> CierreCajaScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
                 is PantallaInterna.Tarjetas -> if (esAdmin) TarjetasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
                 is PantallaInterna.Aprobaciones -> if (esAdmin) AprobacionesScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
+                is PantallaInterna.TicketsSoporte -> TicketsClienteScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
                 is PantallaInterna.Trazas -> if (esAdmin) TrazasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
                 is PantallaInterna.Conflictos -> ConflictosScreen(onBack = { pantalla = PantallaInterna.Home })
             }

@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.luisito.gestor360.data.models.Tarjeta
 import org.luisito.gestor360.data.models.Product
@@ -88,9 +89,9 @@ fun VentasScreen(
                 Text("Total: $totalCarrito CUP", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Button(onClick = { showEfectivoConfirm = true }, modifier = Modifier.weight(1f), shape = androidx.compose.foundation.shape.RoundedCornerShape(0.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("EFECTIVO", style = MaterialTheme.typography.labelSmall) }
-                    Button(onClick = { showTransferenciaDialog = true }, modifier = Modifier.weight(1f), shape = androidx.compose.foundation.shape.RoundedCornerShape(0.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("TRANSFER", style = MaterialTheme.typography.labelSmall) }
-                    Button(onClick = { showMixtoDialog = true }, modifier = Modifier.weight(1f), shape = androidx.compose.foundation.shape.RoundedCornerShape(0.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("MIXTO", style = MaterialTheme.typography.labelSmall) }
+                    Button(onClick = { showEfectivoConfirm = true }, modifier = Modifier.weight(1f), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("EFECTIVO", style = MaterialTheme.typography.labelSmall) }
+                    Button(onClick = { showTransferenciaDialog = true }, modifier = Modifier.weight(1f), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("TRANSFER", style = MaterialTheme.typography.labelSmall) }
+                    Button(onClick = { showMixtoDialog = true }, modifier = Modifier.weight(1f), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("MIXTO", style = MaterialTheme.typography.labelSmall) }
                 }
             }
         }
