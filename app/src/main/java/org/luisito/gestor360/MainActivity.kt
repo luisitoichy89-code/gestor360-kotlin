@@ -4,6 +4,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,19 +36,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.animation.*
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.animation.*
 import androidx.compose.runtime.collectAsState
-import androidx.compose.animation.*
 import androidx.compose.runtime.getValue
-import androidx.compose.animation.*
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.animation.*
 import androidx.compose.runtime.remember
-import androidx.compose.animation.*
 import androidx.compose.runtime.setValue
-import androidx.compose.animation.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -62,8 +59,8 @@ import org.luisito.gestor360.ui.screens.DashboardScreen
 import org.luisito.gestor360.ui.screens.PinLoginScreen
 import org.luisito.gestor360.ui.screens.ProductosScreen
 import org.luisito.gestor360.ui.screens.TarjetasScreen
-import org.luisito.gestor360.ui.screens.TrazasScreen
 import org.luisito.gestor360.ui.screens.TicketsClienteScreen
+import org.luisito.gestor360.ui.screens.TrazasScreen
 import org.luisito.gestor360.ui.screens.VentasScreen
 import org.luisito.gestor360.ui.screens.VerificarDispositivoScreen
 import org.luisito.gestor360.ui.theme.Gestor360Theme
@@ -82,9 +79,10 @@ class MainActivity : ComponentActivity() {
         // Reintento de sincronización de fondo cada 15 min (mínimo de Android).
         SyncWorker.programarPeriodico(applicationContext)
 
+        // OJO: aquí antes había código de splash (`remember{...}`) suelto en onCreate.
+        // remember es una función @Composable y no se puede llamar fuera de un árbol
+        // Compose — eso no compilaba. El splash ahora vive solo dentro de Gestor360App().
         setContent { Gestor360Theme { Gestor360App() } }
-        var mostrarSplash by remember { mutableStateOf(true) }
-        if (mostrarSplash) { SplashScreen { mostrarSplash = false }; return }
     }
 }
 
@@ -103,10 +101,17 @@ private sealed class PantallaInterna {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Gestor360App() {
+    // Splash: una sola declaración, un solo lugar. Antes había dos `var mostrarSplash`
+    // duplicadas en este mismo scope (error de compilación) más una tercera copia
+    // rota dentro de onCreate.
     var mostrarSplash by remember { mutableStateOf(true) }
-    if (mostrarSplash) { SplashScreen(onFinished = { mostrarSplash = false }); return }
-    var mostrarSplash by remember { mutableStateOf(true) }
+    if (mostrarSplash) {
+        SplashScreen(onFinished = { mostrarSplash = false })
+        return
+    }
+
     VerificarActualizacion()
+
     val context = androidx.compose.ui.platform.LocalContext.current
     val sessionManager = remember { SessionManager(context) }
     val accesoViewModel: AccesoViewModel = viewModel()
@@ -177,36 +182,43 @@ fun Gestor360App() {
             val androidId = sessionManager.getAndroidId()
             val esAdmin = rol == "admin"
 
-            when (pantalla) {
-                is PantallaInterna.Home -> Column {
-                    SyncStatusBar(androidId = androidId, onVerConflictos = { pantalla = PantallaInterna.Conflictos })
-                    if (esAdmin) SelectorDeLocalBar(androidId = androidId, viewModel = localSeleccionViewModel)
-                    DashboardScreen(
-                        userRol = rol,
-                        username = sessionManager.getNombre().ifEmpty { sessionManager.getUsername() },
-                        onNavigate = { ruta ->
-                            pantalla = when (ruta) {
-                                "ventas" -> PantallaInterna.Ventas
-                                "productos" -> PantallaInterna.Productos
-                                "cierrecaja" -> PantallaInterna.CierreCaja
-                                "tarjetas" -> if (esAdmin) PantallaInterna.Tarjetas else PantallaInterna.Home
-                                "aprobaciones" -> if (esAdmin) PantallaInterna.Aprobaciones else PantallaInterna.Home
-                                "soporte" -> PantallaInterna.TicketsSoporte
-                                "trazas" -> if (esAdmin) PantallaInterna.Trazas else PantallaInterna.Home
-                                else -> PantallaInterna.Home
-                            }
-                        },
-                        onLogout = { cerrarSesion() }
-                    )
+            // AnimatedContent: fundido suave entre pantallas en vez del salto seco de un `when` normal.
+            AnimatedContent(
+                targetState = pantalla,
+                label = "navegacion_principal",
+                transitionSpec = { fadeIn(animationSpec = androidx.compose.animation.core.tween(220)) togetherWith fadeOut(animationSpec = androidx.compose.animation.core.tween(180)) }
+            ) { pantallaActual ->
+                when (pantallaActual) {
+                    is PantallaInterna.Home -> Column {
+                        SyncStatusBar(androidId = androidId, onVerConflictos = { pantalla = PantallaInterna.Conflictos })
+                        if (esAdmin) SelectorDeLocalBar(androidId = androidId, viewModel = localSeleccionViewModel)
+                        DashboardScreen(
+                            userRol = rol,
+                            username = sessionManager.getNombre().ifEmpty { sessionManager.getUsername() },
+                            onNavigate = { ruta ->
+                                pantalla = when (ruta) {
+                                    "ventas" -> PantallaInterna.Ventas
+                                    "productos" -> PantallaInterna.Productos
+                                    "cierrecaja" -> PantallaInterna.CierreCaja
+                                    "tarjetas" -> if (esAdmin) PantallaInterna.Tarjetas else PantallaInterna.Home
+                                    "aprobaciones" -> if (esAdmin) PantallaInterna.Aprobaciones else PantallaInterna.Home
+                                    "soporte" -> PantallaInterna.TicketsSoporte
+                                    "trazas" -> if (esAdmin) PantallaInterna.Trazas else PantallaInterna.Home
+                                    else -> PantallaInterna.Home
+                                }
+                            },
+                            onLogout = { cerrarSesion() }
+                        )
+                    }
+                    is PantallaInterna.Ventas -> VentasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
+                    is PantallaInterna.Productos -> ProductosScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home })
+                    is PantallaInterna.CierreCaja -> CierreCajaScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
+                    is PantallaInterna.Tarjetas -> if (esAdmin) TarjetasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
+                    is PantallaInterna.Aprobaciones -> if (esAdmin) AprobacionesScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
+                    is PantallaInterna.TicketsSoporte -> TicketsClienteScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
+                    is PantallaInterna.Trazas -> if (esAdmin) TrazasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
+                    is PantallaInterna.Conflictos -> ConflictosScreen(onBack = { pantalla = PantallaInterna.Home })
                 }
-                is PantallaInterna.Ventas -> VentasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
-                is PantallaInterna.Productos -> ProductosScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home })
-                is PantallaInterna.CierreCaja -> CierreCajaScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
-                is PantallaInterna.Tarjetas -> if (esAdmin) TarjetasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
-                is PantallaInterna.Aprobaciones -> if (esAdmin) AprobacionesScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
-                is PantallaInterna.TicketsSoporte -> TicketsClienteScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
-                is PantallaInterna.Trazas -> if (esAdmin) TrazasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
-                is PantallaInterna.Conflictos -> ConflictosScreen(onBack = { pantalla = PantallaInterna.Home })
             }
         }
     }
