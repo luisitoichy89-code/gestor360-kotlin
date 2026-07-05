@@ -64,6 +64,7 @@ class SaleViewModel(
         viewModelScope.launch {
             saleRepository.guardarVenta(androidIdActual, _uiState.value.carrito, metodo, efectivo, transferencia, cliente)
             _uiState.value = _uiState.value.copy(carrito = emptyList(), ventaConfirmada = true)
+            iniciar(androidIdActual) // Refrescar stock inmediatamente
         }
     }
 
