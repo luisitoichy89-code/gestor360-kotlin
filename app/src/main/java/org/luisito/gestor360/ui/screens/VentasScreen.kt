@@ -33,7 +33,7 @@ fun VentasScreen(
     val tarjetaUiState by tarjetaViewModel.uiState.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     var selectedProduct by remember { mutableStateOf<Product?>(null) }
-    var cantidad by remember { mutableStateOf(1.0) }
+    var cantidad by remember { mutableStateOf(0.0) }
     var showEfectivoConfirm by remember { mutableStateOf(false) }
     var showTransferenciaDialog by remember { mutableStateOf(false) }
     var showMixtoDialog by remember { mutableStateOf(false) }
@@ -65,7 +65,7 @@ fun VentasScreen(
 
             LazyColumn(modifier = Modifier.weight(1f)) {
                 items(productosFiltrados) { producto ->
-                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), onClick = { selectedProduct = producto; cantidad = 1.0 }) {
+                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), onClick = { selectedProduct = producto; cantidad = 0.0 }) {
                         Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(producto.nombre, style = MaterialTheme.typography.titleMedium)
@@ -113,7 +113,7 @@ fun VentasScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = if (cantidad == cantidad.toLong().toDouble()) cantidad.toLong().toString() else cantidad.toString(),
-                        onValueChange = { cantidad = it.toDoubleOrNull() ?: 1.0 },
+                        onValueChange = { cantidad = it.toDoubleOrNull() ?: 0.0 },
                         label = { Text("Cantidad") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true
