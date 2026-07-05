@@ -60,8 +60,8 @@ class CierreCajaViewModel(
         val delTurno = ventas.filter {
             it.usuario_id == turno.usuario_id && (it.created_at ?: "") >= (turno.created_at ?: "")
         }
-        val productos = delTurno.groupBy { it.producto_nombre ?: "Producto #${it.producto_id}" }.map { (nombre, filas) -> nombre to filas.sumOf { it.cantidad } }.sortedByDescending { it.second }
-            .groupBy { it.producto_nombre }
+        val productos = delTurno
+            .groupBy { (it.producto_nombre ?: "Producto #${it.producto_id}") }
             .map { (nombre, filas) -> nombre to filas.sumOf { it.cantidad } }
             .sortedByDescending { it.second }
 
