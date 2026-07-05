@@ -44,8 +44,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.luisito.gestor360.data.models.User
+import org.luisito.gestor360.data.sync.NetworkMonitor
+import org.luisito.gestor360.data.sync.SyncWorker
+import org.luisito.gestor360.ui.components.SyncStatusBar
 import org.luisito.gestor360.ui.screens.AprobacionesScreen
 import org.luisito.gestor360.ui.screens.CierreCajaScreen
+import org.luisito.gestor360.ui.screens.ConflictosScreen
 import org.luisito.gestor360.ui.screens.DashboardScreen
 import org.luisito.gestor360.ui.screens.PinLoginScreen
 import org.luisito.gestor360.ui.screens.ProductosScreen
@@ -56,11 +60,19 @@ import org.luisito.gestor360.ui.screens.VerificarDispositivoScreen
 import org.luisito.gestor360.ui.theme.Gestor360Theme
 import org.luisito.gestor360.ui.viewmodels.AccesoViewModel
 import org.luisito.gestor360.ui.viewmodels.LocalSeleccionViewModel
+import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Necesario para que los repositorios (ProductRepository, SaleRepository)
+        // puedan usar Room sin que cada ViewModel tenga que pasarles el Context.
+        AppContextHolder.init(applicationContext)
+        // Reintento de sincronización de fondo cada 15 min (mínimo de Android).
+        SyncWorker.programarPeriodico(applicationContext)
+
         setContent { Gestor360Theme { Gestor360App() } }
     }
 }
@@ -73,6 +85,7 @@ private sealed class PantallaInterna {
     object Aprobaciones : PantallaInterna()
     object CierreCaja : PantallaInterna()
     object Trazas : PantallaInterna()
+    object Conflictos : PantallaInterna()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,6 +104,16 @@ fun Gestor360App() {
     LaunchedEffect(Unit) {
         isLoggedIn = sessionManager.isLoggedIn()
         isLoading = false
+    }
+
+    // En cuanto vuelve la señal, intenta sincronizar de inmediato (no espera
+    // los 15 min del trabajo periódico de fondo).
+    LaunchedEffect(Unit) {
+        NetworkMonitor.observar(context).collect { hayInternet ->
+            if (hayInternet && sessionManager.isLoggedIn()) {
+                SyncWorker.sincronizarAhora(context)
+            }
+        }
     }
 
     fun cerrarSesion() {
@@ -140,12 +163,13 @@ fun Gestor360App() {
 
             when (pantalla) {
                 is PantallaInterna.Home -> Column {
+                    SyncStatusBar(androidId = androidId, onVerConflictos = { pantalla = PantallaInterna.Conflictos })
                     if (esAdmin) SelectorDeLocalBar(androidId = androidId, viewModel = localSeleccionViewModel)
                     DashboardScreen(
                         userRol = rol,
                         username = sessionManager.getNombre().ifEmpty { sessionManager.getUsername() },
                         onNavigate = { ruta ->
-                            pantalla = when(ruta) {
+                            pantalla = when (ruta) {
                                 "ventas" -> PantallaInterna.Ventas
                                 "productos" -> PantallaInterna.Productos
                                 "cierrecaja" -> PantallaInterna.CierreCaja
@@ -164,6 +188,7 @@ fun Gestor360App() {
                 is PantallaInterna.Tarjetas -> if (esAdmin) TarjetasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
                 is PantallaInterna.Aprobaciones -> if (esAdmin) AprobacionesScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
                 is PantallaInterna.Trazas -> if (esAdmin) TrazasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
+                is PantallaInterna.Conflictos -> ConflictosScreen(onBack = { pantalla = PantallaInterna.Home })
             }
         }
     }

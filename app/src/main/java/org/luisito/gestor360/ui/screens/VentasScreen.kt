@@ -88,9 +88,9 @@ fun VentasScreen(
                 Text("Total: $totalCarrito CUP", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Button(onClick = { showEfectivoConfirm = true }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("EFECTIVO", style = MaterialTheme.typography.labelSmall) }
-                    Button(onClick = { showTransferenciaDialog = true }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("TRANSFER", style = MaterialTheme.typography.labelSmall) }
-                    Button(onClick = { showMixtoDialog = true }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("MIXTO", style = MaterialTheme.typography.labelSmall) }
+                    Button(onClick = { showEfectivoConfirm = true }, modifier = Modifier.weight(1f), shape = RectangleShape, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("EFECTIVO", style = MaterialTheme.typography.labelSmall) }
+                    Button(onClick = { showTransferenciaDialog = true }, modifier = Modifier.weight(1f), shape = RectangleShape, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("TRANSFER", style = MaterialTheme.typography.labelSmall) }
+                    Button(onClick = { showMixtoDialog = true }, modifier = Modifier.weight(1f), shape = RectangleShape, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), contentPadding = PaddingValues(6.dp)) { Text("MIXTO", style = MaterialTheme.typography.labelSmall) }
                 }
             }
         }
