@@ -15,6 +15,8 @@ data class AprobacionStock(
     val cantidad: Double = 0.0,
     val tipo: String = "",
     val estado: String = "pendiente",
+    val venta_id: String? = null,
+    val venta_total: Double? = null,
     val solicitado_por_nombre: String? = null,
     val created_at: String? = null
 )
@@ -23,7 +25,7 @@ class AprobacionStockRepository {
     suspend fun getPendientes(androidId: String): Result<List<AprobacionStock>> {
         return try {
             val response = SupabaseClientProvider.client.postgrest
-                .rpc("get_aprobaciones_stock", buildJsonObject { put("p_android_id", androidId) })
+                .rpc("get_aprobaciones", buildJsonObject { put("p_android_id", androidId) })
                 .decodeList<AprobacionStock>()
             Result.success(response)
         } catch (e: Exception) { Result.failure(e) }
@@ -47,9 +49,18 @@ class AprobacionStockRepository {
         } catch (e: Exception) { Result.failure(e) }
     }
 
+    suspend fun solicitarAnularVenta(androidId: String, ventaId: String, ventaTotal: Double): Result<Unit> {
+        return try {
+            SupabaseClientProvider.client.postgrest.rpc("solicitar_anular_venta", buildJsonObject {
+                put("p_android_id", androidId); put("p_venta_id", ventaId); put("p_venta_total", ventaTotal)
+            })
+            Result.success(Unit)
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
     suspend fun resolver(androidId: String, id: Long, estado: String, aprobadoPor: Long): Result<Unit> {
         return try {
-            SupabaseClientProvider.client.postgrest.rpc("resolver_aprobacion_stock", buildJsonObject {
+            SupabaseClientProvider.client.postgrest.rpc("resolver_aprobacion", buildJsonObject {
                 put("p_android_id", androidId); put("p_id", id); put("p_estado", estado); put("p_aprobado_por", aprobadoPor)
             })
             Result.success(Unit)
