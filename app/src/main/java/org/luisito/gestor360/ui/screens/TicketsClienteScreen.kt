@@ -38,7 +38,7 @@ class TicketViewModel(private val repo: TicketRepository = TicketRepository()) :
     fun cargarTickets(aid: String) { androidId = aid; viewModelScope.launch { _s.value = _s.value.copy(isLoading = true); repo.getTickets(aid).onSuccess { _s.value = _s.value.copy(isLoading = false, tickets = it) }.onFailure { _s.value = _s.value.copy(isLoading = false, error = it.message) } } }
     fun abrirTicket(ticket: Ticket) { _s.value = _s.value.copy(ticketSeleccionado = ticket); viewModelScope.launch { repo.getMensajes(ticket.id!!).onSuccess { _s.value = _s.value.copy(mensajes = it) } } }
     fun refrescarMensajes() { _s.value.ticketSeleccionado?.let { t -> viewModelScope.launch { repo.getMensajes(t.id!!).onSuccess { _s.value = _s.value.copy(mensajes = it) } } } }
-    fun crearTicket(telefono: String, mensaje: String) { viewModelScope.launch { repo.crearTicket(androidId, telefono, mensaje).onSuccess { cargarTickets(androidId); _s.value = _s.value.copy(ticketSeleccionado = null) } } }
+    fun crearTicket(mensaje: String) { viewModelScope.launch { repo.crearTicket(androidId, mensaje).onSuccess { cargarTickets(androidId); _s.value = _s.value.copy(ticketSeleccionado = null) } } }
     fun responder(mensaje: String) { val t = _s.value.ticketSeleccionado ?: return; viewModelScope.launch { repo.responderTicket(androidId, t.id!!, mensaje).onSuccess { abrirTicket(t) } } }
     fun cerrar() { _s.value = _s.value.copy(ticketSeleccionado = null, mensajes = emptyList()) }
 }
@@ -50,13 +50,9 @@ fun TicketsClienteScreen(androidId: String, onBack: () -> Unit, vm: TicketViewMo
     LaunchedEffect(androidId) { vm.cargarTickets(androidId) }
     var mostrarCrear by remember { mutableStateOf(false) }
 
-    // Refrescar mensajes cada 5 segundos cuando hay ticket abierto
     LaunchedEffect(s.ticketSeleccionado) {
         if (s.ticketSeleccionado != null) {
-            while (true) {
-                delay(5000)
-                vm.refrescarMensajes()
-            }
+            while (true) { delay(5000); vm.refrescarMensajes() }
         }
     }
 
@@ -91,8 +87,8 @@ fun TicketsClienteScreen(androidId: String, onBack: () -> Unit, vm: TicketViewMo
     }
 
     if (mostrarCrear) {
-        var telefono by remember { mutableStateOf("") }; var mensaje by remember { mutableStateOf("") }
-        AlertDialog(onDismissRequest = { mostrarCrear = false }, title = { Text("Nuevo ticket") }, text = { Column { OutlinedTextField(telefono, { telefono = it.filter { c -> c.isDigit() } }, label = { Text("Teléfono de contacto") }, singleLine = true); Spacer(Modifier.height(8.dp)); OutlinedTextField(mensaje, { mensaje = it }, label = { Text("Describe detalladamente el problema") }, minLines = 3) } }, confirmButton = { TextButton(onClick = { vm.crearTicket(telefono, mensaje); mostrarCrear = false }) { Text("Enviar") } }, dismissButton = { TextButton(onClick = { mostrarCrear = false }) { Text("Cancelar") } })
+        var mensaje by remember { mutableStateOf("") }
+        AlertDialog(onDismissRequest = { mostrarCrear = false }, title = { Text("Nuevo ticket") }, text = { OutlinedTextField(mensaje, { mensaje = it }, label = { Text("Describe detalladamente el problema") }, minLines = 3) }, confirmButton = { TextButton(onClick = { if (mensaje.isNotBlank()) { vm.crearTicket(mensaje); mostrarCrear = false } }) { Text("Enviar") } }, dismissButton = { TextButton(onClick = { mostrarCrear = false }) { Text("Cancelar") } })
     }
 }
 
