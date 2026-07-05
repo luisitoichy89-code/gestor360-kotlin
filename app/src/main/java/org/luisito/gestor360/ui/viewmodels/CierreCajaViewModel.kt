@@ -51,27 +51,26 @@ class CierreCajaViewModel(
     private fun cargarVentasDelTurno(turno: Turno) {
         viewModelScope.launch {
             saleRepository.getSales(androidIdActual)
-                .onSuccess { ventasConNombre -> procesar(ventasConNombre, turno) }
+                .onSuccess { ventas -> procesar(ventas, turno) }
                 .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.message) }
         }
     }
 
-    private fun procesar(ventasConNombre: List<Pair<Sale, String>>, turno: Turno) {
-        val delTurno = ventasConNombre.filter { (venta, _) ->
-            venta.usuario_id == turno.usuario_id && (venta.created_at ?: "") >= (turno.created_at ?: "")
+    private fun procesar(ventas: List<Sale>, turno: Turno) {
+        val delTurno = ventas.filter {
+            it.usuario_id == turno.usuario_id && (it.created_at ?: "") >= (turno.created_at ?: "")
         }
         val productos = delTurno
-            .groupBy({ it.second }, { it.first })
+            .groupBy { it.producto_nombre }
             .map { (nombre, filas) -> nombre to filas.sumOf { it.cantidad } }
             .sortedByDescending { it.second }
 
-        val ventasSolas = delTurno.map { it.first }
         _uiState.value = _uiState.value.copy(
             isLoading = false,
             productosVendidos = productos,
-            totalEfectivo = ventasSolas.filter { it.metodo == "cash" }.sumOf { it.total },
-            totalTransferencia = ventasSolas.filter { it.metodo == "transfer" }.sumOf { it.total },
-            totalMixto = ventasSolas.filter { it.metodo == "mixed" }.sumOf { it.total }
+            totalEfectivo = delTurno.filter { it.metodo == "cash" }.sumOf { it.total },
+            totalTransferencia = delTurno.filter { it.metodo == "transfer" }.sumOf { it.total },
+            totalMixto = delTurno.filter { it.metodo == "mixed" }.sumOf { it.total }
         )
     }
 
