@@ -56,6 +56,7 @@ import org.luisito.gestor360.ui.screens.ProductosScreen
 import org.luisito.gestor360.ui.screens.TarjetasScreen
 import org.luisito.gestor360.ui.screens.TrazasScreen
 import org.luisito.gestor360.ui.screens.TicketsClienteScreen
+import org.luisito.gestor360.ui.screens.TicketsClienteScreen
 import org.luisito.gestor360.ui.screens.VentasScreen
 import org.luisito.gestor360.ui.screens.VerificarDispositivoScreen
 import org.luisito.gestor360.ui.theme.Gestor360Theme

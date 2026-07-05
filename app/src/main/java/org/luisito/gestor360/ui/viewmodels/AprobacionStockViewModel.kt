@@ -57,6 +57,13 @@ class AprobacionStockViewModel(
         }
     }
 
+    fun solicitarAnularVenta(androidId: String, ventaId: String, ventaTotal: Double) {
+        viewModelScope.launch {
+            repository.solicitarAnularVenta(androidId, ventaId, ventaTotal)
+                .onSuccess { _uiState.value = _uiState.value.copy(mensaje = "Anulación enviada a aprobación"); cargar(androidId) }
+                .onFailure { _uiState.value = _uiState.value.copy(error = it.message) }
+        }
+    }
     fun clearMensaje() { _uiState.value = _uiState.value.copy(mensaje = null) }
     fun clearError() { _uiState.value = _uiState.value.copy(error = null) }
 }

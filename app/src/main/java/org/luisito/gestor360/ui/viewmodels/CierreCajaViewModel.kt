@@ -16,7 +16,6 @@ data class CierreCajaUiState(
     val isSaving: Boolean = false,
     val error: String? = null,
     val turnoActivo: Turno? = null,
-    val ventasDelTurno: List<Sale> = emptyList(),
     val productosVendidos: List<Pair<String, Double>> = emptyList(),
     val totalEfectivo: Double = 0.0,
     val totalTransferencia: Double = 0.0,
@@ -30,47 +29,24 @@ class CierreCajaViewModel(
     private val turnoRepository: TurnoRepository = TurnoRepository(),
     private val saleRepository: SaleRepository = SaleRepository()
 ) : ViewModel() {
+
     private val _uiState = MutableStateFlow(CierreCajaUiState())
     val uiState: StateFlow<CierreCajaUiState> = _uiState.asStateFlow()
+
     private var androidIdActual: String = ""
 
     fun cargar(androidId: String) {
         androidIdActual = androidId
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-            turnoRepository.getTurnoAbierto(androidId)
+            turnoRepository.obtenerTurnoActivo(androidId)
                 .onSuccess { turno ->
                     _uiState.value = _uiState.value.copy(turnoActivo = turno)
-                    if (turno != null) cargarVentasDelTurno(turno)
-                    else _uiState.value = _uiState.value.copy(isLoading = false)
+                    if (turno != null) cargarVentasDelTurno(turno) else _uiState.value = _uiState.value.copy(isLoading = false)
                 }
                 .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.message) }
         }
     }
-
-    fun refrescar() { if (androidIdActual.isNotBlank()) cargar(androidIdActual) }
-
-    fun abrirTurno(apertura: Double) {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isSaving = true)
-            turnoRepository.abrirTurno(androidIdActual, apertura)
-                .onSuccess { cargar(androidIdActual) }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.message) }
-            _uiState.value = _uiState.value.copy(isSaving = false)
-        }
-    }
-
-    fun cerrarTurno(cierre: Double) {
-        val turno = _uiState.value.turnoActivo ?: return
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isSaving = true)
-            turnoRepository.cerrarTurno(androidIdActual, turno.id!!, cierre)
-                .onSuccess { _uiState.value = _uiState.value.copy(turnoRecienCerrado = it, turnoActivo = null, isSaving = false) }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.message, isSaving = false) }
-        }
-    }
-
-    fun limpiarTurnoRecienCerrado() { _uiState.value = _uiState.value.copy(turnoRecienCerrado = null) }
 
     private fun cargarVentasDelTurno(turno: Turno) {
         viewModelScope.launch {
@@ -81,15 +57,56 @@ class CierreCajaViewModel(
     }
 
     private fun procesar(ventas: List<Sale>, turno: Turno) {
-        val delTurno = ventas.filter { it.usuario_id.toString() == turno.usuario_id.toString() && (it.created_at ?: "") >= (turno.created_at ?: "") }
-        val productos = delTurno.groupBy { it.producto_id }.map { (_, filas) -> ("Producto #${filas.first().producto_id}" to filas.sumOf { it.cantidad }) }.sortedByDescending { it.second }
+        val delTurno = ventas.filter {
+            it.usuario_id == turno.usuario_id && (it.created_at ?: "") >= (turno.created_at ?: "")
+        }
+        val productos = delTurno
+            .groupBy { it.producto_nombre }
+            .map { (nombre, filas) -> nombre to filas.sumOf { it.cantidad } }
+            .sortedByDescending { it.second }
+
         _uiState.value = _uiState.value.copy(
             isLoading = false,
-            ventasDelTurno = delTurno,
             productosVendidos = productos,
             totalEfectivo = delTurno.filter { it.metodo == "cash" }.sumOf { it.total },
             totalTransferencia = delTurno.filter { it.metodo == "transfer" }.sumOf { it.total },
             totalMixto = delTurno.filter { it.metodo == "mixed" }.sumOf { it.total }
         )
+    }
+
+    fun refrescar() {
+        if (androidIdActual.isNotBlank()) cargar(androidIdActual)
+    }
+
+    fun abrirTurno(apertura: Double) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isSaving = true, error = null)
+            turnoRepository.abrirTurno(androidIdActual, apertura)
+                .onSuccess { refrescar() }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.message) }
+            _uiState.value = _uiState.value.copy(isSaving = false)
+        }
+    }
+
+    fun cerrarTurno(cierreContado: Double) {
+        val turno = _uiState.value.turnoActivo ?: return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isSaving = true, error = null)
+            turnoRepository.cerrarTurno(androidIdActual, turno.id, cierreContado)
+                .onSuccess {
+                    val esperado = turno.apertura + _uiState.value.totalEfectivo
+                    val diferencia = cierreContado - esperado
+                    _uiState.value = _uiState.value.copy(
+                        turnoRecienCerrado = turno.copy(cierre = cierreContado, diferencia = diferencia)
+                    )
+                    refrescar()
+                }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.message) }
+            _uiState.value = _uiState.value.copy(isSaving = false)
+        }
+    }
+
+    fun limpiarTurnoRecienCerrado() {
+        _uiState.value = _uiState.value.copy(turnoRecienCerrado = null)
     }
 }
