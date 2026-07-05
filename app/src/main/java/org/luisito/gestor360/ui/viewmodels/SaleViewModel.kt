@@ -37,9 +37,12 @@ class SaleViewModel(
         }
     }
 
-    fun agregarAlCarrito(producto: Product, cantidad: Double) {
+    fun agregarAlCarrito(producto: Product, cantidad: Double): String? {
+        if (cantidad <= 0) return "Cantidad inválida"
         val carrito = _uiState.value.carrito.toMutableList()
         val index = carrito.indexOfFirst { it.productId == producto.id }
+        val cantidadActual = if (index >= 0) carrito[index].cantidad else 0.0
+        if (cantidadActual + cantidad > producto.stock) return "Stock insuficiente (${producto.stock.toInt()} disponibles)"
         if (index >= 0) {
             val item = carrito[index]
             carrito[index] = item.copy(cantidad = item.cantidad + cantidad)
@@ -47,6 +50,7 @@ class SaleViewModel(
             carrito.add(CartItem(producto.id, producto.nombre, producto.precio, cantidad, producto.stock))
         }
         _uiState.value = _uiState.value.copy(carrito = carrito)
+        return null
     }
 
     fun quitarDelCarrito(index: Int) {

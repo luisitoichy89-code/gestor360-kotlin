@@ -120,7 +120,7 @@ fun VentasScreen(
                     )
                 }
             },
-            confirmButton = { TextButton(onClick = { viewModel.agregarAlCarrito(selectedProduct!!, cantidad); selectedProduct = null }) { Text("Agregar") } },
+            confirmButton = { TextButton(onClick = { val error = viewModel.agregarAlCarrito(selectedProduct!!, cantidad); if (error == null) { selectedProduct = null; cantidad = 1.0 } else { /* mostrar error */ } }) { Text("Agregar") } },
             dismissButton = { TextButton(onClick = { selectedProduct = null }) { Text("Cancelar") } }
         )
     }
