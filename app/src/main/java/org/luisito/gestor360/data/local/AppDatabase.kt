@@ -23,6 +23,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun accionPendienteDao(): AccionPendienteDao
     abstract fun ventaDao(): VentaDao
     abstract fun conflictoDao(): ConflictoDao
+    abstract fun turnoDao(): TurnoDao
+    abstract fun tarjetaDao(): TarjetaDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
