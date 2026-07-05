@@ -37,11 +37,6 @@ fun CierreCajaScreen(
     LaunchedEffect(androidId) { viewModel.cargar(androidId) }
 
     // Confirmación al abrir turno
-    LaunchedEffect(uiState.mensaje) {
-        if (uiState.mensaje != null) {
-            kotlinx.coroutines.delay(2000)
-            viewModel.clearMensaje()
-        }
     }
 
     Scaffold(
@@ -56,10 +51,6 @@ fun CierreCajaScreen(
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
             // Mensaje de éxito
             uiState.mensaje?.let { mensaje ->
-                Surface(color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                    Text(mensaje, modifier = Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onPrimaryContainer)
-                }
-            }
 
             when {
                 uiState.isLoading -> EstadoCargando()

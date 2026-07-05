@@ -50,7 +50,7 @@ class CierreCajaViewModel(
 
     private fun cargarVentasDelTurno(turno: Turno) {
         viewModelScope.launch {
-            saleRepository.getSalesConNombre(androidIdActual)
+            saleRepository.getSales(androidIdActual)
                 .onSuccess { ventasConNombre -> procesar(ventasConNombre, turno) }
                 .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.message) }
         }

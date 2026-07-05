@@ -47,7 +47,7 @@ fun VentasScreen(
 
     LaunchedEffect(androidId) {
         viewModel.iniciar(androidId)
-        tarjetaViewModel.cargar(androidId, "")
+        tarjetaViewModel.cargar(androidId)
     }
 
     val productosFiltrados = uiState.productos.filter {
