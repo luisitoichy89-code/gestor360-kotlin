@@ -63,7 +63,6 @@ import org.luisito.gestor360.ui.screens.TicketsClienteScreen
 import org.luisito.gestor360.ui.screens.TrazasScreen
 import org.luisito.gestor360.ui.screens.VentasScreen
 import org.luisito.gestor360.ui.screens.VerificarDispositivoScreen
-import org.luisito.gestor360.ui.screens.SplashScreen
 import org.luisito.gestor360.ui.theme.Gestor360Theme
 import org.luisito.gestor360.ui.viewmodels.AccesoViewModel
 import org.luisito.gestor360.ui.viewmodels.LocalSeleccionViewModel
@@ -196,6 +195,7 @@ fun Gestor360App() {
                         DashboardScreen(
                             userRol = rol,
                             username = sessionManager.getNombre().ifEmpty { sessionManager.getUsername() },
+                            androidId = androidId,
                             onNavigate = { ruta ->
                                 pantalla = when (ruta) {
                                     "ventas" -> PantallaInterna.Ventas

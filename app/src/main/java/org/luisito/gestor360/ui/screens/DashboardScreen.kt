@@ -4,33 +4,39 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import org.luisito.gestor360.data.repository.TicketRepository
 
-private data class SeccionDashboard(
-    val titulo: String,
-    val icono: ImageVector,
-    val ruta: String
-)
+private data class SeccionDashboard(val titulo: String, val icono: ImageVector, val ruta: String)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     userRol: String = "",
     username: String = "",
+    androidId: String = "",
     onNavigate: (String) -> Unit,
     onLogout: () -> Unit
 ) {
     val esAdmin = userRol == "admin"
+    var mensajesSinLeer by remember { mutableStateOf(0L) }
+
+    // Se refresca cada vez que entras al Dashboard (ej. al volver de Soporte
+    // después de marcar los mensajes como leídos).
+    LaunchedEffect(androidId) {
+        if (esAdmin && androidId.isNotBlank()) {
+            TicketRepository().contarNoLeidos(androidId).onSuccess { mensajesSinLeer = it }
+        }
+    }
+
     val secciones = buildList {
         add(SeccionDashboard("Ventas", Icons.Default.PointOfSale, "ventas"))
         add(SeccionDashboard("Productos", Icons.Default.Inventory2, "productos"))
@@ -44,42 +50,61 @@ fun DashboardScreen(
     }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("Gestor360", fontWeight = FontWeight.Bold) },
-                navigationIcon = { IconButton(onClick = onLogout) { Icon(Icons.Default.Logout, contentDescription = "Cerrar sesión", tint = Color.White) } },
-                actions = { Text(text = "👤 $username", color = Color.White, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(end = 12.dp)) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary, titleContentColor = Color.White)
+                title = { Text("Gestor360") },
+                navigationIcon = {
+                    IconButton(onClick = onLogout) {
+                        Icon(Icons.Default.Logout, "Cerrar sesión", tint = Color.White)
+                    }
+                },
+                actions = {
+                    Text("👤 $username", color = Color.White, modifier = Modifier.padding(end = 8.dp))
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = Color.White
+                )
             )
         }
     ) { padding ->
         if (secciones.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("No hay secciones disponibles", style = MaterialTheme.typography.titleMedium)
+                Text("No hay secciones disponibles")
             }
         } else {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(20.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                contentPadding = PaddingValues(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxSize().padding(padding)
             ) {
                 items(secciones) { seccion ->
-                    ElevatedCard(
-                        onClick = { onNavigate(seccion.ruta) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
-                        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 6.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                    Box {
+                        ElevatedCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = {
+                                if (seccion.ruta == "soporte") mensajesSinLeer = 0L // se marcan leídos al abrir la pantalla
+                                onNavigate(seccion.ruta)
+                            }
                         ) {
-                            Icon(imageVector = seccion.icono, contentDescription = null, modifier = Modifier.size(42.dp), tint = MaterialTheme.colorScheme.primary)
-                            Spacer(modifier = Modifier.height(14.dp))
-                            Text(text = seccion.titulo, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(seccion.icono, null, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(seccion.titulo, style = MaterialTheme.typography.titleSmall)
+                            }
+                        }
+                        if (seccion.ruta == "soporte" && mensajesSinLeer > 0) {
+                            Badge(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)
+                            ) {
+                                Text(if (mensajesSinLeer > 99) "99+" else mensajesSinLeer.toString())
+                            }
                         }
                     }
                 }
