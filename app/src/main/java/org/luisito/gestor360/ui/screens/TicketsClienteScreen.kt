@@ -11,8 +11,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.luisito.gestor360.data.models.Ticket
 import org.luisito.gestor360.data.models.TicketMensaje
@@ -26,9 +31,9 @@ data class TicketUiState(
     val error: String? = null
 )
 
-class TicketViewModel(private val repo: TicketRepository = TicketRepository()) : androidx.lifecycle.ViewModel() {
-    private val _s = kotlinx.coroutines.flow.MutableStateFlow(TicketUiState())
-    val uiState = _s as kotlinx.coroutines.flow.StateFlow<TicketUiState>
+class TicketViewModel(private val repo: TicketRepository = TicketRepository()) : ViewModel() {
+    private val _s = MutableStateFlow(TicketUiState())
+    val uiState: StateFlow<TicketUiState> = _s.asStateFlow()
     private var androidId = ""
 
     fun cargarTickets(aid: String) { androidId = aid; viewModelScope.launch { _s.value = _s.value.copy(isLoading = true); repo.getTickets(aid).onSuccess { _s.value = _s.value.copy(isLoading = false, tickets = it) }.onFailure { _s.value = _s.value.copy(isLoading = false, error = it.message) } } }
