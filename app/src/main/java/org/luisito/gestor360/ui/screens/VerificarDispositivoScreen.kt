@@ -5,6 +5,8 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.PhoneAndroid
@@ -21,73 +23,33 @@ import org.luisito.gestor360.ui.viewmodels.AccesoViewModel
 import org.luisito.gestor360.utils.DeviceIdManager
 
 @Composable
-fun VerificarDispositivoScreen(
-    onDispositivoAutorizado: (User) -> Unit,
-    viewModel: AccesoViewModel = viewModel()
-) {
+fun VerificarDispositivoScreen(onDispositivoAutorizado: (User) -> Unit, viewModel: AccesoViewModel = viewModel()) {
     val context = LocalContext.current
-    val androidId = remember { DeviceIdManager.getFormattedDeviceId(context) }
     val uiState by viewModel.uiState.collectAsState()
+    val androidId = remember { DeviceIdManager.getFormattedDeviceId(context) }
 
-    LaunchedEffect(uiState.usuarioVerificado) {
-        uiState.usuarioVerificado?.let { onDispositivoAutorizado(it) }
-    }
+    LaunchedEffect(uiState.usuarioVerificado) { uiState.usuarioVerificado?.let { onDispositivoAutorizado(it) } }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(Icons.Default.PhoneAndroid, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
-        Spacer(modifier = Modifier.height(16.dp))
-        Text("Gestor360°", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text("Verifica este dispositivo para continuar", style = MaterialTheme.typography.bodyMedium)
-        Spacer(modifier = Modifier.height(24.dp))
-
-        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp)) {
-                Text("Android ID de este dispositivo", style = MaterialTheme.typography.labelMedium)
-                Spacer(modifier = Modifier.height(4.dp))
-                SelectionContainerCompat(androidId)
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("Android ID", androidId))
-                        Toast.makeText(context, "ID copiado al portapapeles", Toast.LENGTH_SHORT).show()
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Copiar ID")
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.primaryContainer) { Icon(Icons.Default.PhoneAndroid, null, Modifier.padding(18.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer) }
+            Spacer(Modifier.height(16.dp))
+            Text("Gestor360", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text("Verificación de dispositivo requerida", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(24.dp))
+            ElevatedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Identificador del dispositivo", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(6.dp))
+                    SelectionContainer { Text(androidId, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) }
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(onClick = { val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager; clipboard.setPrimaryClip(ClipData.newPlainText("Device ID", androidId)); Toast.makeText(context, "ID copiado al portapapeles", Toast.LENGTH_SHORT).show() }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) { Icon(Icons.Default.ContentCopy, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Copiar identificador") }
                 }
             }
+            Spacer(Modifier.height(24.dp))
+            if (uiState.verificando) { CircularProgressIndicator(); Spacer(Modifier.height(12.dp)); Text("Verificando dispositivo...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            else { Button(onClick = { viewModel.verificarDispositivo(androidId) }, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp)) { Text("Verificar dispositivo") } }
+            uiState.mensajeError?.let { error -> Spacer(Modifier.height(16.dp)); Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) { Text(error, Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodySmall) } }
         }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        if (uiState.verificando) {
-            CircularProgressIndicator()
-        } else {
-            Button(onClick = { viewModel.verificarDispositivo(androidId) }, modifier = Modifier.fillMaxWidth()) {
-                Text("Verificar")
-            }
-        }
-
-        uiState.mensajeError?.let { error ->
-            Spacer(modifier = Modifier.height(16.dp))
-            Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
-                Text(error, modifier = Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodySmall)
-            }
-        }
-    }
-}
-
-@Composable
-private fun SelectionContainerCompat(texto: String) {
-    androidx.compose.foundation.text.selection.SelectionContainer {
-        Text(texto, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
     }
 }

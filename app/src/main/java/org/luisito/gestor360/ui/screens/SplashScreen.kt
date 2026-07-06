@@ -25,7 +25,7 @@ fun SplashScreen(onFinished: () -> Unit) {
     }
 
     Box(
-        modifier = Modifier.fillMaxSize().background(Color(0xFF1A1A1A)),
+        modifier = Modifier.fillMaxSize().background(Color(0xFF1E3A8A)),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
