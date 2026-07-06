@@ -66,6 +66,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
+            isDebuggable = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // Si no hay keystore configurado (ej. build de CI sin secretos), no rompe el build;
             // simplemente no habrá signingConfig y el APK quedará sin firmar.
@@ -74,6 +75,7 @@ android {
             }
         }
         debug {
+            isDebuggable = true
             isMinifyEnabled = false
         }
     }
