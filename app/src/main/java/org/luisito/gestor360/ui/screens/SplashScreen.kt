@@ -25,12 +25,12 @@ fun SplashScreen(onFinished: () -> Unit) {
     }
 
     Box(
-        modifier = Modifier.fillMaxSize().background(Color(0xFFFF6600)),
+        modifier = Modifier.fillMaxSize().background(Color(0xFF1A1A1A)),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Gestor360°", fontSize = 48.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier)
-            Text("Sistema de gestión comercial", fontSize = 16.sp, color = Color.White.copy(alpha = 0.8f), modifier = Modifier)
+            Text("Gestor360°", fontSize = 48.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text("Sistema de gestión comercial", fontSize = 16.sp, color = Color.White.copy(alpha = 0.7f))
         }
     }
 }

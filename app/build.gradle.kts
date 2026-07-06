@@ -102,7 +102,6 @@ kotlin {
 
 dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
-    implementation("com.google.firebase:firebase-messaging-ktx")
 
     implementation("androidx.work:work-runtime-ktx:2.10.0")
     implementation("androidx.core:core-ktx:1.13.1")
@@ -136,7 +135,6 @@ dependencies {
     implementation("com.russhwolf:multiplatform-settings-coroutines:1.2.0")
 
     // Impresión térmica Bluetooth (ESC/POS)
-    implementation("com.github.DantSu:ESCPOS-ThermalPrinter-Android:3.3.0")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

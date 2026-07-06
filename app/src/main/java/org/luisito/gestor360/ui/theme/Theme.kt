@@ -4,27 +4,29 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-private val Naranja = Color(0xFFFF6600)
-private val NaranjaOscuro = Color(0xFFCC5500)
-private val Blanco = Color(0xFFFFFFFF)
+private val GrisOscuro = Color(0xFF1A1A1A)
+private val GrisMedio = Color(0xFF333333)
 private val GrisClaro = Color(0xFFF5F5F5)
-private val GrisOscuro = Color(0xFF333333)
+private val Blanco = Color(0xFFFFFFFF)
+private val Acento = Color(0xFFE53935)
 
 private val LightColorScheme = lightColorScheme(
-    primary = Naranja,
+    primary = GrisOscuro,
     onPrimary = Blanco,
-    primaryContainer = Naranja.copy(alpha = 0.15f),
-    onPrimaryContainer = NaranjaOscuro,
-    secondary = NaranjaOscuro,
+    primaryContainer = GrisClaro,
+    onPrimaryContainer = GrisOscuro,
+    secondary = GrisMedio,
     onSecondary = Blanco,
-    background = GrisClaro,
+    background = Blanco,
     onBackground = GrisOscuro,
     surface = Blanco,
     onSurface = GrisOscuro,
     surfaceVariant = GrisClaro,
-    onSurfaceVariant = GrisOscuro.copy(alpha = 0.7f),
+    onSurfaceVariant = GrisMedio,
     error = Color(0xFFD32F2F),
-    onError = Blanco
+    onError = Blanco,
+    tertiary = Acento,
+    onTertiary = Blanco
 )
 
 @Composable
