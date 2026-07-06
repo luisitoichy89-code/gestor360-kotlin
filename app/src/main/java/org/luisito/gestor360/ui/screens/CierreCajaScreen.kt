@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import org.luisito.gestor360.data.models.Sale
 import org.luisito.gestor360.ui.components.EstadoCargando
 import org.luisito.gestor360.ui.components.EstadoError
 import org.luisito.gestor360.ui.components.EstadoVacio
@@ -39,7 +40,8 @@ fun CierreCajaScreen(
     var mostrarAbrirTurno by remember { mutableStateOf(false) }
     var mostrarCerrarTurno by remember { mutableStateOf(false) }
     var mostrarCancelarVenta by remember { mutableStateOf(false) }
-    var ventaSeleccionada by remember { mutableStateOf<org.luisito.gestor360.data.models.Sale?>(null) }
+    var ventaSeleccionada by remember { mutableStateOf<Sale?>(null) }
+    val esAdmin = true // TODO: pasar rol real desde SessionManager
 
     LaunchedEffect(androidId) { viewModel.cargar(androidId) }
 
@@ -58,36 +60,35 @@ fun CierreCajaScreen(
     if (mostrarCerrarTurno) CerrarTurnoDialog((uiState.turnoActivo?.apertura ?: 0.0) + uiState.totalEfectivo, uiState.isSaving, { mostrarCerrarTurno = false }) { viewModel.cerrarTurno(it); mostrarCerrarTurno = false }
 
     if (mostrarCancelarVenta) {
-        CancelarVentaDialog(uiState.ventasDelTurno, { mostrarCancelarVenta = false }) { venta ->
-            ventaSeleccionada = venta
-            mostrarCancelarVenta = false
-        }
+        AlertDialog(
+            onDismissRequest = { mostrarCancelarVenta = false },
+            title = { Text("Cancelar una venta") },
+            text = {
+                if (uiState.ventasDelTurno.isEmpty()) Text("No hay ventas en este turno")
+                else LazyColumn {
+                    items(uiState.ventasDelTurno) { v ->
+                        Card(Modifier.fillMaxWidth().padding(vertical = 2.dp), onClick = { ventaSeleccionada = v; mostrarCancelarVenta = false }) {
+                            Column(Modifier.padding(12.dp)) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Total: ${v.total} CUP", fontWeight = FontWeight.Bold); Text(v.metodo) }
+                                if (!v.cliente_nombre.isNullOrBlank()) Text("Cliente: ${v.cliente_nombre}", style = MaterialTheme.typography.bodySmall)
+                                Text(v.created_at?.take(16)?.replace("T", " ") ?: "", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { mostrarCancelarVenta = false }) { Text("Cancelar") } }
+        )
     }
 
     if (ventaSeleccionada != null) {
-        val venta = ventaSeleccionada!!
-        val esAdmin = true // Debes pasar el rol desde el ViewModel o Session. Por ahora asumo admin.
+        val v = ventaSeleccionada!!
         AlertDialog(
             onDismissRequest = { ventaSeleccionada = null },
             title = { Text(if (esAdmin) "Anular venta" else "Solicitar anulación") },
-            text = {
-                Column {
-                    Text("Producto #${venta.producto_id}")
-                    Text("Total: ${venta.total} CUP · ${venta.metodo}")
-                    if (!venta.cliente_nombre.isNullOrBlank()) Text("Cliente: ${venta.cliente_nombre}")
-                    if (esAdmin) Text("Se anulará inmediatamente y se devolverá el stock.") else Text("Se enviará a aprobación del admin.")
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (esAdmin) {
-                        viewModel.anularVenta(venta.id ?: "")
-                    } else {
-                        aprobacionVM.solicitarAnularVenta(androidId, venta.id ?: "", venta.total)
-                    }
-                    ventaSeleccionada = null
-                }) { Text("Confirmar") }
-            },
+            text = { Column { Text("Producto #${v.producto_id}"); Text("Total: ${v.total} CUP · ${v.metodo}"); if (!v.cliente_nombre.isNullOrBlank()) Text("Cliente: ${v.cliente_nombre}"); Text(if (esAdmin) "Se anulará y devolverá el stock." else "Se enviará a aprobación.") } },
+            confirmButton = { TextButton(onClick = { if (esAdmin) viewModel.anularVenta(v.id ?: "") else aprobacionVM.solicitarAnularVenta(androidId, v.id ?: "", v.total); ventaSeleccionada = null }) { Text("Confirmar") } },
             dismissButton = { TextButton(onClick = { ventaSeleccionada = null }) { Text("Cancelar") } }
         )
     }
@@ -123,40 +124,16 @@ private fun TurnoAbiertoPanel(uiState: CierreCajaUiState, onCerrar: () -> Unit, 
             }
         }
         Spacer(Modifier.height(16.dp))
-        Text("Productos vendidos en este turno", style = MaterialTheme.typography.labelLarge)
+        Text("Productos vendidos", style = MaterialTheme.typography.labelLarge)
         if (uiState.productosVendidos.isEmpty()) EstadoVacio("Aún no hay ventas en este turno")
         else LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(uiState.productosVendidos) { (nombre, cantidad) ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(nombre); Text(if (cantidad == cantidad.toLong().toDouble()) cantidad.toLong().toString() else cantidad.toString(), fontWeight = FontWeight.Bold) }
-            }
+            items(uiState.productosVendidos) { (nombre, cantidad) -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(nombre); Text(if (cantidad == cantidad.toLong().toDouble()) cantidad.toLong().toString() else cantidad.toString(), fontWeight = FontWeight.Bold) } }
         }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = onCancelarVenta, Modifier.fillMaxWidth()) { Icon(Icons.Default.Block, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Cancelar una venta") }
         Spacer(Modifier.height(8.dp))
         Button(onClick = onCerrar, Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Icon(Icons.Default.Lock, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Cerrar turno") }
     }
-}
-
-@Composable
-private fun CancelarVentaDialog(ventas: List<org.luisito.gestor360.data.models.Sale>, onDismiss: () -> Unit, onSeleccionar: (org.luisito.gestor360.data.models.Sale) -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Selecciona la venta a cancelar") },
-        text = {
-            if (ventas.isEmpty()) Text("No hay ventas en este turno")
-            else LazyColumn { items(ventas) { v ->
-                Card(Modifier.fillMaxWidth().padding(vertical = 2.dp), onClick = { onSeleccionar(v) }) {
-                    Column(Modifier.padding(12.dp)) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Total: ${v.total} CUP", fontWeight = FontWeight.Bold); Text(v.metodo) }
-                        if (!v.cliente_nombre.isNullOrBlank()) Text("Cliente: ${v.cliente_nombre}", style = MaterialTheme.typography.bodySmall)
-                        Text(v.created_at?.take(16)?.replace("T", " ") ?: "", style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-            }}
-        },
-        confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
-    )
 }
 
 @Composable

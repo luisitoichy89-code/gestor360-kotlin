@@ -1,7 +1,12 @@
 package org.luisito.gestor360.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -33,12 +38,7 @@ fun VerificarDispositivoScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(
-            Icons.Default.PhoneAndroid,
-            contentDescription = null,
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
+        Icon(Icons.Default.PhoneAndroid, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(16.dp))
         Text("Gestor360°", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(8.dp))
@@ -50,6 +50,19 @@ fun VerificarDispositivoScreen(
                 Text("Android ID de este dispositivo", style = MaterialTheme.typography.labelMedium)
                 Spacer(modifier = Modifier.height(4.dp))
                 SelectionContainerCompat(androidId)
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("Android ID", androidId))
+                        Toast.makeText(context, "ID copiado al portapapeles", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Copiar ID")
+                }
             }
         }
 
@@ -58,10 +71,7 @@ fun VerificarDispositivoScreen(
         if (uiState.verificando) {
             CircularProgressIndicator()
         } else {
-            Button(
-                onClick = { viewModel.verificarDispositivo(androidId) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            Button(onClick = { viewModel.verificarDispositivo(androidId) }, modifier = Modifier.fillMaxWidth()) {
                 Text("Verificar")
             }
         }
@@ -69,12 +79,7 @@ fun VerificarDispositivoScreen(
         uiState.mensajeError?.let { error ->
             Spacer(modifier = Modifier.height(16.dp))
             Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    error,
-                    modifier = Modifier.padding(12.dp),
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                    style = MaterialTheme.typography.bodySmall
-                )
+                Text(error, modifier = Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodySmall)
             }
         }
     }

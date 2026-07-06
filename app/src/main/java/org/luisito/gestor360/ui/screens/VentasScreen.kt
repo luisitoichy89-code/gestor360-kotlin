@@ -36,10 +36,12 @@ fun VentasScreen(
     var showTransferenciaDialog by remember { mutableStateOf(false) }
     var showMixtoDialog by remember { mutableStateOf(false) }
     var showMixtoTransferencia by remember { mutableStateOf(false) }
+    var showMixtoResumen by remember { mutableStateOf(false) }
     var montoEfectivoMixto by remember { mutableStateOf(0.0) }
-    var clienteCi by remember { mutableStateOf("") }
-    var clienteTel by remember { mutableStateOf("") }
-    var clienteNombre by remember { mutableStateOf("") }
+    var mixtoClienteCi by remember { mutableStateOf("") }
+    var mixtoClienteTel by remember { mutableStateOf("") }
+    var mixtoClienteNombre by remember { mutableStateOf("") }
+    var mixtoTarjeta by remember { mutableStateOf<Tarjeta?>(null) }
 
     LaunchedEffect(androidId) {
         viewModel.iniciar(androidId)
@@ -92,25 +94,13 @@ fun VentasScreen(
     }
 
     if (selectedProduct != null) {
-        AlertDialog(
-            onDismissRequest = { selectedProduct = null },
-            title = { Text(selectedProduct!!.nombre) },
-            text = {
-                Column {
-                    Text("Stock: ${selectedProduct!!.stock.toInt()} unidades")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(cantidad, { cantidad = it.filter { c -> c.isDigit() || c == '.' } }, label = { Text("Cantidad") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
-                }
-            },
-            confirmButton = { TextButton(onClick = { val c = cantidad.toDoubleOrNull() ?: 0.0; val err = viewModel.agregarAlCarrito(selectedProduct!!, c); if (err == null) { selectedProduct = null; cantidad = "" } }) { Text("Agregar") } },
-            dismissButton = { TextButton(onClick = { selectedProduct = null }) { Text("Cancelar") } }
-        )
+        AlertDialog(onDismissRequest = { selectedProduct = null }, title = { Text(selectedProduct!!.nombre) }, text = { Column { Text("Stock: ${selectedProduct!!.stock.toInt()} unidades"); Spacer(Modifier.height(8.dp)); OutlinedTextField(cantidad, { cantidad = it.filter { c -> c.isDigit() || c == '.' } }, label = { Text("Cantidad") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true) } }, confirmButton = { TextButton(onClick = { val c = cantidad.toDoubleOrNull() ?: 0.0; val err = viewModel.agregarAlCarrito(selectedProduct!!, c); if (err == null) { selectedProduct = null; cantidad = "" } }) { Text("Agregar") } }, dismissButton = { TextButton(onClick = { selectedProduct = null }) { Text("Cancelar") } })
     }
 
     if (showEfectivoConfirm) AlertDialog(
         onDismissRequest = { showEfectivoConfirm = false },
         title = { Text("Confirmar venta") },
-        text = { Text("Total: $totalCarrito CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) },
+        text = { Text("Total a cobrar en efectivo: $totalCarrito CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) },
         confirmButton = { TextButton(onClick = { viewModel.confirmarVenta("cash", totalCarrito, 0.0, 0L, null); showEfectivoConfirm = false }) { Text("Aceptar") } },
         dismissButton = { TextButton(onClick = { showEfectivoConfirm = false }) { Text("Cancelar") } }
     )
@@ -124,8 +114,39 @@ fun VentasScreen(
         AlertDialog(onDismissRequest = { showMixtoDialog = false }, title = { Text("Pago mixto") }, text = { Column { Text("Total: $totalCarrito CUP"); OutlinedTextField(efTexto, { efTexto = it.filter { c -> c.isDigit() } }, label = { Text("Monto en efectivo") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true); val ef = efTexto.toDoubleOrNull() ?: 0.0; if (ef > 0) Text("Restante: ${totalCarrito - ef} CUP") } }, confirmButton = { val ef = efTexto.toDoubleOrNull() ?: 0.0; TextButton(enabled = ef > 0 && ef < totalCarrito, onClick = { montoEfectivoMixto = ef; showMixtoDialog = false; showMixtoTransferencia = true }) { Text("Continuar") } }, dismissButton = { TextButton(onClick = { showMixtoDialog = false }) { Text("Cancelar") } })
     }
 
-    if (showMixtoTransferencia) DatosClienteDialog("Mixto - Transferencia", totalCarrito - montoEfectivoMixto, tarjetaUiState.tarjetas, { showMixtoTransferencia = false; showMixtoDialog = true }) { ci, tel, nombre, tarjeta ->
-        viewModel.confirmarVenta("mixed", montoEfectivoMixto, totalCarrito - montoEfectivoMixto, 0L, SaleRepository.DatosCliente(ci, tel, nombre, "${tarjeta.banco} · ${tarjeta.numero}")); showMixtoTransferencia = false
+    if (showMixtoTransferencia) {
+        val restante = totalCarrito - montoEfectivoMixto
+        DatosClienteDialog("Mixto - Transferencia", restante, tarjetaUiState.tarjetas, { showMixtoTransferencia = false; showMixtoDialog = true }) { ci, tel, nombre, tarjeta ->
+            mixtoClienteCi = ci; mixtoClienteTel = tel; mixtoClienteNombre = nombre; mixtoTarjeta = tarjeta
+            showMixtoTransferencia = false
+            showMixtoResumen = true
+        }
+    }
+
+    if (showMixtoResumen) {
+        val restante = totalCarrito - montoEfectivoMixto
+        AlertDialog(
+            onDismissRequest = { showMixtoResumen = false },
+            title = { Text("Confirmar pago mixto") },
+            text = {
+                Column {
+                    Text("💵 Efectivo: $montoEfectivoMixto CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("📲 Transferencia: $restante CUP", fontWeight = FontWeight.Bold)
+                    Text("💰 Total: $totalCarrito CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(8.dp))
+                    if (mixtoTarjeta != null) Text("Cuenta: ${mixtoTarjeta!!.banco} · ${mixtoTarjeta!!.numero}")
+                    Text("Cliente: $mixtoClienteNombre")
+                    Text("CI: $mixtoClienteCi · Tel: $mixtoClienteTel")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.confirmarVenta("mixed", montoEfectivoMixto, restante, 0L, SaleRepository.DatosCliente(mixtoClienteCi, mixtoClienteTel, mixtoClienteNombre, "${mixtoTarjeta!!.banco} · ${mixtoTarjeta!!.numero}"))
+                    showMixtoResumen = false
+                }) { Text("Confirmar") }
+            },
+            dismissButton = { TextButton(onClick = { showMixtoResumen = false; showMixtoDialog = true }) { Text("Cancelar") } }
+        )
     }
 }
 
@@ -136,12 +157,12 @@ private fun DatosClienteDialog(titulo: String, monto: Double, tarjetas: List<Tar
     var tarjetaSel by remember { mutableStateOf(tarjetas.firstOrNull()) }; var menuAbierto by remember { mutableStateOf(false) }
     AlertDialog(onDismissRequest = onDismiss, title = { Text(titulo) }, text = { Column {
         Text("Monto: $monto CUP", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(Modifier.height(12.dp))
         if (tarjetas.isEmpty()) Text("No hay tarjetas", color = MaterialTheme.colorScheme.error) else ExposedDropdownMenuBox(menuAbierto, { menuAbierto = it }) {
             OutlinedTextField(tarjetaSel?.let { "${it.banco} · ${it.numero}" } ?: "Seleccionar", {}, readOnly = true, label = { Text("Cuenta destino") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(menuAbierto) }, modifier = Modifier.fillMaxWidth().menuAnchor())
             ExposedDropdownMenu(menuAbierto, { menuAbierto = false }) { tarjetas.forEach { t -> DropdownMenuItem(text = { Text("${t.banco} · ${t.numero}") }, onClick = { tarjetaSel = t; menuAbierto = false }) } }
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(Modifier.height(8.dp))
         OutlinedTextField(ci, { ci = it.filter { c -> c.isDigit() } }, label = { Text("CI") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
         OutlinedTextField(tel, { tel = it.filter { c -> c.isDigit() } }, label = { Text("Teléfono") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), modifier = Modifier.fillMaxWidth())
         OutlinedTextField(nombre, { nombre = it.uppercase() }, label = { Text("Nombre") }, singleLine = true, modifier = Modifier.fillMaxWidth())
