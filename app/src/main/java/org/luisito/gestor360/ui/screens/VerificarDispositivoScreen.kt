@@ -4,12 +4,12 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,6 +19,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import org.luisito.gestor360.R
 import org.luisito.gestor360.data.models.User
 import org.luisito.gestor360.ui.viewmodels.AccesoViewModel
 import org.luisito.gestor360.utils.DeviceIdManager
@@ -33,7 +34,7 @@ fun VerificarDispositivoScreen(onDispositivoAutorizado: (User) -> Unit, viewMode
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.primaryContainer) { Image(painterResource(R.drawable.logo_splash), "Gestor360", Modifier.size(80.dp)) }
+            Image(painterResource(R.drawable.logo_splash), "Gestor360", Modifier.size(80.dp))
             Spacer(Modifier.height(16.dp))
             Text("Gestor360", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Text("Verificación de dispositivo requerida", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
