@@ -53,6 +53,7 @@ import org.luisito.gestor360.data.sync.SyncWorker
 import org.luisito.gestor360.ui.components.SyncStatusBar
 import org.luisito.gestor360.ui.components.VerificarActualizacion
 import org.luisito.gestor360.ui.screens.AprobacionesScreen
+import org.luisito.gestor360.ui.screens.CarritoScreen
 import org.luisito.gestor360.ui.screens.CierreCajaScreen
 import org.luisito.gestor360.ui.screens.ConflictosScreen
 import org.luisito.gestor360.ui.screens.DashboardScreen
@@ -74,15 +75,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Necesario para que los repositorios (ProductRepository, SaleRepository)
-        // puedan usar Room sin que cada ViewModel tenga que pasarles el Context.
         AppContextHolder.init(applicationContext)
-        // Reintento de sincronización de fondo cada 15 min (mínimo de Android).
         SyncWorker.programarPeriodico(applicationContext)
 
-        // OJO: aquí antes había código de splash (`remember{...}`) suelto en onCreate.
-        // remember es una función @Composable y no se puede llamar fuera de un árbol
-        // Compose — eso no compilaba. El splash ahora vive solo dentro de Gestor360App().
         setContent { Gestor360Theme { Gestor360App() } }
     }
 }
@@ -103,9 +98,6 @@ private sealed class PantallaInterna {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Gestor360App() {
-    // Splash: una sola declaración, un solo lugar. Antes había dos `var mostrarSplash`
-    // duplicadas en este mismo scope (error de compilación) más una tercera copia
-    // rota dentro de onCreate.
     var mostrarSplash by remember { mutableStateOf(true) }
     if (mostrarSplash) {
         SplashScreen(onFinished = { mostrarSplash = false })
@@ -129,8 +121,6 @@ fun Gestor360App() {
         isLoading = false
     }
 
-    // En cuanto vuelve la señal, intenta sincronizar de inmediato (no espera
-    // los 15 min del trabajo periódico de fondo).
     LaunchedEffect(Unit) {
         NetworkMonitor.observar(context).collect { hayInternet ->
             if (hayInternet && sessionManager.isLoggedIn()) {
@@ -184,7 +174,6 @@ fun Gestor360App() {
             val androidId = sessionManager.getAndroidId()
             val esAdmin = rol == "admin"
 
-            // AnimatedContent: fundido suave entre pantallas en vez del salto seco de un `when` normal.
             AnimatedContent(
                 targetState = pantalla,
                 label = "navegacion_principal",

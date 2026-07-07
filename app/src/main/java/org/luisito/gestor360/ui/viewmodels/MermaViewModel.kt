@@ -40,10 +40,10 @@ class MermaViewModel(
         if (androidIdActual.isNotBlank()) cargarPendientes(androidIdActual)
     }
 
-    fun solicitar(androidId: String, productoId: Long, cantidad: Double, motivo: String, onListo: () -> Unit = {}) {
+    fun solicitar(androidId: String, productoId: Long, productoNombre: String, cantidad: Double, motivo: String, onListo: () -> Unit = {}) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
-            repository.solicitar(androidId, productoId, cantidad, motivo)
+            repository.solicitar(androidId, productoId, productoNombre, cantidad, motivo)
                 .onSuccess {
                     _uiState.value = _uiState.value.copy(mensaje = "Merma enviada para aprobación del admin")
                     onListo()

@@ -2,6 +2,7 @@ package org.luisito.gestor360.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -20,11 +21,6 @@ import org.luisito.gestor360.data.repository.SaleRepository
 import org.luisito.gestor360.ui.viewmodels.SaleViewModel
 import org.luisito.gestor360.ui.viewmodels.TarjetaViewModel
 
-/**
- * Un solo estado de "en qué paso del checkout estoy" en vez de 5 booleanas
- * sueltas (showEfectivoConfirm, showTransferenciaDialog, showMixtoDialog,
- * showMixtoTransferencia, showMixtoResumen) que tenía la versión anterior.
- */
 private sealed class PasoCheckout {
     object Ninguno : PasoCheckout()
     object ConfirmarEfectivo : PasoCheckout()
@@ -34,7 +30,6 @@ private sealed class PasoCheckout {
     object ResumenMixto : PasoCheckout()
 }
 
-/** Todo lo que se va acumulando durante el flujo de pago mixto, en un solo lugar. */
 private data class DatosMixto(
     val efectivo: Double = 0.0,
     val ci: String = "",
@@ -90,7 +85,7 @@ fun CarritoScreen(
                 Text("Carrito (${uiState.carrito.size} productos)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(12.dp))
                 LazyColumn(modifier = Modifier.weight(1f)) {
-                    androidx.compose.foundation.lazy.items(uiState.carrito.size) { i ->
+                    items(uiState.carrito.size) { i ->
                         val item = uiState.carrito[i]
                         ElevatedCard(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), shape = RoundedCornerShape(14.dp)) {
                             Row(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -283,13 +278,14 @@ private fun DatosClienteDialog(titulo: String, monto: Double, tarjetas: List<Tar
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(tel, { tel = it.filter { c -> c.isDigit() } }, label = { Text("Teléfono") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(nombre, { nombre = it.uppercase() }, label = { Text("Nombre") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
+                OutlinedTextField(nombre, { nombre = it }, label = { Text("Nombre") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
             }
         },
         confirmButton = {
-            TextButton(enabled = ci.isNotBlank() && tel.isNotBlank() && nombre.isNotBlank() && tarjetaSel != null, onClick = { onConfirmar(ci, tel, nombre, tarjetaSel!!) }) {
-                Text("Confirmar", fontWeight = FontWeight.Bold)
-            }
+            val tarjeta = tarjetaSel
+            TextButton(enabled = ci.isNotBlank() && tarjeta != null, onClick = {
+                if (tarjeta != null) onConfirmar(ci.trim(), tel.trim(), nombre.trim(), tarjeta)
+            }) { Text("Confirmar", fontWeight = FontWeight.Bold) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
     )
