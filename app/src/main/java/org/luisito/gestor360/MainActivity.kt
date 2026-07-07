@@ -90,6 +90,7 @@ class MainActivity : ComponentActivity() {
 private sealed class PantallaInterna {
     object Home : PantallaInterna()
     object Ventas : PantallaInterna()
+    object Carrito : PantallaInterna()
     object Productos : PantallaInterna()
     object Tarjetas : PantallaInterna()
     object Aprobaciones : PantallaInterna()
@@ -212,7 +213,15 @@ fun Gestor360App() {
                             onLogout = { cerrarSesion() }
                         )
                     }
-                    is PantallaInterna.Ventas -> VentasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
+                    is PantallaInterna.Ventas -> VentasScreen(
+                        androidId = androidId,
+                        onBack = { pantalla = PantallaInterna.Home },
+                        onIrACarrito = { pantalla = PantallaInterna.Carrito }
+                    )
+                    is PantallaInterna.Carrito -> CarritoScreen(
+                        onBack = { pantalla = PantallaInterna.Ventas },
+                        onVentaConfirmada = { pantalla = PantallaInterna.Ventas }
+                    )
                     is PantallaInterna.Productos -> ProductosScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home })
                     is PantallaInterna.CierreCaja -> CierreCajaScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
                     is PantallaInterna.Tarjetas -> if (esAdmin) TarjetasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }

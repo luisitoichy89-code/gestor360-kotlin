@@ -10,6 +10,8 @@ data class Turno(
     val apertura: Double,
     val cierre: Double? = null,
     val diferencia: Double? = null,
+    val cliente_id: String? = null,
+    val local_id: Long? = null,
     val created_at: String? = null
 ) {
     val estaAbierto: Boolean get() = cierre == null

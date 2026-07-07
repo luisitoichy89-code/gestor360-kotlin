@@ -13,11 +13,14 @@ import org.luisito.gestor360.data.repository.SaleRepository
 
 data class SaleUiState(
     val isLoading: Boolean = false,
+    val isSaving: Boolean = false,
     val productos: List<Product> = emptyList(),
     val carrito: List<CartItem> = emptyList(),
     val error: String? = null,
     val ventaConfirmada: Boolean = false
-)
+) {
+    val totalCarrito: Double get() = carrito.sumOf { it.subtotal }
+}
 
 class SaleViewModel(
     private val productRepository: ProductRepository = ProductRepository(),
@@ -30,7 +33,7 @@ class SaleViewModel(
     fun iniciar(androidId: String) {
         androidIdActual = androidId
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             productRepository.getProducts(androidId)
                 .onSuccess { _uiState.value = _uiState.value.copy(isLoading = false, productos = it) }
                 .onFailure { _uiState.value = _uiState.value.copy(isLoading = false, error = it.message) }
@@ -60,11 +63,26 @@ class SaleViewModel(
 
     fun limpiarCarrito() { _uiState.value = _uiState.value.copy(carrito = emptyList()) }
 
+    /**
+     * Transaction-safe: si ya hay una venta guardándose, ignora toques
+     * repetidos (evita doble-envío). El carrito solo se limpia y
+     * "ventaConfirmada" solo se marca si guardarVenta() realmente tuvo
+     * éxito — antes esto pasaba siempre, sin mirar el resultado.
+     */
     fun confirmarVenta(metodo: String, efectivo: Double, transferencia: Double, usuarioId: Long, cliente: SaleRepository.DatosCliente?) {
+        if (_uiState.value.isSaving) return
+        if (_uiState.value.carrito.isEmpty()) return
+
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             saleRepository.guardarVenta(androidIdActual, _uiState.value.carrito, metodo, efectivo, transferencia, cliente)
-            _uiState.value = _uiState.value.copy(carrito = emptyList(), ventaConfirmada = true)
-            iniciar(androidIdActual) // Refrescar stock inmediatamente
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(carrito = emptyList(), ventaConfirmada = true, isSaving = false)
+                    iniciar(androidIdActual) // Refrescar stock inmediatamente
+                }
+                .onFailure { e ->
+                    _uiState.value = _uiState.value.copy(isSaving = false, error = e.message ?: "No se pudo guardar la venta")
+                }
         }
     }
 
