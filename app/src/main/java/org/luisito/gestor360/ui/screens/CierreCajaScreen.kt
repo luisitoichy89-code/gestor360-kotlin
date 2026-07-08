@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.luisito.gestor360.ui.components.*
 import org.luisito.gestor360.ui.viewmodels.CierreCajaViewModel
+import org.luisito.gestor360.utils.CsvExporter
 import org.luisito.gestor360.utils.ReporteExporter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,6 +54,7 @@ fun CierreCajaScreen(
                     DropdownMenuItem(text = { Text("PDF") }, leadingIcon = { Icon(Icons.Default.PictureAsPdf, null) }, onClick = { mostrarMenuExportar = false; ReporteExporter.exportarPdf(context, datos) })
                     DropdownMenuItem(text = { Text("TXT") }, leadingIcon = { Icon(Icons.Default.Description, null) }, onClick = { mostrarMenuExportar = false; ReporteExporter.exportarTxt(context, datos) })
                     DropdownMenuItem(text = { Text("Word") }, leadingIcon = { Icon(Icons.Default.Article, null) }, onClick = { mostrarMenuExportar = false; ReporteExporter.exportarWord(context, datos) })
+                    DropdownMenuItem(text = { Text("CSV") }, leadingIcon = { Icon(Icons.Default.TableChart, null) }, onClick = { mostrarMenuExportar = false; CsvExporter.exportarCierreCaja(context, datos.fecha, datos.productosVendidos, datos.totalEfectivo, datos.totalTransferencia, datos.totalMixto, datos.totalMixtoEfectivo, datos.totalMixtoTransferencia, datos.apertura) })
                     DropdownMenuItem(text = { Text("Compartir") }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = { mostrarMenuExportar = false; ReporteExporter.compartirTexto(context, datos) })
                 }
             }

@@ -66,7 +66,13 @@ object ReporteExporter {
         if (valor == valor.toLong().toDouble()) valor.toLong().toString() else valor.toString()
 
     private fun carpetaExport(context: Context): File {
-        val carpeta = File(context.getExternalFilesDir(null), "reportes")
+        // OJO: se reutiliza la MISMA carpeta "csv/" que ya usa CsvExporter, no una
+        // carpeta nueva. res/xml/file_paths.xml solo tiene declarada esa ruta para
+        // el FileProvider; si se escribe en una carpeta distinta sin declararla ahí,
+        // FileProvider.getUriForFile() lanza IllegalArgumentException apenas se llama
+        // y la app se cierra sola (eso rompía PDF/TXT/Word: "Compartir" no falla
+        // porque no toca FileProvider, es solo texto plano).
+        val carpeta = File(context.getExternalFilesDir(null), "csv")
         if (!carpeta.exists()) carpeta.mkdirs()
         return carpeta
     }
