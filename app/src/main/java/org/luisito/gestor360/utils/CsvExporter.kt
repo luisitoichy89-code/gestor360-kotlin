@@ -66,9 +66,22 @@ object CsvExporter {
         productosVendidos: List<Pair<String, Double>>,
         totalEfectivo: Double,
         totalTransferencia: Double,
-        totalMixto: Double
+        totalMixto: Double,
+        totalMixtoEfectivo: Double = 0.0,
+        totalMixtoTransferencia: Double = 0.0,
+        apertura: Double = 0.0
     ) {
-        val filas = mutableListOf(listOf("Cierre de caja", fecha))
+        // Encabezado real del archivo: antes solo tenía "Cierre de caja, <fecha>" en
+        // la primera fila. Ahora identifica la app, la fecha del turno y el momento
+        // exacto de generación (útil cuando se manda el CSV por WhatsApp/Drive y hay
+        // que saber si es el reporte del cierre del día o uno reimpreso después).
+        val generadoEl = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+        val efectivoEnCaja = totalEfectivo + totalMixtoEfectivo
+        val filas = mutableListOf(
+            listOf("Gestor360 · Cierre de caja"),
+            listOf("Fecha del turno", fecha),
+            listOf("Generado el", generadoEl)
+        )
         filas.add(listOf())
         filas.add(listOf("Producto", "Cantidad vendida"))
         productosVendidos.forEach { (nombre, cantidad) ->
@@ -76,10 +89,15 @@ object CsvExporter {
         }
         filas.add(listOf())
         filas.add(listOf("Resumen de cobros", ""))
-        filas.add(listOf("Efectivo", formatearNumero(totalEfectivo)))
+        filas.add(listOf("Apertura", formatearNumero(apertura)))
+        filas.add(listOf("Efectivo (ventas 100% efectivo)", formatearNumero(totalEfectivo)))
         filas.add(listOf("Transferencia", formatearNumero(totalTransferencia)))
-        filas.add(listOf("Mixto", formatearNumero(totalMixto)))
-        filas.add(listOf("Total", formatearNumero(totalEfectivo + totalTransferencia + totalMixto)))
+        filas.add(listOf("Mixto (total)", formatearNumero(totalMixto)))
+        filas.add(listOf("   · Mixto en efectivo", formatearNumero(totalMixtoEfectivo)))
+        filas.add(listOf("   · Mixto en transferencia", formatearNumero(totalMixtoTransferencia)))
+        filas.add(listOf())
+        filas.add(listOf("Efectivo esperado en caja (apertura + efectivo + mixto-efectivo)", formatearNumero(apertura + efectivoEnCaja)))
+        filas.add(listOf("Total general vendido", formatearNumero(totalEfectivo + totalTransferencia + totalMixto)))
         compartirCsv(context, "cierre_caja_$fecha.csv", filas)
     }
 

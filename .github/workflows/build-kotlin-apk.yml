@@ -43,4 +43,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: gestor360-release-apk
-          path: app/build/outputs/apk/release/app-release.apk
+          # Wildcard en vez del nombre exacto: si algún día vuelve a faltar el
+          # signingConfig, el APK sale como app-release-unsigned.apk y con el
+          # nombre fijo anterior el paso fallaba en silencio sin subir nada.
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error

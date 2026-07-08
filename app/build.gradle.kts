@@ -10,6 +10,19 @@ plugins {
 // era un parche para el mismo conflicto kapt + plugin de serialización bajo K2.
 // Si algo de metadata vuelve a fallar, es la primera línea a revisar.
 
+// local.properties NO se carga automáticamente como Gradle properties: el AGP solo
+// lee de ahí "sdk.dir". Por eso RELEASE_STORE_FILE/RELEASE_STORE_PASSWORD/etc. que el
+// workflow de CI escribe en local.properties nunca llegaban a project.findProperty(),
+// signingConfig quedaba null, y assembleRelease generaba un APK SIN FIRMAR con otro
+// nombre (app-release-unsigned.apk) en vez de app-release.apk. El paso "Upload Release APK"
+// del workflow buscaba exactamente app-release.apk, no lo encontraba, y por eso no
+// aparecía ningún artifact para descargar. Se carga local.properties manualmente aquí
+// como respaldo para que sirva tanto en CI (repo checkout limpio) como en local.
+val localProperties = java.util.Properties().apply {
+    val localFile = rootProject.file("local.properties")
+    if (localFile.exists()) localFile.inputStream().use { load(it) }
+}
+
 android {
     namespace = "org.luisito.gestor360"
     compileSdk = 36
@@ -47,10 +60,14 @@ android {
     //    RELEASE_KEY_ALIAS=gestor360
     //    RELEASE_KEY_PASSWORD=tu_password_de_la_key
     //
-    val releaseStoreFile = project.findProperty("RELEASE_STORE_FILE") as String?
-    val releaseStorePassword = project.findProperty("RELEASE_STORE_PASSWORD") as String?
-    val releaseKeyAlias = project.findProperty("RELEASE_KEY_ALIAS") as String?
-    val releaseKeyPassword = project.findProperty("RELEASE_KEY_PASSWORD") as String?
+    val releaseStoreFile = (project.findProperty("RELEASE_STORE_FILE") as String?)
+        ?: localProperties.getProperty("RELEASE_STORE_FILE")
+    val releaseStorePassword = (project.findProperty("RELEASE_STORE_PASSWORD") as String?)
+        ?: localProperties.getProperty("RELEASE_STORE_PASSWORD")
+    val releaseKeyAlias = (project.findProperty("RELEASE_KEY_ALIAS") as String?)
+        ?: localProperties.getProperty("RELEASE_KEY_ALIAS")
+    val releaseKeyPassword = (project.findProperty("RELEASE_KEY_PASSWORD") as String?)
+        ?: localProperties.getProperty("RELEASE_KEY_PASSWORD")
 
     signingConfigs {
         if (releaseStoreFile != null) {

@@ -31,19 +31,19 @@ fun CierreCajaScreen(
 
     LaunchedEffect(androidId) { viewModel.cargar(androidId) }
 
-    Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = { TopAppBar(title = { Text("Cierre de caja", fontWeight = FontWeight.Bold) }, navigationIcon = { if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null) } }, actions = { IconButton(onClick = { viewModel.refrescar() }) { Icon(Icons.Default.Refresh, null) }; if (uiState.turnoActivo != null) IconButton(onClick = { CsvExporter.exportarCierreCaja(context, uiState.turnoActivo?.created_at?.take(10) ?: "", uiState.productosVendidos, uiState.totalEfectivo, uiState.totalTransferencia, uiState.totalMixto) }) { Icon(Icons.Default.FileDownload, null) } }) }) { padding ->
+    Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = { TopAppBar(title = { Text("Cierre de caja", fontWeight = FontWeight.Bold) }, navigationIcon = { if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null) } }, actions = { IconButton(onClick = { viewModel.refrescar() }) { Icon(Icons.Default.Refresh, null) }; if (uiState.turnoActivo != null) IconButton(onClick = { CsvExporter.exportarCierreCaja(context, uiState.turnoActivo?.created_at?.take(10) ?: "", uiState.productosVendidos, uiState.totalEfectivo, uiState.totalTransferencia, uiState.totalMixto, uiState.totalMixtoEfectivo, uiState.totalMixtoTransferencia, uiState.turnoActivo?.apertura ?: 0.0) }) { Icon(Icons.Default.FileDownload, null) } }) }) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
             when {
                 uiState.isLoading -> EstadoCargando()
                 uiState.error != null -> EstadoError(uiState.error ?: "Error") { viewModel.refrescar() }
                 uiState.turnoActivo == null -> TurnoCerradoPanel(uiState.isSaving) { mostrarAbrirTurno = true }
-                else -> TurnoAbiertoPanel(uiState.turnoActivo?.apertura ?: 0.0, uiState.productosVendidos, uiState.totalEfectivo, uiState.totalTransferencia, uiState.totalMixto) { mostrarCerrarTurno = true }
+                else -> TurnoAbiertoPanel(uiState.turnoActivo?.apertura ?: 0.0, uiState.productosVendidos, uiState.totalEfectivo, uiState.totalTransferencia, uiState.totalMixto, uiState.totalMixtoEfectivo, uiState.totalMixtoTransferencia) { mostrarCerrarTurno = true }
             }
         }
     }
 
     if (mostrarAbrirTurno) AbrirTurnoDialog(uiState.isSaving, { mostrarAbrirTurno = false }) { viewModel.abrirTurno(it); mostrarAbrirTurno = false }
-    if (mostrarCerrarTurno) CerrarTurnoDialog((uiState.turnoActivo?.apertura ?: 0.0) + uiState.totalEfectivo, uiState.isSaving, { mostrarCerrarTurno = false }) { viewModel.cerrarTurno(it); mostrarCerrarTurno = false }
+    if (mostrarCerrarTurno) CerrarTurnoDialog((uiState.turnoActivo?.apertura ?: 0.0) + uiState.efectivoEnCaja, uiState.isSaving, { mostrarCerrarTurno = false }) { viewModel.cerrarTurno(it); mostrarCerrarTurno = false }
 
     uiState.turnoRecienCerrado?.let { turno ->
         val dif = turno.diferencia ?: 0.0
@@ -65,7 +65,7 @@ private fun TurnoCerradoPanel(isSaving: Boolean, onAbrir: () -> Unit) {
 }
 
 @Composable
-private fun TurnoAbiertoPanel(apertura: Double, productosVendidos: List<Pair<String, Double>>, totalEfectivo: Double, totalTransferencia: Double, totalMixto: Double, onCerrar: () -> Unit) {
+private fun TurnoAbiertoPanel(apertura: Double, productosVendidos: List<Pair<String, Double>>, totalEfectivo: Double, totalTransferencia: Double, totalMixto: Double, totalMixtoEfectivo: Double, totalMixtoTransferencia: Double, onCerrar: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         ElevatedCard(shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
@@ -75,8 +75,14 @@ private fun TurnoAbiertoPanel(apertura: Double, productosVendidos: List<Pair<Str
                 FilaResumen("Efectivo vendido", totalEfectivo)
                 FilaResumen("Transferencia", totalTransferencia)
                 FilaResumen("Mixto", totalMixto)
+                if (totalMixto > 0.0) {
+                    // Desglose de lo que hay dentro de "Mixto": antes se veía un solo
+                    // monto y no se sabía cuánto de eso había que contar como efectivo.
+                    FilaResumen("   · Mixto en efectivo", totalMixtoEfectivo)
+                    FilaResumen("   · Mixto en transferencia", totalMixtoTransferencia)
+                }
                 Divider(modifier = Modifier.padding(vertical = 10.dp))
-                FilaResumen("Total esperado", apertura + totalEfectivo, destacado = true)
+                FilaResumen("Total esperado", apertura + totalEfectivo + totalMixtoEfectivo, destacado = true)
             }
         }
         Spacer(Modifier.height(16.dp))
