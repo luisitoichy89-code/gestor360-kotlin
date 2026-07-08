@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -18,7 +20,11 @@ plugins {
 // del workflow buscaba exactamente app-release.apk, no lo encontraba, y por eso no
 // aparecía ningún artifact para descargar. Se carga local.properties manualmente aquí
 // como respaldo para que sirva tanto en CI (repo checkout limpio) como en local.
-val localProperties = java.util.Properties().apply {
+// Nota: se referencia como "Properties()" (import arriba), NO como "java.util.Properties()":
+// el plugin de Android registra un accessor de Gradle llamado "java" en el scope del
+// script, que tapa el paquete java.util al escribirlo inline y rompe la compilación
+// con "Unresolved reference: util".
+val localProperties = Properties().apply {
     val localFile = rootProject.file("local.properties")
     if (localFile.exists()) localFile.inputStream().use { load(it) }
 }
@@ -60,14 +66,19 @@ android {
     //    RELEASE_KEY_ALIAS=gestor360
     //    RELEASE_KEY_PASSWORD=tu_password_de_la_key
     //
+    // OJO: se usa localProperties["KEY"] (operador de Map, devuelve Any? -> String?)
+    // y no localProperties.getProperty("KEY"), porque getProperty() es un método Java
+    // que Kotlin ve como tipo plataforma "String!" (no marcado nullable), y entonces
+    // el compilador infiere que releaseStoreFile nunca puede ser null y marca como
+    // "siempre true" cualquier chequeo posterior (aunque si falta la propiedad sí lo es).
     val releaseStoreFile = (project.findProperty("RELEASE_STORE_FILE") as String?)
-        ?: localProperties.getProperty("RELEASE_STORE_FILE")
+        ?: (localProperties["RELEASE_STORE_FILE"] as String?)
     val releaseStorePassword = (project.findProperty("RELEASE_STORE_PASSWORD") as String?)
-        ?: localProperties.getProperty("RELEASE_STORE_PASSWORD")
+        ?: (localProperties["RELEASE_STORE_PASSWORD"] as String?)
     val releaseKeyAlias = (project.findProperty("RELEASE_KEY_ALIAS") as String?)
-        ?: localProperties.getProperty("RELEASE_KEY_ALIAS")
+        ?: (localProperties["RELEASE_KEY_ALIAS"] as String?)
     val releaseKeyPassword = (project.findProperty("RELEASE_KEY_PASSWORD") as String?)
-        ?: localProperties.getProperty("RELEASE_KEY_PASSWORD")
+        ?: (localProperties["RELEASE_KEY_PASSWORD"] as String?)
 
     signingConfigs {
         if (releaseStoreFile != null) {
