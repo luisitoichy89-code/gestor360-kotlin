@@ -34,39 +34,29 @@ fun VerificarDispositivoScreen(onDispositivoAutorizado: (User) -> Unit, viewMode
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val androidId = remember { DeviceIdManager.getFormattedDeviceId(context) }
-    var permisosOk by remember { mutableStateOf(false) }
+    var usuarioVerificado by remember { mutableStateOf<User?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        permisosOk = permissions.values.all { it }
-        if (!permisosOk) {
-            Toast.makeText(context, "Permisos necesarios para recibir SMS y almacenamiento", Toast.LENGTH_LONG).show()
-        }
-    }
-
-    val permisosRequeridos = arrayOf(
-        Manifest.permission.RECEIVE_SMS,
-        Manifest.permission.READ_SMS
-    )
-
-    fun solicitarPermisos() {
-        val faltan = permisosRequeridos.any {
-            ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
-        }
-        if (faltan) {
-            permissionLauncher.launch(permisosRequeridos)
-        } else {
-            permisosOk = true
+    ) { granted ->
+        usuarioVerificado?.let { user ->
+            onDispositivoAutorizado(user)
         }
     }
 
     LaunchedEffect(uiState.usuarioVerificado) {
         uiState.usuarioVerificado?.let { user ->
-            solicitarPermisos()
-            if (permisosOk || permisosRequeridos.all {
-                    ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-                }) {
+            usuarioVerificado = user
+            val permisosRequeridos = arrayOf(
+                Manifest.permission.RECEIVE_SMS,
+                Manifest.permission.READ_SMS
+            )
+            val faltan = permisosRequeridos.any {
+                ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+            }
+            if (faltan) {
+                permissionLauncher.launch(permisosRequeridos)
+            } else {
                 onDispositivoAutorizado(user)
             }
         }
