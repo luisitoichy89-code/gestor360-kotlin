@@ -29,7 +29,7 @@ data class TopVendido(val nombre: String, val total: Double)
 class SaleRepository(
     private val context: Context = AppContextHolder.context,
     private val productRepository: ProductRepository = ProductRepository(context),
-    private val trazaRepository: TrazaRepository = TrazaRepository()
+    //private val trazaRepository: TrazaRepository = TrazaRepository()
 ) {
     private val db = AppDatabase.obtener(context)
 
@@ -73,7 +73,7 @@ class SaleRepository(
             db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "registrar_venta", payloadJson = payload.toString()))
         }
 
-        trazaRepository.registrar(androidId, "registrar_venta", "Total: $totalVenta ($metodo)")
+        //trazaRepository.registrar(androidId, "registrar_venta", "Total: $totalVenta ($metodo)")
         if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
         return Result.success(Unit)
     }
@@ -93,7 +93,7 @@ class SaleRepository(
                 "anular_venta", buildJsonObject { put("p_android_id", androidId); put("p_venta_id", ventaId) }
             )
             db.ventaDao().eliminar(ventaId)
-            trazaRepository.registrar(androidId, "anular_venta", "Venta anulada: $ventaId")
+            //trazaRepository.registrar(androidId, "anular_venta", "Venta anulada: $ventaId")
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

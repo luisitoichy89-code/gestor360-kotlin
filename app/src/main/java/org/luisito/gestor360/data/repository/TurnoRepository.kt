@@ -17,7 +17,7 @@ import org.luisito.gestor360.utils.AppContextHolder
 /** RPC: abrir_turno, obtener_turno_activo, cerrar_turno, get_turnos. Offline-first. */
 class TurnoRepository(
     private val context: Context = AppContextHolder.context,
-    private val trazaRepository: TrazaRepository = TrazaRepository()
+    //private val trazaRepository: TrazaRepository = TrazaRepository()
 ) {
     private val db = AppDatabase.obtener(context)
 
@@ -61,7 +61,7 @@ class TurnoRepository(
         db.accionPendienteDao().encolar(
             AccionPendienteEntity(tipo = "abrir_turno", payloadJson = payload.toString(), idLocalTemporal = idTemporal)
         )
-        trazaRepository.registrar(androidId, "abrir_turno", "Apertura: $apertura")
+        //trazaRepository.registrar(androidId, "abrir_turno", "Apertura: $apertura")
         if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
         return Result.success(idTemporal)
     }
@@ -80,7 +80,7 @@ class TurnoRepository(
             SupabaseClientProvider.client.postgrest.rpc("cerrar_turno", params)
             db.turnoDao().cerrar(turnoId, cierre, 0.0) // la diferencia real se corrige al refrescar desde el servidor
             refrescarDesdeServidor(androidId)
-            trazaRepository.registrar(androidId, "cerrar_turno", "Cierre contado: $cierre")
+            //trazaRepository.registrar(androidId, "cerrar_turno", "Cierre contado: $cierre")
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

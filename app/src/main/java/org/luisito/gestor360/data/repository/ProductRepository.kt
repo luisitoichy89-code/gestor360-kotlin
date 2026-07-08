@@ -28,7 +28,7 @@ class ProductRepository(
     private val context: Context = AppContextHolder.context
 ) {
     private val db = AppDatabase.obtener(context)
-    private val trazaRepository: TrazaRepository = TrazaRepository()
+    //private val trazaRepository: TrazaRepository = TrazaRepository()
 
     suspend fun getProducts(androidId: String): Result<List<Product>> {
         val cacheados = db.productoDao().obtenerTodos()
@@ -76,7 +76,7 @@ class ProductRepository(
             put("p_stock", stock); put("p_almacen_id", almacenId); put("p_ubicacion", ubicacion); put("p_categoria", categoria)
         }
         encolarYSincronizar(androidId, "crear_producto", payload, idTemporal)
-        trazaRepository.registrar(androidId, "crear_producto", nombre)
+        //trazaRepository.registrar(androidId, "crear_producto", nombre)
         return Result.success(Unit)
     }
 
@@ -92,7 +92,7 @@ class ProductRepository(
             put("p_precio", precio); put("p_stock", stock); put("p_ubicacion", ubicacion); put("p_categoria", categoria)
         }
         encolarYSincronizar(androidId, "actualizar_producto", payload)
-        trazaRepository.registrar(androidId, "actualizar_producto", "$nombre (id=$id)")
+        //trazaRepository.registrar(androidId, "actualizar_producto", "$nombre (id=$id)")
         return Result.success(Unit)
     }
 
@@ -105,7 +105,7 @@ class ProductRepository(
         db.productoDao().eliminar(id)
         val payload = buildJsonObject { put("p_android_id", androidId); put("p_id", id) }
         encolarYSincronizar(androidId, "eliminar_producto", payload)
-        trazaRepository.registrar(androidId, "eliminar_producto", "id=$id")
+        //trazaRepository.registrar(androidId, "eliminar_producto", "id=$id")
         return Result.success(Unit)
     }
 

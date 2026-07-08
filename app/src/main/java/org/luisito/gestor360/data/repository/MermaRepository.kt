@@ -17,7 +17,7 @@ import org.luisito.gestor360.utils.AppContextHolder
 /** RPC: get_mermas_pendientes, crear_merma, resolver_merma. Offline-first. */
 class MermaRepository(
     private val context: Context = AppContextHolder.context,
-    private val trazaRepository: TrazaRepository = TrazaRepository()
+    //private val trazaRepository: TrazaRepository = TrazaRepository()
 ) {
     private val db = AppDatabase.obtener(context)
 
@@ -56,7 +56,7 @@ class MermaRepository(
             put("p_cantidad", cantidad); put("p_motivo", motivo)
         }
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "crear_merma", payloadJson = payload.toString(), idLocalTemporal = idTemporal))
-        trazaRepository.registrar(androidId, "proponer_merma", "producto_id=$productoId cantidad=$cantidad")
+        //trazaRepository.registrar(androidId, "proponer_merma", "producto_id=$productoId cantidad=$cantidad")
         if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
         return Result.success(Unit)
     }
@@ -74,7 +74,7 @@ class MermaRepository(
             val params = buildJsonObject { put("p_android_id", androidId); put("p_merma_id", mermaId); put("p_estado", estado) }
             SupabaseClientProvider.client.postgrest.rpc("resolver_merma", params)
             db.mermaDao().actualizarEstado(mermaId, estado)
-            trazaRepository.registrar(androidId, "resolver_merma", "merma_id=$mermaId estado=$estado")
+            //trazaRepository.registrar(androidId, "resolver_merma", "merma_id=$mermaId estado=$estado")
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

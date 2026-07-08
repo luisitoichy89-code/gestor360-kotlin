@@ -22,7 +22,7 @@ import org.luisito.gestor360.utils.AppContextHolder
  */
 class TarjetaRepository(
     private val context: Context = AppContextHolder.context,
-    private val trazaRepository: TrazaRepository = TrazaRepository()
+    //private val trazaRepository: TrazaRepository = TrazaRepository()
 ) {
     private val db = AppDatabase.obtener(context)
 
@@ -60,7 +60,7 @@ class TarjetaRepository(
             put("p_android_id", androidId); put("p_banco", banco); put("p_numero", numero); put("p_titular", titular)
         }
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "crear_tarjeta", payloadJson = payload.toString(), idLocalTemporal = idTemporal))
-        trazaRepository.registrar(androidId, "crear_tarjeta", "$banco $numero")
+        //trazaRepository.registrar(androidId, "crear_tarjeta", "$banco $numero")
         if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
         return Result.success(Unit)
     }
