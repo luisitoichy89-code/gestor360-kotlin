@@ -36,17 +36,8 @@ jobs:
           echo "RELEASE_KEY_ALIAS=${{ secrets.RELEASE_KEY_ALIAS }}" >> keystore.properties
           echo "RELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}" >> keystore.properties
 
-      - name: Build Debug APK
-        run: ./gradlew clean assembleDebug --refresh-dependencies --no-build-cache -PSUPABASE_URL=${{ secrets.SUPABASE_URL }} -PSUPABASE_KEY=${{ secrets.SUPABASE_KEY }}
-
       - name: Build Release APK
         run: ./gradlew assembleRelease -PSUPABASE_URL=${{ secrets.SUPABASE_URL }} -PSUPABASE_KEY=${{ secrets.SUPABASE_KEY }}
-
-      - name: Upload Debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: gestor360-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4

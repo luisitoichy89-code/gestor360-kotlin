@@ -15,13 +15,25 @@ data class SmsPagoResult(
     val mensaje: String = ""
 )
 
-object SmsPagoReceiver : BroadcastReceiver() {
+class SmsPagoReceiver : BroadcastReceiver() {
 
-    private val _resultFlow = MutableSharedFlow<SmsPagoResult>(extraBufferCapacity = 1)
-    val resultFlow: SharedFlow<SmsPagoResult> = _resultFlow.asSharedFlow()
+    companion object {
+        private val _resultFlow = MutableSharedFlow<SmsPagoResult>(extraBufferCapacity = 1)
+        val resultFlow: SharedFlow<SmsPagoResult> = _resultFlow.asSharedFlow()
 
-    var montoEsperado: Double = 0.0
-    var escuchando: Boolean = false
+        var montoEsperado: Double = 0.0
+        var escuchando: Boolean = false
+
+        fun iniciarEspera(monto: Double) {
+            montoEsperado = monto
+            escuchando = true
+        }
+
+        fun detenerEspera() {
+            escuchando = false
+            montoEsperado = 0.0
+        }
+    }
 
     override fun onReceive(context: Context, intent: Intent) {
         if (!escuchando) return
@@ -34,7 +46,6 @@ object SmsPagoReceiver : BroadcastReceiver() {
 
                 if (sender == "PAGOxMOVIL") {
                     val monto = extractMonto(body)
-                    // Coincidencia exacta, tolerancia 0
                     val coincide = monto == montoEsperado
 
                     _resultFlow.tryEmit(
@@ -55,18 +66,7 @@ object SmsPagoReceiver : BroadcastReceiver() {
         }
     }
 
-    fun iniciarEspera(monto: Double) {
-        montoEsperado = monto
-        escuchando = true
-    }
-
-    fun detenerEspera() {
-        escuchando = false
-        montoEsperado = 0.0
-    }
-
     private fun extractMonto(body: String): Double {
-        // Formato: "de 450.00 CUP" o "de 300.00 CUP"
         val regex = Regex("""de\s+(\d+(?:\.\d{1,2})?)\s+CUP""", RegexOption.IGNORE_CASE)
         val match = regex.find(body)
         return match?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
