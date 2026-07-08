@@ -16,14 +16,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import org.luisito.gestor360.data.models.Tarjeta
 import org.luisito.gestor360.data.repository.SaleRepository
+import org.luisito.gestor360.data.sms.SmsPagoReceiver
+import org.luisito.gestor360.ui.components.EsperandoPagoOverlay
 import org.luisito.gestor360.ui.viewmodels.SaleViewModel
 import org.luisito.gestor360.ui.viewmodels.TarjetaViewModel
 
 private sealed class PasoCheckout {
     object Ninguno : PasoCheckout()
     object ConfirmarEfectivo : PasoCheckout()
+    data class EsperandoSMS(val monto: Double, val tipo: String) : PasoCheckout() // "Total" o "Mixto"
     object DatosTransferencia : PasoCheckout()
     object MontoMixto : PasoCheckout()
     object DatosMixtoTransferencia : PasoCheckout()
@@ -50,12 +54,49 @@ fun CarritoScreen(
     val tarjetaUiState by tarjetaViewModel.uiState.collectAsState()
     var paso by remember { mutableStateOf<PasoCheckout>(PasoCheckout.Ninguno) }
     var datosMixto by remember { mutableStateOf(DatosMixto()) }
+    val scope = rememberCoroutineScope()
+
+    // Observar SMS entrantes cuando estamos en espera
+    LaunchedEffect(paso) {
+        if (paso is PasoCheckout.EsperandoSMS) {
+            val esperando = paso as PasoCheckout.EsperandoSMS
+            SmsPagoReceiver.iniciarEspera(esperando.monto)
+            SmsPagoReceiver.resultFlow.collect { resultado ->
+                if (resultado.success) {
+                    SmsPagoReceiver.detenerEspera()
+                    when (esperando.tipo) {
+                        "Total" -> paso = PasoCheckout.DatosTransferencia
+                        "Mixto" -> paso = PasoCheckout.DatosMixtoTransferencia
+                    }
+                }
+            }
+        }
+    }
 
     LaunchedEffect(uiState.ventaConfirmada) {
         if (uiState.ventaConfirmada) {
             viewModel.limpiarVentaConfirmada()
             onVentaConfirmada()
         }
+    }
+
+    // Mostrar overlay cuando estamos esperando SMS
+    if (paso is PasoCheckout.EsperandoSMS) {
+        val esperando = paso as PasoCheckout.EsperandoSMS
+        EsperandoPagoOverlay(
+            montoEsperado = esperando.monto,
+            onCancelarPago = {
+                SmsPagoReceiver.detenerEspera()
+                paso = PasoCheckout.Ninguno
+            },
+            onSinVerificacion = {
+                SmsPagoReceiver.detenerEspera()
+                when (esperando.tipo) {
+                    "Total" -> paso = PasoCheckout.DatosTransferencia
+                    "Mixto" -> paso = PasoCheckout.DatosMixtoTransferencia
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -108,9 +149,9 @@ fun CarritoScreen(
                 }
                 Spacer(Modifier.height(16.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button({ paso = PasoCheckout.ConfirmarEfectivo }, Modifier.weight(1f), enabled = !uiState.isSaving, shape = RoundedCornerShape(14.dp)) { Text("EFECTIVO") }
-                    Button({ paso = PasoCheckout.DatosTransferencia }, Modifier.weight(1f), enabled = !uiState.isSaving, shape = RoundedCornerShape(14.dp)) { Text("TRANSFER") }
-                    Button({ paso = PasoCheckout.MontoMixto }, Modifier.weight(1f), enabled = !uiState.isSaving, shape = RoundedCornerShape(14.dp)) { Text("MIXTO") }
+                    Button({ paso = PasoCheckout.ConfirmarEfectivo }, Modifier.weight(1f), enabled = !uiState.isSaving, shape = RoundedCornerShape(14.dp)) { Text("EFC") }
+                    Button({ paso = PasoCheckout.EsperandoSMS(uiState.totalCarrito, "Total") }, Modifier.weight(1f), enabled = !uiState.isSaving, shape = RoundedCornerShape(14.dp)) { Text("TFR") }
+                    Button({ paso = PasoCheckout.MontoMixto }, Modifier.weight(1f), enabled = !uiState.isSaving, shape = RoundedCornerShape(14.dp)) { Text("MXT") }
                 }
             }
         }
@@ -118,6 +159,7 @@ fun CarritoScreen(
 
     when (paso) {
         is PasoCheckout.Ninguno -> {}
+        is PasoCheckout.EsperandoSMS -> { /* el overlay se muestra arriba */ }
 
         is PasoCheckout.ConfirmarEfectivo -> AlertDialog(
             onDismissRequest = { paso = PasoCheckout.Ninguno },
@@ -176,7 +218,7 @@ fun CarritoScreen(
                     val ef = efTexto.toDoubleOrNull() ?: 0.0
                     TextButton(enabled = ef > 0 && ef < uiState.totalCarrito, onClick = {
                         datosMixto = datosMixto.copy(efectivo = ef)
-                        paso = PasoCheckout.DatosMixtoTransferencia
+                        paso = PasoCheckout.EsperandoSMS(uiState.totalCarrito - ef, "Mixto")
                     }) { Text("Continuar", fontWeight = FontWeight.Bold) }
                 },
                 dismissButton = { TextButton(onClick = { paso = PasoCheckout.Ninguno }) { Text("Cancelar") } }
