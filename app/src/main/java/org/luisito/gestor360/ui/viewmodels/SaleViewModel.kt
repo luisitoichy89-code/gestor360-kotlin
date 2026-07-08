@@ -63,27 +63,25 @@ class SaleViewModel(
 
     fun limpiarCarrito() { _uiState.value = _uiState.value.copy(carrito = emptyList()) }
 
-    /**
-     * Transaction-safe: si ya hay una venta guardándose, ignora toques
-     * repetidos (evita doble-envío). El carrito solo se limpia y
-     * "ventaConfirmada" solo se marca si guardarVenta() realmente tuvo
-     * éxito — antes esto pasaba siempre, sin mirar el resultado.
-     */
     fun confirmarVenta(metodo: String, efectivo: Double, transferencia: Double, usuarioId: Long, cliente: SaleRepository.DatosCliente?) {
         if (_uiState.value.isSaving) return
         if (_uiState.value.carrito.isEmpty()) return
-
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             saleRepository.guardarVenta(androidIdActual, _uiState.value.carrito, metodo, efectivo, transferencia, cliente)
                 .onSuccess {
                     _uiState.value = _uiState.value.copy(carrito = emptyList(), ventaConfirmada = true, isSaving = false)
-                    iniciar(androidIdActual) // Refrescar stock inmediatamente
+                    iniciar(androidIdActual)
                 }
                 .onFailure { e ->
                     _uiState.value = _uiState.value.copy(isSaving = false, error = e.message ?: "No se pudo guardar la venta")
                 }
         }
+    }
+
+    fun cancelarVenta(motivo: String) {
+        limpiarCarrito()
+        // TODO: guardar motivo en historial de cancelaciones (cierre de turno)
     }
 
     fun anularVenta(ventaId: String) {

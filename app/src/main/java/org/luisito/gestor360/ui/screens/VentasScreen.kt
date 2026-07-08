@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -20,10 +21,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import org.luisito.gestor360.data.models.Product
 import org.luisito.gestor360.ui.viewmodels.SaleViewModel
 
-/**
- * Solo búsqueda + agregar al carrito. El checkout (pago, tarjetas, cliente)
- * vive en CarritoScreen — antes todo esto estaba junto en un solo archivo.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VentasScreen(
@@ -36,6 +33,8 @@ fun VentasScreen(
     var searchQuery by remember { mutableStateOf("") }
     var selectedProduct by remember { mutableStateOf<Product?>(null) }
     var cantidad by remember { mutableStateOf("") }
+    var mostrarCancelarVenta by remember { mutableStateOf(false) }
+    var motivoCancelacion by remember { mutableStateOf("") }
 
     LaunchedEffect(androidId) { viewModel.iniciar(androidId) }
 
@@ -46,7 +45,14 @@ fun VentasScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Ventas", fontWeight = FontWeight.Bold) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Volver") } }
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Volver") } },
+                actions = {
+                    if (uiState.carrito.isNotEmpty()) {
+                        IconButton(onClick = { mostrarCancelarVenta = true }) {
+                            Icon(Icons.Default.Cancel, "Cancelar venta", tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
             )
         },
         floatingActionButton = {
@@ -112,6 +118,40 @@ fun VentasScreen(
                 }) { Text("Agregar", fontWeight = FontWeight.Bold) }
             },
             dismissButton = { TextButton(onClick = { selectedProduct = null }) { Text("Cancelar") } }
+        )
+    }
+
+    if (mostrarCancelarVenta) {
+        AlertDialog(
+            onDismissRequest = { mostrarCancelarVenta = false; motivoCancelacion = "" },
+            title = { Text("Cancelar venta", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text("¿Por qué cancelas la venta?")
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        motivoCancelacion, { motivoCancelacion = it },
+                        label = { Text("Motivo (obligatorio)") },
+                        singleLine = false,
+                        maxLines = 3,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = motivoCancelacion.isNotBlank(),
+                    onClick = {
+                        viewModel.cancelarVenta(motivoCancelacion.trim())
+                        mostrarCancelarVenta = false
+                        motivoCancelacion = ""
+                        onBack()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Cancelar venta", fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = { TextButton(onClick = { mostrarCancelarVenta = false; motivoCancelacion = "" }) { Text("Volver") } }
         )
     }
 }

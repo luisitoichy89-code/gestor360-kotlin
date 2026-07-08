@@ -1,9 +1,13 @@
 package org.luisito.gestor360.ui.screens
 
+import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.pm.PackageManager
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.luisito.gestor360.R
 import org.luisito.gestor360.data.models.User
@@ -29,8 +34,43 @@ fun VerificarDispositivoScreen(onDispositivoAutorizado: (User) -> Unit, viewMode
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val androidId = remember { DeviceIdManager.getFormattedDeviceId(context) }
+    var permisosOk by remember { mutableStateOf(false) }
 
-    LaunchedEffect(uiState.usuarioVerificado) { uiState.usuarioVerificado?.let { onDispositivoAutorizado(it) } }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        permisosOk = permissions.values.all { it }
+        if (!permisosOk) {
+            Toast.makeText(context, "Permisos necesarios para recibir SMS y almacenamiento", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    val permisosRequeridos = arrayOf(
+        Manifest.permission.RECEIVE_SMS,
+        Manifest.permission.READ_SMS
+    )
+
+    fun solicitarPermisos() {
+        val faltan = permisosRequeridos.any {
+            ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (faltan) {
+            permissionLauncher.launch(permisosRequeridos)
+        } else {
+            permisosOk = true
+        }
+    }
+
+    LaunchedEffect(uiState.usuarioVerificado) {
+        uiState.usuarioVerificado?.let { user ->
+            solicitarPermisos()
+            if (permisosOk || permisosRequeridos.all {
+                    ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+                }) {
+                onDispositivoAutorizado(user)
+            }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
