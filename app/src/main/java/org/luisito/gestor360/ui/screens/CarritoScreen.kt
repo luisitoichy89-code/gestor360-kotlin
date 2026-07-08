@@ -54,6 +54,7 @@ fun CarritoScreen(
     val tarjetaUiState by tarjetaViewModel.uiState.collectAsState()
     var paso by remember { mutableStateOf<PasoCheckout>(PasoCheckout.Ninguno) }
     var datosMixto by remember { mutableStateOf(DatosMixto()) }
+    var metodoVisual by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     // Observar SMS entrantes cuando estamos en espera
@@ -89,8 +90,9 @@ fun CarritoScreen(
                 SmsPagoReceiver.detenerEspera()
                 paso = PasoCheckout.Ninguno
             },
-            onSinVerificacion = {
+            onConfirmarVisual = {
                 SmsPagoReceiver.detenerEspera()
+                metodoVisual = true
                 when (esperando.tipo) {
                     "Total" -> paso = PasoCheckout.DatosTransferencia
                     "Mixto" -> paso = PasoCheckout.DatosMixtoTransferencia
@@ -186,10 +188,12 @@ fun CarritoScreen(
             titulo = "Transferencia",
             monto = uiState.totalCarrito,
             tarjetas = tarjetaUiState.tarjetas,
-            onDismiss = { paso = PasoCheckout.Ninguno }
+            onDismiss = { paso = PasoCheckout.Ninguno; metodoVisual = false }
         ) { ci, tel, nombre, tarjeta ->
-            viewModel.confirmarVenta("transfer", 0.0, uiState.totalCarrito, 0L, SaleRepository.DatosCliente(ci, tel, nombre, "${tarjeta.banco} · ${tarjeta.numero}"))
+            val metodo = if (metodoVisual) "transfer_visual" else "transfer"
+            viewModel.confirmarVenta(metodo, 0.0, uiState.totalCarrito, 0L, SaleRepository.DatosCliente(ci, tel, nombre, "${tarjeta.banco} · ${tarjeta.numero}"))
             paso = PasoCheckout.Ninguno
+            metodoVisual = false
         }
 
         is PasoCheckout.MontoMixto -> {
@@ -231,10 +235,14 @@ fun CarritoScreen(
                 titulo = "Mixto - Transferencia",
                 monto = restante,
                 tarjetas = tarjetaUiState.tarjetas,
-                onDismiss = { paso = PasoCheckout.MontoMixto }
+                onDismiss = { paso = PasoCheckout.MontoMixto; metodoVisual = false }
             ) { ci, tel, nombre, tarjeta ->
+                val metodo = if (metodoVisual) "mixed_visual" else "mixed"
                 datosMixto = datosMixto.copy(ci = ci, tel = tel, nombre = nombre, tarjeta = tarjeta)
-                paso = PasoCheckout.ResumenMixto
+                viewModel.confirmarVenta(metodo, datosMixto.efectivo, restante, 0L, SaleRepository.DatosCliente(ci, tel, nombre, "${tarjeta.banco} · ${tarjeta.numero}"))
+                paso = PasoCheckout.Ninguno
+                datosMixto = DatosMixto()
+                metodoVisual = false
             }
         }
 
