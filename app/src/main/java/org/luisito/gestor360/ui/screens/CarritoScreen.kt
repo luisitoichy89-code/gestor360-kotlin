@@ -1,6 +1,5 @@
 package org.luisito.gestor360.ui.screens
 
-import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -13,12 +12,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.launch
 import org.luisito.gestor360.data.models.Tarjeta
 import org.luisito.gestor360.data.repository.SaleRepository
 import org.luisito.gestor360.data.sms.SmsPagoReceiver
@@ -57,18 +54,10 @@ fun CarritoScreen(
     var paso by remember { mutableStateOf<PasoCheckout>(PasoCheckout.Ninguno) }
     var datosMixto by remember { mutableStateOf(DatosMixto()) }
     var metodoVisual by remember { mutableStateOf(false) }
-    val context = LocalContext.current
 
-    // Debug: mostrar Toast cuando cambia el paso
-    LaunchedEffect(paso) {
-        Toast.makeText(context, "Paso: ${paso::class.simpleName}", Toast.LENGTH_SHORT).show()
-    }
-
-    // Observar SMS entrantes cuando estamos en espera
     LaunchedEffect(paso) {
         if (paso is PasoCheckout.EsperandoSMS) {
             val esperando = paso as PasoCheckout.EsperandoSMS
-            Toast.makeText(context, "Esperando SMS por ${esperando.monto} CUP", Toast.LENGTH_LONG).show()
             SmsPagoReceiver.iniciarEspera(esperando.monto)
             SmsPagoReceiver.resultFlow.collect { resultado ->
                 if (resultado.success) {
@@ -89,81 +78,83 @@ fun CarritoScreen(
         }
     }
 
-    // Overlay SIEMPRE visible si paso es EsperandoSMS
-    if (paso is PasoCheckout.EsperandoSMS) {
-        val esperando = paso as PasoCheckout.EsperandoSMS
-        EsperandoPagoOverlay(
-            montoEsperado = esperando.monto,
-            onCancelarPago = {
-                SmsPagoReceiver.detenerEspera()
-                paso = PasoCheckout.Ninguno
-            },
-            onConfirmarVisual = {
-                SmsPagoReceiver.detenerEspera()
-                metodoVisual = true
-                when (esperando.tipo) {
-                    "Total" -> paso = PasoCheckout.DatosTransferencia
-                    "Mixto" -> paso = PasoCheckout.DatosMixtoTransferencia
-                }
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            topBar = {
+                TopAppBar(
+                    title = { Text("Carrito", fontWeight = FontWeight.Bold) },
+                    navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Volver") } }
+                )
             }
-        )
-    }
-
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = { Text("Carrito", fontWeight = FontWeight.Bold) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Volver") } }
-            )
-        }
-    ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(20.dp)) {
-            uiState.error?.let { error ->
-                Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
-                    Row(Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text(error, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.weight(1f))
-                        TextButton(onClick = { viewModel.clearError() }) { Text("Ok") }
-                    }
-                }
-            }
-
-            if (uiState.carrito.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("El carrito está vacío", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            } else {
-                Text("Carrito (${uiState.carrito.size} productos)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(12.dp))
-                LazyColumn(modifier = Modifier.weight(1f)) {
-                    items(uiState.carrito.size) { i ->
-                        val item = uiState.carrito[i]
-                        ElevatedCard(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), shape = RoundedCornerShape(14.dp)) {
-                            Row(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(item.nombre, fontWeight = FontWeight.SemiBold)
-                                    Spacer(Modifier.height(2.dp))
-                                    Text("${item.cantidad.toInt()} × ${item.subtotal} CUP", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                                FilledIconButton(onClick = { viewModel.quitarDelCarrito(i) }) { Icon(Icons.Default.Delete, "Eliminar") }
-                            }
+        ) { padding ->
+            Column(modifier = Modifier.fillMaxSize().padding(padding).padding(20.dp)) {
+                uiState.error?.let { error ->
+                    Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
+                        Row(Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text(error, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.weight(1f))
+                            TextButton(onClick = { viewModel.clearError() }) { Text("Ok") }
                         }
                     }
                 }
-                Spacer(Modifier.height(16.dp))
-                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                    Row(Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("TOTAL", fontWeight = FontWeight.Bold)
-                        Text("${uiState.totalCarrito} CUP", fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+
+                if (uiState.carrito.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("El carrito está vacío", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } else {
+                    Text("Carrito (${uiState.carrito.size} productos)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(12.dp))
+                    LazyColumn(modifier = Modifier.weight(1f)) {
+                        items(uiState.carrito.size) { i ->
+                            val item = uiState.carrito[i]
+                            ElevatedCard(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), shape = RoundedCornerShape(14.dp)) {
+                                Row(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(item.nombre, fontWeight = FontWeight.SemiBold)
+                                        Spacer(Modifier.height(2.dp))
+                                        Text("${item.cantidad.toInt()} × ${item.subtotal} CUP", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    FilledIconButton(onClick = { viewModel.quitarDelCarrito(i) }) { Icon(Icons.Default.Delete, "Eliminar") }
+                                }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                        Row(Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("TOTAL", fontWeight = FontWeight.Bold)
+                            Text("${uiState.totalCarrito} CUP", fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button({ paso = PasoCheckout.ConfirmarEfectivo }, Modifier.weight(1f), enabled = !uiState.isSaving, shape = RoundedCornerShape(14.dp)) { Text("EFC") }
+                        Button({ paso = PasoCheckout.EsperandoSMS(uiState.totalCarrito, "Total") }, Modifier.weight(1f), enabled = !uiState.isSaving, shape = RoundedCornerShape(14.dp)) { Text("TFR") }
+                        Button({ paso = PasoCheckout.MontoMixto }, Modifier.weight(1f), enabled = !uiState.isSaving, shape = RoundedCornerShape(14.dp)) { Text("MXT") }
                     }
                 }
-                Spacer(Modifier.height(16.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button({ paso = PasoCheckout.ConfirmarEfectivo }, Modifier.weight(1f), enabled = !uiState.isSaving, shape = RoundedCornerShape(14.dp)) { Text("EFC") }
-                    Button({ paso = PasoCheckout.EsperandoSMS(uiState.totalCarrito, "Total") }, Modifier.weight(1f), enabled = !uiState.isSaving, shape = RoundedCornerShape(14.dp)) { Text("TFR") }
-                    Button({ paso = PasoCheckout.MontoMixto }, Modifier.weight(1f), enabled = !uiState.isSaving, shape = RoundedCornerShape(14.dp)) { Text("MXT") }
-                }
             }
+        }
+
+        // Overlay encima del Scaffold
+        if (paso is PasoCheckout.EsperandoSMS) {
+            val esperando = paso as PasoCheckout.EsperandoSMS
+            EsperandoPagoOverlay(
+                montoEsperado = esperando.monto,
+                onCancelarPago = {
+                    SmsPagoReceiver.detenerEspera()
+                    paso = PasoCheckout.Ninguno
+                },
+                onConfirmarVisual = {
+                    SmsPagoReceiver.detenerEspera()
+                    metodoVisual = true
+                    when (esperando.tipo) {
+                        "Total" -> paso = PasoCheckout.DatosTransferencia
+                        "Mixto" -> paso = PasoCheckout.DatosMixtoTransferencia
+                    }
+                }
+            )
         }
     }
 
