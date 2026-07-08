@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CreditCard
@@ -180,7 +181,15 @@ fun Gestor360App() {
                 transitionSpec = { fadeIn(animationSpec = androidx.compose.animation.core.tween(220)) togetherWith fadeOut(animationSpec = androidx.compose.animation.core.tween(180)) }
             ) { pantallaActual ->
                 when (pantallaActual) {
-                    is PantallaInterna.Home -> Column {
+                    is PantallaInterna.Home -> Column(modifier = Modifier.statusBarsPadding()) {
+                        // Antes este Column no tenía ningún padding para la barra de
+                        // estado del sistema (hora/cobertura/operador). Con targetSdk
+                        // 36 (Android 15+), el modo edge-to-edge queda forzado por el
+                        // sistema aunque no se llame enableEdgeToEdge() explícitamente,
+                        // así que este Column se dibujaba DETRÁS de esa barra y
+                        // "Sincronizar" quedaba tapado/mezclado con la hora y el ícono
+                        // de señal. DashboardScreen no tenía este problema porque su
+                        // propio Scaffold + TopAppBar ya manejan esos insets solos.
                         SyncStatusBar(androidId = androidId, onVerConflictos = { pantalla = PantallaInterna.Conflictos })
                         if (esAdmin) SelectorDeLocalBar(androidId = androidId, viewModel = localSeleccionViewModel)
                         DashboardScreen(
@@ -214,7 +223,7 @@ fun Gestor360App() {
                     is PantallaInterna.Productos -> ProductosScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home })
                     is PantallaInterna.CierreCaja -> CierreCajaScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
                     is PantallaInterna.Tarjetas -> if (esAdmin) TarjetasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
-                    is PantallaInterna.Aprobaciones -> if (esAdmin) AprobacionesScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
+                    is PantallaInterna.Aprobaciones -> if (esAdmin) AprobacionesScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
                     is PantallaInterna.TicketsSoporte -> TicketsClienteScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
                     is PantallaInterna.Trazas -> if (esAdmin) TrazasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
                     is PantallaInterna.Conflictos -> ConflictosScreen(onBack = { pantalla = PantallaInterna.Home })
