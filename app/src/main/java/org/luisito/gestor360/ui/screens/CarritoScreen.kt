@@ -1,5 +1,6 @@
 package org.luisito.gestor360.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -27,7 +29,7 @@ import org.luisito.gestor360.ui.viewmodels.TarjetaViewModel
 private sealed class PasoCheckout {
     object Ninguno : PasoCheckout()
     object ConfirmarEfectivo : PasoCheckout()
-    data class EsperandoSMS(val monto: Double, val tipo: String) : PasoCheckout() // "Total" o "Mixto"
+    data class EsperandoSMS(val monto: Double, val tipo: String) : PasoCheckout()
     object DatosTransferencia : PasoCheckout()
     object MontoMixto : PasoCheckout()
     object DatosMixtoTransferencia : PasoCheckout()
@@ -55,12 +57,18 @@ fun CarritoScreen(
     var paso by remember { mutableStateOf<PasoCheckout>(PasoCheckout.Ninguno) }
     var datosMixto by remember { mutableStateOf(DatosMixto()) }
     var metodoVisual by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    // Debug: mostrar Toast cuando cambia el paso
+    LaunchedEffect(paso) {
+        Toast.makeText(context, "Paso: ${paso::class.simpleName}", Toast.LENGTH_SHORT).show()
+    }
 
     // Observar SMS entrantes cuando estamos en espera
     LaunchedEffect(paso) {
         if (paso is PasoCheckout.EsperandoSMS) {
             val esperando = paso as PasoCheckout.EsperandoSMS
+            Toast.makeText(context, "Esperando SMS por ${esperando.monto} CUP", Toast.LENGTH_LONG).show()
             SmsPagoReceiver.iniciarEspera(esperando.monto)
             SmsPagoReceiver.resultFlow.collect { resultado ->
                 if (resultado.success) {
@@ -81,7 +89,7 @@ fun CarritoScreen(
         }
     }
 
-    // Mostrar overlay cuando estamos esperando SMS
+    // Overlay SIEMPRE visible si paso es EsperandoSMS
     if (paso is PasoCheckout.EsperandoSMS) {
         val esperando = paso as PasoCheckout.EsperandoSMS
         EsperandoPagoOverlay(
