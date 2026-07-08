@@ -52,6 +52,7 @@ class TarjetaRepository(
         }
     }
 
+    suspend fun limpiarCache() { db.tarjetaDao().limpiar() }
     suspend fun crearTarjeta(androidId: String, banco: String, numero: String, titular: String): Result<Unit> {
         val idTemporal = -System.currentTimeMillis()
         db.tarjetaDao().insertarUna(TarjetaEntity(idTemporal, banco, numero, titular, activo = true))

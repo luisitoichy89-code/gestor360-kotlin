@@ -141,7 +141,7 @@ fun VentasScreen(
             },
             confirmButton = {
                 TextButton(
-                    enabled = motivoCancelacion.isNotBlank(),
+                TextButton(
                     onClick = {
                         viewModel.cancelarVenta(motivoCancelacion.trim())
                         mostrarCancelarVenta = false
@@ -150,6 +150,8 @@ fun VentasScreen(
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) { Text("Cancelar venta", fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = { TextButton(onClick = { mostrarCancelarVenta = false; motivoCancelacion = "" }) { Text("Volver") } }
             },
             dismissButton = { TextButton(onClick = { mostrarCancelarVenta = false; motivoCancelacion = "" }) { Text("Volver") } }
         )
