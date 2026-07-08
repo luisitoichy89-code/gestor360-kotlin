@@ -131,7 +131,7 @@ fun VentasScreen(
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         motivoCancelacion, { motivoCancelacion = it },
-                        label = { Text("Motivo (obligatorio)") },
+                        label = { Text("Motivo") },
                         singleLine = false,
                         maxLines = 3,
                         modifier = Modifier.fillMaxWidth(),
@@ -141,7 +141,6 @@ fun VentasScreen(
             },
             confirmButton = {
                 TextButton(
-                TextButton(
                     onClick = {
                         viewModel.cancelarVenta(motivoCancelacion.trim())
                         mostrarCancelarVenta = false
@@ -150,8 +149,6 @@ fun VentasScreen(
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) { Text("Cancelar venta", fontWeight = FontWeight.Bold) }
-            },
-            dismissButton = { TextButton(onClick = { mostrarCancelarVenta = false; motivoCancelacion = "" }) { Text("Volver") } }
             },
             dismissButton = { TextButton(onClick = { mostrarCancelarVenta = false; motivoCancelacion = "" }) { Text("Volver") } }
         )

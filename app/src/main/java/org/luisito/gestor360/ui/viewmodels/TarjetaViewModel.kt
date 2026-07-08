@@ -30,9 +30,7 @@ class TarjetaViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             repository.limpiarCache()
-                    db.tarjetaDao().limpiar()
-        repository.limpiarCache()
-                    repository.getTarjetas(androidId)
+            repository.getTarjetas(androidId)
                 .onSuccess { lista -> _uiState.value = _uiState.value.copy(isLoading = false, tarjetas = lista) }
                 .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.message) }
         }
