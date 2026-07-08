@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.luisito.gestor360.ui.components.*
 import org.luisito.gestor360.ui.viewmodels.CierreCajaViewModel
-import org.luisito.gestor360.utils.CsvExporter
+import org.luisito.gestor360.utils.ReporteExporter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,10 +28,36 @@ fun CierreCajaScreen(
     val context = LocalContext.current
     var mostrarAbrirTurno by remember { mutableStateOf(false) }
     var mostrarCerrarTurno by remember { mutableStateOf(false) }
+    var mostrarMenuExportar by remember { mutableStateOf(false) }
 
     LaunchedEffect(androidId) { viewModel.cargar(androidId) }
 
-    Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = { TopAppBar(title = { Text("Cierre de caja", fontWeight = FontWeight.Bold) }, navigationIcon = { if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null) } }, actions = { IconButton(onClick = { viewModel.refrescar() }) { Icon(Icons.Default.Refresh, null) }; if (uiState.turnoActivo != null) IconButton(onClick = { CsvExporter.exportarCierreCaja(context, uiState.turnoActivo?.created_at?.take(10) ?: "", uiState.productosVendidos, uiState.totalEfectivo, uiState.totalTransferencia, uiState.totalMixto, uiState.totalMixtoEfectivo, uiState.totalMixtoTransferencia, uiState.turnoActivo?.apertura ?: 0.0) }) { Icon(Icons.Default.FileDownload, null) } }) }) { padding ->
+    Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = { TopAppBar(title = { Text("Cierre de caja", fontWeight = FontWeight.Bold) }, navigationIcon = { if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null) } }, actions = {
+        IconButton(onClick = { viewModel.refrescar() }) { Icon(Icons.Default.Refresh, null) }
+        if (uiState.turnoActivo != null) {
+            Box {
+                IconButton(onClick = { mostrarMenuExportar = true }) { Icon(Icons.Default.FileDownload, null) }
+                DropdownMenu(expanded = mostrarMenuExportar, onDismissRequest = { mostrarMenuExportar = false }) {
+                    // Los 4 formatos parten del mismo DatosCierreCaja: solo lo que
+                    // afecta al turno abierto ahora mismo (nada de otros turnos).
+                    val datos = ReporteExporter.DatosCierreCaja(
+                        fecha = uiState.turnoActivo?.created_at?.take(10) ?: "",
+                        productosVendidos = uiState.productosVendidos,
+                        totalEfectivo = uiState.totalEfectivo,
+                        totalTransferencia = uiState.totalTransferencia,
+                        totalMixto = uiState.totalMixto,
+                        totalMixtoEfectivo = uiState.totalMixtoEfectivo,
+                        totalMixtoTransferencia = uiState.totalMixtoTransferencia,
+                        apertura = uiState.turnoActivo?.apertura ?: 0.0
+                    )
+                    DropdownMenuItem(text = { Text("PDF") }, leadingIcon = { Icon(Icons.Default.PictureAsPdf, null) }, onClick = { mostrarMenuExportar = false; ReporteExporter.exportarPdf(context, datos) })
+                    DropdownMenuItem(text = { Text("TXT") }, leadingIcon = { Icon(Icons.Default.Description, null) }, onClick = { mostrarMenuExportar = false; ReporteExporter.exportarTxt(context, datos) })
+                    DropdownMenuItem(text = { Text("Word") }, leadingIcon = { Icon(Icons.Default.Article, null) }, onClick = { mostrarMenuExportar = false; ReporteExporter.exportarWord(context, datos) })
+                    DropdownMenuItem(text = { Text("Compartir") }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = { mostrarMenuExportar = false; ReporteExporter.compartirTexto(context, datos) })
+                }
+            }
+        }
+    }) }) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
             when {
                 uiState.isLoading -> EstadoCargando()

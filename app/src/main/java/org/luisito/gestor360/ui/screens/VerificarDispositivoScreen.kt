@@ -34,32 +34,51 @@ fun VerificarDispositivoScreen(onDispositivoAutorizado: (User) -> Unit, viewMode
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val androidId = remember { DeviceIdManager.getFormattedDeviceId(context) }
-    var usuarioVerificado by remember { mutableStateOf<User?>(null) }
+    var permisosOk by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { granted ->
-        usuarioVerificado?.let { user ->
-            onDispositivoAutorizado(user)
+    ) { permissions ->
+        permisosOk = permissions.values.all { it }
+        if (!permisosOk) {
+            Toast.makeText(context, "Permisos necesarios para recibir SMS y almacenamiento", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    val permisosRequeridos = arrayOf(
+        Manifest.permission.RECEIVE_SMS,
+        Manifest.permission.READ_SMS
+    )
+
+    fun solicitarPermisos() {
+        val faltan = permisosRequeridos.any {
+            ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (faltan) {
+            permissionLauncher.launch(permisosRequeridos)
+        } else {
+            permisosOk = true
         }
     }
 
     LaunchedEffect(uiState.usuarioVerificado) {
-        uiState.usuarioVerificado?.let { user ->
-            usuarioVerificado = user
-            val permisosRequeridos = arrayOf(
-                Manifest.permission.RECEIVE_SMS,
-                Manifest.permission.READ_SMS
-            )
-            val faltan = permisosRequeridos.any {
-                ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
-            }
-            if (faltan) {
-                permissionLauncher.launch(permisosRequeridos)
-            } else {
-                onDispositivoAutorizado(user)
-            }
-        }
+        if (uiState.usuarioVerificado != null) solicitarPermisos()
+    }
+
+    // Antes esto vivía dentro del mismo LaunchedEffect que llamaba a solicitarPermisos():
+    // se comprobaba "permisosOk" en la misma pasada, pero solicitarPermisos() solo LANZA
+    // el diálogo del sistema (async) y retorna al instante — la primera vez que un usuario
+    // instala la app, el diálogo de permisos SMS aún no tiene respuesta cuando se hacía esa
+    // comprobación, así que onDispositivoAutorizado(user) nunca se llamaba y, como la key del
+    // efecto (usuarioVerificado) no cambiaba, tampoco se reintentaba después de conceder el
+    // permiso. El usuario podía terminar navegando sin RECEIVE_SMS/READ_SMS realmente
+    // concedidos, y sin ese permiso Android nunca entrega el SMS_RECEIVED al receiver — por
+    // eso "el receiver no recibe nada" aunque el manifest esté bien.
+    // Separarlo en su propio LaunchedEffect con "permisosOk" como key hace que SÍ se
+    // re-ejecute en cuanto el callback del permissionLauncher actualiza ese estado.
+    LaunchedEffect(uiState.usuarioVerificado, permisosOk) {
+        val user = uiState.usuarioVerificado ?: return@LaunchedEffect
+        if (permisosOk) onDispositivoAutorizado(user)
     }
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -82,6 +101,15 @@ fun VerificarDispositivoScreen(onDispositivoAutorizado: (User) -> Unit, viewMode
             if (uiState.verificando) { CircularProgressIndicator(); Spacer(Modifier.height(12.dp)); Text("Verificando dispositivo...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             else { Button(onClick = { viewModel.verificarDispositivo(androidId) }, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp)) { Text("Verificar dispositivo") } }
             uiState.mensajeError?.let { error -> Spacer(Modifier.height(16.dp)); Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) { Text(error, Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodySmall) } }
+            // Si el usuario niega el permiso de SMS (o lo hace "no volver a preguntar"),
+            // no lo dejamos bloqueado sin poder entrar: el checkout ya tiene el botón
+            // "Confirmé visual" en el overlay de pago como respaldo manual para ese caso.
+            if (uiState.usuarioVerificado != null && !permisosOk) {
+                Spacer(Modifier.height(12.dp))
+                TextButton(onClick = { uiState.usuarioVerificado?.let(onDispositivoAutorizado) }) {
+                    Text("Continuar sin confirmación automática por SMS")
+                }
+            }
         }
     }
 }
