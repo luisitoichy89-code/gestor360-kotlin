@@ -1,9 +1,7 @@
-import org.luisito.gestor360.utils.SessionManager
 package org.luisito.gestor360.data.repository
 
 import android.content.Context
 import io.github.jan.supabase.postgrest.postgrest
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.luisito.gestor360.data.SupabaseClientProvider
@@ -16,31 +14,19 @@ import org.luisito.gestor360.data.models.Sale
 import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.data.sync.SyncWorker
 import org.luisito.gestor360.utils.AppContextHolder
+import org.luisito.gestor360.utils.SessionManager
 import kotlin.math.round
 
 data class TopVendido(val nombre: String, val total: Double)
 
-/**
- * Offline-first. registrar_venta inserta UN producto por llamada (no el
- * carrito completo) y "ventas" no guarda producto_nombre — solo producto_id.
- *
- * OJO arreglé un bug: getSales() llamaba al RPC, decodificaba la lista, y la
- * descartaba (devolvía siempre emptyList()). Ya usa el resultado real.
- */
 class SaleRepository(
     private val context: Context = AppContextHolder.context,
-    private val productRepository: ProductRepository = ProductRepository(context),
-    //private val trazaRepository: TrazaRepository = TrazaRepository()
+    private val productRepository: ProductRepository = ProductRepository(context)
 ) {
     private val db = AppDatabase.obtener(context)
 
     data class DatosCliente(val ci: String, val telefono: String, val nombre: String, val banco: String)
 
-    /**
-     * Guarda local YA (stock descontado al instante + fila de venta visible de
-     * inmediato) y encola una acción por cada producto del carrito. Si hay
-     * internet, dispara sincronización en el momento; si no, queda pendiente.
-     */
     suspend fun guardarVenta(
         androidId: String, carrito: List<CartItem>, metodo: String,
         montoEfectivo: Double, montoTransferencia: Double, cliente: DatosCliente? = null
@@ -55,7 +41,6 @@ class SaleRepository(
             val efectivoItem = round(montoEfectivo * ratio * 100) / 100
             val transferenciaItem = round(montoTransferencia * ratio * 100) / 100
 
-            // 1. Aplicar YA en local: baja el stock cacheado y agrega la venta a la vista.
             productRepository.descontarStockLocal(item.productId, item.cantidad)
             val ventaLocal = Sale(
                 id = null, producto_id = item.productId, cantidad = item.cantidad, total = item.subtotal,
@@ -65,10 +50,9 @@ class SaleRepository(
             )
             db.ventaDao().insertarUna(ventaLocal.toEntity(sincronizada = false))
 
-            // 2. Encolar la llamada real para cuando haya internet.
             val payload = buildJsonObject {
                 put("p_android_id", androidId); put("p_producto_id", item.productId)
-                            put("p_local_id", localId)
+                put("p_local_id", localId)
                 put("p_cantidad", item.cantidad); put("p_total", item.subtotal)
                 put("p_metodo", metodo); put("p_efectivo", efectivoItem); put("p_transferencia", transferenciaItem)
                 put("p_cliente_ci", cliente?.ci ?: ""); put("p_cliente_tel", cliente?.telefono ?: ""); put("p_cliente_nombre", cliente?.nombre ?: "")
@@ -76,17 +60,10 @@ class SaleRepository(
             db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "registrar_venta", payloadJson = payload.toString()))
         }
 
-        //trazaRepository.registrar(androidId, "registrar_venta", "Total: $totalVenta ($metodo)")
         if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
         return Result.success(Unit)
     }
 
-    /**
-     * Anular una venta necesita internet sí o sí (no tiene sentido encolarla:
-     * si el dispositivo está offline es porque la venta a anular tampoco se
-     * sincronizó todavía). Requiere el RPC "anular_venta" — confírmame si ya
-     * existe en Supabase o si hay que crearlo.
-     */
     suspend fun anularVenta(androidId: String, ventaId: String): Result<Unit> {
         if (!NetworkMonitor.hayInternet(context)) {
             return Result.failure(IllegalStateException("Necesitas conexión para anular una venta"))
@@ -96,14 +73,12 @@ class SaleRepository(
                 "anular_venta", buildJsonObject { put("p_android_id", androidId); put("p_venta_id", ventaId) }
             )
             db.ventaDao().eliminar(ventaId)
-            //trazaRepository.registrar(androidId, "anular_venta", "Venta anulada: $ventaId")
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    /** Lee del caché local primero; refresca de fondo si hay internet. */
     suspend fun getSales(androidId: String): Result<List<Sale>> {
         val cacheadas = db.ventaDao().obtenerTodas()
         if (cacheadas.isNotEmpty() && !NetworkMonitor.hayInternet(context)) {
@@ -113,7 +88,6 @@ class SaleRepository(
             val ventas = SupabaseClientProvider.client.postgrest
                 .rpc("get_ventas", buildJsonObject { put("p_android_id", androidId) })
                 .decodeList<Sale>()
-            // No se borra el caché entero aquí: podría haber ventas locales sin sincronizar todavía.
             db.ventaDao().insertarTodas(ventas.map { it.toEntity(sincronizada = true) })
             Result.success((cacheadas.map { it.toModel() } + ventas).distinctBy { it.id ?: it.hashCode().toString() })
         } catch (e: Exception) {
@@ -121,7 +95,6 @@ class SaleRepository(
         }
     }
 
-    /** ventas + nombre de producto ya resuelto (join en memoria contra productos). */
     suspend fun getSalesConNombre(androidId: String): Result<List<Pair<Sale, String>>> {
         return try {
             val ventas = getSales(androidId).getOrThrow()

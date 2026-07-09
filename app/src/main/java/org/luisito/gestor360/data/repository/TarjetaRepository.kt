@@ -1,4 +1,3 @@
-import org.luisito.gestor360.utils.SessionManager
 package org.luisito.gestor360.data.repository
 
 import android.content.Context
@@ -15,15 +14,10 @@ import org.luisito.gestor360.data.models.Tarjeta
 import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.data.sync.SyncWorker
 import org.luisito.gestor360.utils.AppContextHolder
+import org.luisito.gestor360.utils.SessionManager
 
-/**
- * RPC: get_tarjetas, crear_tarjeta (editar_tarjeta/eliminar_tarjeta/activar_tarjeta
- * son nombres supuestos, iguales a la nota que ya tenías — sigue pendiente
- * confirmarlos o crearlos). Offline-first: mismo patrón que Producto/Merma/Turno.
- */
 class TarjetaRepository(
-    private val context: Context = AppContextHolder.context,
-    //private val trazaRepository: TrazaRepository = TrazaRepository()
+    private val context: Context = AppContextHolder.context
 ) {
     private val db = AppDatabase.obtener(context)
 
@@ -54,6 +48,7 @@ class TarjetaRepository(
     }
 
     suspend fun limpiarCache() { db.tarjetaDao().limpiar() }
+
     suspend fun crearTarjeta(androidId: String, banco: String, numero: String, titular: String): Result<Unit> {
         val localId = SessionManager(context).getLocalId()
         val idTemporal = -System.currentTimeMillis()
@@ -64,15 +59,10 @@ class TarjetaRepository(
             put("p_local_id", localId)
         }
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "crear_tarjeta", payloadJson = payload.toString(), idLocalTemporal = idTemporal))
-        //trazaRepository.registrar(androidId, "crear_tarjeta", "$banco $numero")
         if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
         return Result.success(Unit)
     }
 
-    // NOTA: mismo supuesto de nombre que ya tenías. Requiere internet porque
-    // editar una cuenta bancaria no es algo que quieras "reproducir" a ciegas
-    // si el servidor tiene una versión más reciente (poca frecuencia, bajo riesgo
-    // de necesitarlo offline, y mucho riesgo si el offline pisa un cambio real).
     suspend fun editarTarjeta(androidId: String, id: Long, banco: String, numero: String, titular: String): Result<Unit> {
         if (!NetworkMonitor.hayInternet(context)) return Result.failure(IllegalStateException("Necesitas conexión para editar una tarjeta"))
         return try {
@@ -88,7 +78,6 @@ class TarjetaRepository(
     }
 
     suspend fun setActivo(androidId: String, id: Long, activo: Boolean): Result<Unit> {
-        // Esto sí se puede aplicar optimista y encolar: es un simple on/off.
         db.tarjetaDao().setActivo(id, activo)
         val payload = buildJsonObject { put("p_android_id", androidId); put("p_id", id); put("p_activo", activo) }
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "activar_tarjeta", payloadJson = payload.toString()))
