@@ -64,16 +64,16 @@ class ProductRepository(
 
     suspend fun createProduct(
         androidId: String, nombre: String, precio: Double, stock: Double,
-        ubicacion: String, categoria: String, almacenId: String? = null
+        ubicacion: String, categoria: String, localId: Long? = null
     ): Result<Unit> {
         // Id temporal negativo para que se pueda mostrar en la lista antes de sincronizar.
         val idTemporal = -System.currentTimeMillis()
-        val producto = Product(idTemporal, nombre, precio, stock, ubicacion, categoria, almacenId)
+        val producto = Product(idTemporal, nombre, precio, stock, ubicacion, categoria, localId)
         db.productoDao().insertarUno(producto.toEntity())
 
         val payload = buildJsonObject {
             put("p_android_id", androidId); put("p_nombre", nombre); put("p_precio", precio)
-            put("p_stock", stock); put("p_almacen_id", almacenId); put("p_ubicacion", ubicacion); put("p_categoria", categoria)
+            put("p_stock", stock); put("p_almacen_id", localId); put("p_ubicacion", ubicacion); put("p_categoria", categoria)
         }
         encolarYSincronizar(androidId, "crear_producto", payload, idTemporal)
         //trazaRepository.registrar(androidId, "crear_producto", nombre)

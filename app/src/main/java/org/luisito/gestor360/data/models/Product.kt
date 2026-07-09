@@ -10,5 +10,5 @@ data class Product(
     val stock: Double,
     val ubicacion: String? = null,
     val categoria: String? = null,
-    val almacen_id: String? = null
+    val local_id: Long? = null
 )

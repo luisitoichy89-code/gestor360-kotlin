@@ -122,7 +122,7 @@ fun Gestor360App() {
         !isLoggedIn && usuarioParaPin != null -> PinLoginScreen(
             usuario = usuarioParaPin!!,
             onLoginExitoso = { usuario ->
-                sessionManager.saveSession(userId = usuario.id, username = usuario.username, rol = usuario.rol, almacenId = usuario.almacen_id ?: "1", clienteId = usuario.cliente_id, androidId = usuario.android_id ?: "", nombre = usuario.nombre)
+                sessionManager.saveSession(userId = usuario.id, username = usuario.username, rol = usuario.rol, localId = usuario.local_id ?: 0L, clienteId = usuario.cliente_id, androidId = usuario.android_id ?: "", nombre = usuario.nombre)
                 isLoggedIn = true
             },
             onCambiarDispositivo = { usuarioParaPin = null; accesoViewModel.reiniciar() },

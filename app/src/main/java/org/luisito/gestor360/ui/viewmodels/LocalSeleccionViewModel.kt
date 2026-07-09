@@ -6,14 +6,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.models.Local
 import org.luisito.gestor360.data.repository.LocalRepository
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
-import io.github.jan.supabase.postgrest.postgrest
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 data class LocalSeleccionUiState(
     val isLoading: Boolean = false,
@@ -47,17 +43,7 @@ class LocalSeleccionViewModel(
 
     fun seleccionar(local: Local) {
         _uiState.value = _uiState.value.copy(localSeleccionado = local)
-        viewModelScope.launch {
-            try {
-                val sm = SessionManager(AppContextHolder.context)
-                val androidId = sm.getAndroidId()
-                SupabaseClientProvider.client.postgrest
-                    .from("local_seleccion_context")
-                    .upsert(buildJsonObject {
-                        put("usuario_auth_id", androidId)
-                        put("local_id", local.id)
-                    })
-            } catch (_: Exception) { }
-        }
+        val sm = SessionManager(AppContextHolder.context)
+        sm.updateLocalId(local.id)
     }
 }

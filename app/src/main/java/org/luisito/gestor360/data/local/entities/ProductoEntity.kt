@@ -12,15 +12,15 @@ data class ProductoEntity(
     val stock: Double,
     val ubicacion: String?,
     val categoria: String?,
-    val almacenId: String?
+    val localId: Long? = null
 )
 
 fun ProductoEntity.toModel() = Product(
     id = id, nombre = nombre, precio = precio, stock = stock,
-    ubicacion = ubicacion, categoria = categoria, almacen_id = almacenId
+    ubicacion = ubicacion, categoria = categoria, local_id = localId
 )
 
 fun Product.toEntity() = ProductoEntity(
     id = id, nombre = nombre, precio = precio, stock = stock,
-    ubicacion = ubicacion, categoria = categoria, almacenId = almacen_id
+    ubicacion = ubicacion, categoria = categoria, localId = local_id
 )
