@@ -34,7 +34,6 @@ fun VentasScreen(
     var selectedProduct by remember { mutableStateOf<Product?>(null) }
     var cantidad by remember { mutableStateOf("") }
     var mostrarCancelarVenta by remember { mutableStateOf(false) }
-    var motivoCancelacion by remember { mutableStateOf("") }
 
     LaunchedEffect(androidId) { viewModel.iniciar(androidId) }
 
@@ -123,34 +122,20 @@ fun VentasScreen(
 
     if (mostrarCancelarVenta) {
         AlertDialog(
-            onDismissRequest = { mostrarCancelarVenta = false; motivoCancelacion = "" },
+            onDismissRequest = { mostrarCancelarVenta = false },
             title = { Text("Cancelar venta", fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    Text("¿Por qué cancelas la venta?")
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        motivoCancelacion, { motivoCancelacion = it },
-                        label = { Text("Motivo") },
-                        singleLine = false,
-                        maxLines = 3,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp)
-                    )
-                }
-            },
+            text = { Text("¿Estás seguro de cancelar la venta? Se vaciará el carrito.") },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        viewModel.cancelarVenta(motivoCancelacion.trim())
+                        viewModel.limpiarCarrito()
                         mostrarCancelarVenta = false
-                        motivoCancelacion = ""
                         onBack()
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) { Text("Cancelar venta", fontWeight = FontWeight.Bold) }
             },
-            dismissButton = { TextButton(onClick = { mostrarCancelarVenta = false; motivoCancelacion = "" }) { Text("Volver") } }
+            dismissButton = { TextButton(onClick = { mostrarCancelarVenta = false }) { Text("Volver") } }
         )
     }
 }
