@@ -2,7 +2,6 @@ package org.luisito.gestor360.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -10,6 +9,8 @@ import kotlinx.coroutines.launch
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.models.Local
 import org.luisito.gestor360.data.repository.LocalRepository
+import org.luisito.gestor360.utils.AppContextHolder
+import org.luisito.gestor360.utils.SessionManager
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -48,11 +49,12 @@ class LocalSeleccionViewModel(
         _uiState.value = _uiState.value.copy(localSeleccionado = local)
         viewModelScope.launch {
             try {
-                val userId = SupabaseClientProvider.client.auth.currentUserOrNull()?.id ?: return@launch
+                val sm = SessionManager(AppContextHolder.context)
+                val androidId = sm.getAndroidId()
                 SupabaseClientProvider.client.postgrest
                     .from("local_seleccion_context")
                     .upsert(buildJsonObject {
-                        put("usuario_auth_id", userId)
+                        put("usuario_auth_id", androidId)
                         put("local_id", local.id)
                     })
             } catch (_: Exception) { }
