@@ -2,6 +2,7 @@ package org.luisito.gestor360.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,7 +46,6 @@ class LocalSeleccionViewModel(
 
     fun seleccionar(local: Local) {
         _uiState.value = _uiState.value.copy(localSeleccionado = local)
-        // Persistir en Supabase para que RLS funcione
         viewModelScope.launch {
             try {
                 val userId = SupabaseClientProvider.client.auth.currentUserOrNull()?.id ?: return@launch
@@ -55,9 +55,7 @@ class LocalSeleccionViewModel(
                         put("usuario_auth_id", userId)
                         put("local_id", local.id)
                     })
-            } catch (_: Exception) {
-                // Si falla, el local sigue funcionando con el ViewModel
-            }
+            } catch (_: Exception) { }
         }
     }
 }
