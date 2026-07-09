@@ -10,6 +10,6 @@ data class Tarjeta(
     val titular: String? = null,
     val activo: Boolean = true,
     val cliente_id: String? = null,
-    val local_id: Long? = null,
+    val almacen_id: String? = null,
     val created_at: String? = null
 )

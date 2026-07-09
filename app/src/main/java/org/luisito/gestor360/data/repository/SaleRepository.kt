@@ -19,9 +19,16 @@ import kotlin.math.round
 
 data class TopVendido(val nombre: String, val total: Double)
 
+/**
+ * Offline-first.
+ *
+ * CAMBIO: guardarVenta() ahora incluye local_id (leído de SessionManager) en la
+ * VentaEntity local, para que el historial del caché esté correctamente etiquetado
+ * por local incluso antes de sincronizar con el servidor.
+ */
 class SaleRepository(
     private val context: Context = AppContextHolder.context,
-    private val productRepository: ProductRepository = ProductRepository(context)
+    private val productRepository: ProductRepository = ProductRepository(context),
 ) {
     private val db = AppDatabase.obtener(context)
 
@@ -32,9 +39,10 @@ class SaleRepository(
         montoEfectivo: Double, montoTransferencia: Double, cliente: DatosCliente? = null
     ): Result<Unit> {
         if (carrito.isEmpty()) return Result.failure(IllegalStateException("El carrito está vacío"))
-        val localId = SessionManager(context).getLocalId()
         val totalVenta = carrito.sumOf { it.subtotal }
         if (totalVenta <= 0.0) return Result.failure(IllegalStateException("El total de la venta debe ser mayor a 0"))
+
+        val localId = SessionManager(context).getLocalId()
 
         for (item in carrito) {
             val ratio = item.subtotal / totalVenta
@@ -43,19 +51,35 @@ class SaleRepository(
 
             productRepository.descontarStockLocal(item.productId, item.cantidad)
             val ventaLocal = Sale(
-                id = null, producto_id = item.productId, cantidad = item.cantidad, total = item.subtotal,
-                metodo = metodo, efectivo = efectivoItem, transferencia = transferenciaItem,
-                cliente_ci = cliente?.ci, cliente_tel = cliente?.telefono, cliente_nombre = cliente?.nombre,
+                id = null,
+                producto_id = item.productId,
+                cantidad = item.cantidad,
+                total = item.subtotal,
+                metodo = metodo,
+                efectivo = efectivoItem,
+                transferencia = transferenciaItem,
+                local_id = localId,                // ← ahora se guarda el local correcto
+                cliente_ci = cliente?.ci,
+                cliente_tel = cliente?.telefono,
+                cliente_nombre = cliente?.nombre,
                 created_at = java.time.LocalDateTime.now().toString()
             )
             db.ventaDao().insertarUna(ventaLocal.toEntity(sincronizada = false))
 
             val payload = buildJsonObject {
-                put("p_android_id", androidId); put("p_producto_id", item.productId)
-                put("p_local_id", localId)
-                put("p_cantidad", item.cantidad); put("p_total", item.subtotal)
-                put("p_metodo", metodo); put("p_efectivo", efectivoItem); put("p_transferencia", transferenciaItem)
-                put("p_cliente_ci", cliente?.ci ?: ""); put("p_cliente_tel", cliente?.telefono ?: ""); put("p_cliente_nombre", cliente?.nombre ?: "")
+                put("p_android_id", androidId)
+                put("p_producto_id", item.productId)
+                put("p_cantidad", item.cantidad)
+                put("p_total", item.subtotal)
+                put("p_metodo", metodo)
+                put("p_efectivo", efectivoItem)
+                put("p_transferencia", transferenciaItem)
+                put("p_cliente_ci", cliente?.ci ?: "")
+                put("p_cliente_tel", cliente?.telefono ?: "")
+                put("p_cliente_nombre", cliente?.nombre ?: "")
+                // Para admins: el servidor usa este local_id en lugar de intentar
+                // resolverlo desde android_id (que daría NULL para un admin).
+                if (localId != null) put("p_local_id", localId)
             }
             db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "registrar_venta", payloadJson = payload.toString()))
         }

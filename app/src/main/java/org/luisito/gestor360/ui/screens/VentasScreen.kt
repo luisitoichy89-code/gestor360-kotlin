@@ -25,6 +25,8 @@ import org.luisito.gestor360.ui.viewmodels.SaleViewModel
 @Composable
 fun VentasScreen(
     androidId: String,
+    /** Cuando el admin cambia de local, este valor cambia y fuerza recargar los productos. */
+    localId: Long? = null,
     onBack: () -> Unit,
     onIrACarrito: () -> Unit,
     viewModel: SaleViewModel = viewModel()
@@ -34,8 +36,10 @@ fun VentasScreen(
     var selectedProduct by remember { mutableStateOf<Product?>(null) }
     var cantidad by remember { mutableStateOf("") }
     var mostrarCancelarVenta by remember { mutableStateOf(false) }
+    var motivoCancelacion by remember { mutableStateOf("") }
 
-    LaunchedEffect(androidId) { viewModel.iniciar(androidId) }
+    // localId como key: si el admin cambia de local, recarga los productos del nuevo local.
+    LaunchedEffect(androidId, localId) { viewModel.iniciar(androidId) }
 
     val productosFiltrados = uiState.productos.filter { searchQuery.isBlank() || it.nombre.contains(searchQuery, true) }
 
@@ -122,20 +126,34 @@ fun VentasScreen(
 
     if (mostrarCancelarVenta) {
         AlertDialog(
-            onDismissRequest = { mostrarCancelarVenta = false },
+            onDismissRequest = { mostrarCancelarVenta = false; motivoCancelacion = "" },
             title = { Text("Cancelar venta", fontWeight = FontWeight.Bold) },
-            text = { Text("¿Estás seguro de cancelar la venta? Se vaciará el carrito.") },
+            text = {
+                Column {
+                    Text("¿Por qué cancelas la venta?")
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        motivoCancelacion, { motivoCancelacion = it },
+                        label = { Text("Motivo") },
+                        singleLine = false,
+                        maxLines = 3,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp)
+                    )
+                }
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        viewModel.limpiarCarrito()
+                        viewModel.cancelarVenta(motivoCancelacion.trim())
                         mostrarCancelarVenta = false
+                        motivoCancelacion = ""
                         onBack()
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) { Text("Cancelar venta", fontWeight = FontWeight.Bold) }
             },
-            dismissButton = { TextButton(onClick = { mostrarCancelarVenta = false }) { Text("Volver") } }
+            dismissButton = { TextButton(onClick = { mostrarCancelarVenta = false; motivoCancelacion = "" }) { Text("Volver") } }
         )
     }
 }

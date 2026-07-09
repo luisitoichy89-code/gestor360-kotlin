@@ -12,7 +12,8 @@ data class User(
     val rol: String,
     val pin: String? = null,
     val android_id: String? = null,
-    val local_id: Long? = null,
+    val almacen_id: String? = "1",
+    val local_id: Long? = null,   // FK → locales.id, null para admins con acceso multi-local
     val activo: Boolean = true,
     val created_at: String? = null
 )

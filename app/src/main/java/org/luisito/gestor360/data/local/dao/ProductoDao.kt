@@ -8,6 +8,10 @@ interface ProductoDao {
     @Query("SELECT * FROM productos_cache ORDER BY nombre ASC")
     suspend fun obtenerTodos(): List<ProductoEntity>
 
+    /** Filtra por local — usado cuando el usuario tiene un local asignado o el admin seleccionó uno. */
+    @Query("SELECT * FROM productos_cache WHERE localId = :localId ORDER BY nombre ASC")
+    suspend fun obtenerPorLocal(localId: Long): List<ProductoEntity>
+
     @Query("SELECT * FROM productos_cache WHERE id = :id")
     suspend fun obtenerPorId(id: Long): ProductoEntity?
 

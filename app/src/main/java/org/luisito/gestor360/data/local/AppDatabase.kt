@@ -19,12 +19,14 @@ import org.luisito.gestor360.data.local.entities.TarjetaEntity
 import org.luisito.gestor360.data.local.entities.TurnoEntity
 import org.luisito.gestor360.data.local.entities.VentaEntity
 
+// v3: ProductoEntity ahora incluye localId (Long?) para aislar productos por local.
+//     fallbackToDestructiveMigration() limpia el caché — se recarga del servidor en el primer acceso.
 @Database(
     entities = [
         ProductoEntity::class, AccionPendienteEntity::class, VentaEntity::class, ConflictoEntity::class,
         TurnoEntity::class, TarjetaEntity::class, MermaEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

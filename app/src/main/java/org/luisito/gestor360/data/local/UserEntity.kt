@@ -11,6 +11,6 @@ data class UserEntity(
     val username: String,
     val nombre: String?,
     val rol: String,
-    val localId: Long,
+    val almacenId: String,
     val activo: Boolean
 )

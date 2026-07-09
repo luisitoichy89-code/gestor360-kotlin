@@ -10,5 +10,6 @@ data class Product(
     val stock: Double,
     val ubicacion: String? = null,
     val categoria: String? = null,
-    val local_id: Long? = null
+    val almacen_id: String? = null,    // legacy, se mantiene por compatibilidad con el RPC
+    val local_id: Long? = null         // FK → locales.id, para aislar productos por local
 )

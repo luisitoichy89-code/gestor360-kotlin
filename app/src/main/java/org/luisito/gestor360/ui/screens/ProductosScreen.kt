@@ -28,7 +28,11 @@ private const val PRODUCTOS_POR_PAGINA = 25
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductosScreen(
-    androidId: String, rol: String, onBack: (() -> Unit)? = null,
+    androidId: String,
+    rol: String,
+    /** Cuando el admin cambia de local, este valor cambia y fuerza recargar los productos. */
+    localId: Long? = null,
+    onBack: (() -> Unit)? = null,
     viewModel: ProductViewModel = viewModel(),
     mermaViewModel: MermaViewModel = viewModel(),
     aprobacionVM: AprobacionStockViewModel = viewModel()
@@ -47,7 +51,9 @@ fun ProductosScreen(
     var productoParaMerma by remember { mutableStateOf<Product?>(null) }
     var productoAEliminar by remember { mutableStateOf<Product?>(null) }
 
-    LaunchedEffect(androidId) { viewModel.cargar(androidId) }
+    // localId como key: si el admin cambia de local, este LaunchedEffect se re-dispara
+    // y recarga los productos ya filtrados por el nuevo local.
+    LaunchedEffect(androidId, localId) { viewModel.cargar(androidId) }
     val categorias = remember(uiState.productos) { uiState.productos.mapNotNull { it.categoria?.takeIf { c -> c.isNotBlank() } }.distinct().sorted() }
     val filtrados = remember(uiState.productos, query, categoriaSeleccionada) { uiState.productos.filter { p -> (query.isBlank() || p.nombre.contains(query, true)) && (categoriaSeleccionada == null || p.categoria == categoriaSeleccionada) } }
     LaunchedEffect(query, categoriaSeleccionada, uiState.productos) { pagina = 0 }

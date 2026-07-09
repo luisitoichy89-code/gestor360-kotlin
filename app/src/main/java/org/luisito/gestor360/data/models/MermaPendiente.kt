@@ -18,7 +18,7 @@ data class MermaPendiente(
     val estado: String = "pendiente",
     val aprobado_por: Long? = null,
     val cliente_id: String? = null,
-    val local_id: Long? = null,
+    val almacen_id: String? = null,
     val created_at: String? = null,
     val resuelto_at: String? = null
 )
