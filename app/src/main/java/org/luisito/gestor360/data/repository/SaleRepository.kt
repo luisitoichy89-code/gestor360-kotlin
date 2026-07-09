@@ -1,3 +1,4 @@
+import org.luisito.gestor360.utils.SessionManager
 package org.luisito.gestor360.data.repository
 
 import android.content.Context
@@ -45,6 +46,7 @@ class SaleRepository(
         montoEfectivo: Double, montoTransferencia: Double, cliente: DatosCliente? = null
     ): Result<Unit> {
         if (carrito.isEmpty()) return Result.failure(IllegalStateException("El carrito está vacío"))
+        val localId = SessionManager(context).getLocalId()
         val totalVenta = carrito.sumOf { it.subtotal }
         if (totalVenta <= 0.0) return Result.failure(IllegalStateException("El total de la venta debe ser mayor a 0"))
 
@@ -66,6 +68,7 @@ class SaleRepository(
             // 2. Encolar la llamada real para cuando haya internet.
             val payload = buildJsonObject {
                 put("p_android_id", androidId); put("p_producto_id", item.productId)
+                            put("p_local_id", localId)
                 put("p_cantidad", item.cantidad); put("p_total", item.subtotal)
                 put("p_metodo", metodo); put("p_efectivo", efectivoItem); put("p_transferencia", transferenciaItem)
                 put("p_cliente_ci", cliente?.ci ?: ""); put("p_cliente_tel", cliente?.telefono ?: ""); put("p_cliente_nombre", cliente?.nombre ?: "")

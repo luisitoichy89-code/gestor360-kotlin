@@ -1,3 +1,4 @@
+import org.luisito.gestor360.utils.SessionManager
 package org.luisito.gestor360.data.repository
 
 import android.content.Context
@@ -54,11 +55,13 @@ class TarjetaRepository(
 
     suspend fun limpiarCache() { db.tarjetaDao().limpiar() }
     suspend fun crearTarjeta(androidId: String, banco: String, numero: String, titular: String): Result<Unit> {
+        val localId = SessionManager(context).getLocalId()
         val idTemporal = -System.currentTimeMillis()
         db.tarjetaDao().insertarUna(TarjetaEntity(idTemporal, banco, numero, titular, activo = true))
 
         val payload = buildJsonObject {
             put("p_android_id", androidId); put("p_banco", banco); put("p_numero", numero); put("p_titular", titular)
+            put("p_local_id", localId)
         }
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "crear_tarjeta", payloadJson = payload.toString(), idLocalTemporal = idTemporal))
         //trazaRepository.registrar(androidId, "crear_tarjeta", "$banco $numero")
