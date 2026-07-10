@@ -11,8 +11,8 @@ interface VentaDao {
     @Insert
     suspend fun insertarUna(venta: VentaEntity)
 
-    @Query("SELECT * FROM ventas_cache ORDER BY createdAt DESC")
-    suspend fun obtenerTodas(): List<VentaEntity>
+    @Query("SELECT * FROM ventas_cache WHERE localId = :localId ORDER BY createdAt DESC")
+    suspend fun obtenerTodas(localId: Long): List<VentaEntity>
 
     @Query("DELETE FROM ventas_cache WHERE sincronizada = 1")
     suspend fun limpiarSincronizadas()

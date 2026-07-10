@@ -8,64 +8,24 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CreditCard
-import androidx.compose.material.icons.filled.FactCheck
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.PointOfSale
-import androidx.compose.material.icons.filled.ReceiptLong
-import androidx.compose.material.icons.filled.Storefront
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.luisito.gestor360.data.models.User
+import org.luisito.gestor360.data.models.Local
 import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.data.sync.SyncWorker
 import org.luisito.gestor360.ui.components.SyncStatusBar
 import org.luisito.gestor360.ui.components.VerificarActualizacion
-import org.luisito.gestor360.ui.screens.AprobacionesScreen
-import org.luisito.gestor360.ui.screens.CarritoScreen
-import org.luisito.gestor360.ui.screens.CierreCajaScreen
-import org.luisito.gestor360.ui.screens.ConflictosScreen
-import org.luisito.gestor360.ui.screens.DashboardScreen
-import org.luisito.gestor360.ui.screens.PinLoginScreen
-import org.luisito.gestor360.ui.screens.ProductosScreen
-import org.luisito.gestor360.ui.screens.TarjetasScreen
-import org.luisito.gestor360.ui.screens.TicketsClienteScreen
-import org.luisito.gestor360.ui.screens.TrazasScreen
-import org.luisito.gestor360.ui.screens.VentasScreen
-import org.luisito.gestor360.ui.screens.VerificarDispositivoScreen
-import org.luisito.gestor360.ui.screens.SplashScreen
+import org.luisito.gestor360.ui.screens.*
 import org.luisito.gestor360.ui.theme.Gestor360Theme
 import org.luisito.gestor360.ui.viewmodels.AccesoViewModel
 import org.luisito.gestor360.ui.viewmodels.LocalSeleccionViewModel
@@ -75,10 +35,8 @@ import org.luisito.gestor360.utils.SessionManager
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         AppContextHolder.init(applicationContext)
         SyncWorker.programarPeriodico(applicationContext)
-
         setContent { Gestor360Theme { Gestor360App() } }
     }
 }
@@ -164,16 +122,7 @@ fun Gestor360App() {
         !isLoggedIn && usuarioParaPin != null -> PinLoginScreen(
             usuario = usuarioParaPin!!,
             onLoginExitoso = { usuario ->
-                sessionManager.saveSession(
-                    userId    = usuario.id,
-                    username  = usuario.username,
-                    rol       = usuario.rol,
-                    almacenId = usuario.almacen_id ?: "1",
-                    clienteId = usuario.cliente_id,
-                    androidId = usuario.android_id ?: "",
-                    nombre    = usuario.nombre,
-                    localId   = usuario.local_id   // vendedor queda anclado a su local
-                )
+                sessionManager.saveSession(userId = usuario.id, username = usuario.username, rol = usuario.rol, localId = usuario.local_id, clienteId = usuario.cliente_id, androidId = usuario.android_id ?: "", nombre = usuario.nombre)
                 isLoggedIn = true
             },
             onCambiarDispositivo = { usuarioParaPin = null; accesoViewModel.reiniciar() },
@@ -191,14 +140,6 @@ fun Gestor360App() {
             ) { pantallaActual ->
                 when (pantallaActual) {
                     is PantallaInterna.Home -> Column(modifier = Modifier.statusBarsPadding()) {
-                        // Antes este Column no tenía ningún padding para la barra de
-                        // estado del sistema (hora/cobertura/operador). Con targetSdk
-                        // 36 (Android 15+), el modo edge-to-edge queda forzado por el
-                        // sistema aunque no se llame enableEdgeToEdge() explícitamente,
-                        // así que este Column se dibujaba DETRÁS de esa barra y
-                        // "Sincronizar" quedaba tapado/mezclado con la hora y el ícono
-                        // de señal. DashboardScreen no tenía este problema porque su
-                        // propio Scaffold + TopAppBar ya manejan esos insets solos.
                         SyncStatusBar(androidId = androidId, onVerConflictos = { pantalla = PantallaInterna.Conflictos })
                         if (esAdmin) SelectorDeLocalBar(androidId = androidId, viewModel = localSeleccionViewModel)
                         DashboardScreen(
@@ -220,31 +161,19 @@ fun Gestor360App() {
                             onLogout = { cerrarSesion() }
                         )
                     }
-                    is PantallaInterna.Ventas -> {
-                        val localId by localSeleccionViewModel.uiState.collectAsState()
-                        VentasScreen(
-                            androidId = androidId,
-                            localId   = localId.localSeleccionado?.id,
-                            onBack    = { pantalla = PantallaInterna.Home },
-                            onIrACarrito = { pantalla = PantallaInterna.Carrito }
-                        )
-                    }
+                    is PantallaInterna.Ventas -> VentasScreen(
+                        androidId = androidId,
+                        onBack = { pantalla = PantallaInterna.Home },
+                        onIrACarrito = { pantalla = PantallaInterna.Carrito }
+                    )
                     is PantallaInterna.Carrito -> CarritoScreen(
                         onBack = { pantalla = PantallaInterna.Ventas },
                         onVentaConfirmada = { pantalla = PantallaInterna.Ventas }
                     )
-                    is PantallaInterna.Productos -> {
-                        val localId by localSeleccionViewModel.uiState.collectAsState()
-                        ProductosScreen(
-                            androidId = androidId,
-                            rol       = rol,
-                            localId   = localId.localSeleccionado?.id,
-                            onBack    = { pantalla = PantallaInterna.Home }
-                        )
-                    }
+                    is PantallaInterna.Productos -> ProductosScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home })
                     is PantallaInterna.CierreCaja -> CierreCajaScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
                     is PantallaInterna.Tarjetas -> if (esAdmin) TarjetasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
-                    is PantallaInterna.Aprobaciones -> if (esAdmin) AprobacionesScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
+                    is PantallaInterna.Aprobaciones -> if (esAdmin) AprobacionesScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
                     is PantallaInterna.TicketsSoporte -> TicketsClienteScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
                     is PantallaInterna.Trazas -> if (esAdmin) TrazasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
                     is PantallaInterna.Conflictos -> ConflictosScreen(onBack = { pantalla = PantallaInterna.Home })
@@ -258,8 +187,11 @@ fun Gestor360App() {
 private fun SelectorDeLocalBar(androidId: String, viewModel: LocalSeleccionViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     var menuAbierto by remember { mutableStateOf(false) }
+    var localAConfirmar by remember { mutableStateOf<Local?>(null) }
+
     LaunchedEffect(androidId) { viewModel.cargar(androidId) }
     if (uiState.locales.size <= 1) return
+
     Surface(color = MaterialTheme.colorScheme.secondaryContainer) {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Storefront, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
@@ -269,10 +201,33 @@ private fun SelectorDeLocalBar(androidId: String, viewModel: LocalSeleccionViewM
                 TextButton(onClick = { menuAbierto = true }) { Text("Cambiar") }
                 DropdownMenu(expanded = menuAbierto, onDismissRequest = { menuAbierto = false }) {
                     uiState.locales.forEach { local ->
-                        DropdownMenuItem(text = { Text(local.nombre) }, onClick = { viewModel.seleccionar(local); menuAbierto = false })
+                        DropdownMenuItem(
+                            text = { Text(local.nombre) },
+                            onClick = {
+                                localAConfirmar = local
+                                menuAbierto = false
+                            }
+                        )
                     }
                 }
             }
         }
+    }
+
+    if (localAConfirmar != null) {
+        AlertDialog(
+            onDismissRequest = { localAConfirmar = null },
+            title = { Text("Cambiar de local") },
+            text = { Text("¿Cambiar a ${localAConfirmar!!.nombre}?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.seleccionar(localAConfirmar!!)
+                    localAConfirmar = null
+                }) { Text("Aceptar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { localAConfirmar = null }) { Text("Cancelar") }
+            }
+        )
     }
 }

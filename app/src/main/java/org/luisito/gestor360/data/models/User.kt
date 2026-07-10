@@ -12,8 +12,14 @@ data class User(
     val rol: String,
     val pin: String? = null,
     val android_id: String? = null,
-    val almacen_id: String? = "1",
-    val local_id: Long? = null,   // FK → locales.id, null para admins con acceso multi-local
+    /**
+     * Local "hogar" del usuario. Para rol "seller" SIEMPRE debe venir con
+     * valor (un vendedor pertenece a un único local). Para rol "admin" puede
+     * venir null, lo que significa "tiene acceso a todos los locales del
+     * cliente_id" — en ese caso el local activo se resuelve con el selector
+     * de local (LocalSeleccionViewModel) y no hay default silencioso.
+     */
+    val local_id: Long? = null,
     val activo: Boolean = true,
     val created_at: String? = null
 )

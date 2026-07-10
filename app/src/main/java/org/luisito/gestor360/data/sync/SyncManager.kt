@@ -7,25 +7,30 @@ import kotlinx.serialization.json.jsonObject
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.local.AppDatabase
 import org.luisito.gestor360.data.local.entities.ConflictoEntity
-import org.luisito.gestor360.data.local.entities.toEntity
 import org.luisito.gestor360.data.repository.MermaRepository
 import org.luisito.gestor360.data.repository.ProductRepository
 import org.luisito.gestor360.data.repository.TarjetaRepository
 import org.luisito.gestor360.data.repository.TurnoRepository
+import org.luisito.gestor360.utils.SessionManager
 
 data class SyncResultado(val exitosas: Int, val fallidas: Int, val error: String? = null)
 
 /**
  * Motor central de sincronización. Recorre "acciones_pendientes" en orden y
- * reproduce cada llamada RPC exactamente como se habría hecho online. Para las
- * acciones que crean algo (crear_producto, abrir_turno, crear_tarjeta,
- * crear_merma) usa el id real que devuelve el servidor para reemplazar el id
- * temporal negativo que se usó mientras estaba offline. Al terminar, refresca
- * todos los cachés y detecta conflictos (ej. stock negativo).
+ * reproduce cada llamada RPC exactamente como se habría hecho online (cada
+ * payload ya trae su propio p_local_id, congelado en el momento en que se
+ * encoló la acción — así una acción encolada en el Local A siempre se
+ * reproduce contra el Local A aunque el usuario haya cambiado de local activo
+ * mientras estaba offline). Para las acciones que crean algo (crear_producto,
+ * abrir_turno, crear_tarjeta, crear_merma) usa el id real que devuelve el
+ * servidor para reemplazar el id temporal negativo que se usó mientras estaba
+ * offline. Al terminar, refresca todos los cachés (del local ACTIVO ahora) y
+ * detecta conflictos (ej. stock negativo).
  */
 class SyncManager(private val context: Context) {
 
     private val db = AppDatabase.obtener(context)
+    private val session = SessionManager(context)
     private val productRepository = ProductRepository(context)
     private val tarjetaRepository = TarjetaRepository(context)
     private val mermaRepository = MermaRepository(context)
@@ -45,7 +50,13 @@ class SyncManager(private val context: Context) {
                 val respuesta = SupabaseClientProvider.client.postgrest.rpc(accion.tipo, payload)
 
                 if (accion.idLocalTemporal != null) {
-                    reemplazarIdTemporal(accion.tipo, accion.idLocalTemporal, respuesta)
+                    // p_local_id ya viaja dentro del payload guardado: se usa el mismo
+                    // local con el que se encoló la acción, no el local activo ahora.
+                    val localIdDeLaAccion = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull()
+                        ?: session.getLocalId()
+                    if (localIdDeLaAccion != null) {
+                        reemplazarIdTemporal(accion.tipo, accion.idLocalTemporal, respuesta, localIdDeLaAccion)
+                    }
                 }
 
                 db.accionPendienteDao().actualizar(accion.copy(estado = "sincronizado"))
@@ -58,10 +69,12 @@ class SyncManager(private val context: Context) {
             }
         }
 
-        refrescarProductosYDetectarConflictos(androidId)
-        tarjetaRepository.refrescarDesdeServidor(androidId)
-        mermaRepository.refrescarDesdeServidor(androidId)
-        turnoRepository.refrescarDesdeServidor(androidId)
+        if (session.getLocalId() != null) {
+            refrescarProductosYDetectarConflictos(androidId)
+            tarjetaRepository.refrescarDesdeServidor(androidId)
+            mermaRepository.refrescarDesdeServidor(androidId)
+            turnoRepository.refrescarDesdeServidor(androidId)
+        }
 
         db.accionPendienteDao().limpiarSincronizadas()
         db.ventaDao().limpiarSincronizadas()
@@ -74,15 +87,16 @@ class SyncManager(private val context: Context) {
     private suspend fun reemplazarIdTemporal(
         tipo: String,
         idTemporal: Long,
-        respuesta: io.github.jan.supabase.postgrest.result.PostgrestResult
+        respuesta: io.github.jan.supabase.postgrest.result.PostgrestResult,
+        localId: Long
     ) {
         when (tipo) {
             "crear_producto" -> runCatching { respuesta.decodeAs<Long>() }.getOrNull()
-                ?.let { db.productoDao().reemplazarIdTemporal(idTemporal, it) }
+                ?.let { db.productoDao().reemplazarIdTemporal(idTemporal, it, localId) }
             "abrir_turno" -> runCatching { respuesta.decodeAs<Long>() }.getOrNull()
-                ?.let { db.turnoDao().reemplazarIdTemporal(idTemporal, it) }
+                ?.let { db.turnoDao().reemplazarIdTemporal(idTemporal, it, localId) }
             "crear_tarjeta" -> runCatching { respuesta.decodeAs<Long>() }.getOrNull()
-                ?.let { db.tarjetaDao().reemplazarIdTemporal(idTemporal, it) }
+                ?.let { db.tarjetaDao().reemplazarIdTemporal(idTemporal, it, localId) }
         }
     }
 

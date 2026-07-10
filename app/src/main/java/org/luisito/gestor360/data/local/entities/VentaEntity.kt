@@ -14,7 +14,7 @@ data class VentaEntity(
     val efectivo: Double,
     val transferencia: Double,
     val usuarioId: Long?,
-    val localId: Long?,
+    val localId: Long,
     val clienteCi: String?,
     val clienteTel: String?,
     val clienteNombre: String?,
@@ -29,9 +29,9 @@ fun VentaEntity.toModel() = Sale(
     cliente_ci = clienteCi, cliente_tel = clienteTel, cliente_nombre = clienteNombre, created_at = createdAt
 )
 
-fun Sale.toEntity(sincronizada: Boolean = true) = VentaEntity(
+fun Sale.toEntity(localId: Long, sincronizada: Boolean = true) = VentaEntity(
     id = id ?: "local_${System.nanoTime()}", productoId = producto_id, cantidad = cantidad, total = total,
     metodo = metodo, efectivo = efectivo, transferencia = transferencia, usuarioId = usuario_id,
-    localId = local_id, clienteCi = cliente_ci, clienteTel = cliente_tel, clienteNombre = cliente_nombre,
+    localId = localId, clienteCi = cliente_ci, clienteTel = cliente_tel, clienteNombre = cliente_nombre,
     createdAt = created_at, sincronizada = sincronizada
 )

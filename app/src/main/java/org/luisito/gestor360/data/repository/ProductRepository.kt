@@ -19,52 +19,47 @@ import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 
 /**
- * Offline-first: lee siempre de Room primero.
+ * Offline-first: lee siempre de Room primero (nunca bloquea esperando la red).
+ * Crear/editar/eliminar se aplican al instante en el caché local y se encolan
+ * en "acciones_pendientes"; si hay internet se dispara una sincronización de
+ * inmediato, pero aunque falle, la acción ya quedó guardada para reintentarse
+ * después (WorkManager o el botón "Sincronizar ahora").
  *
- * AISLAMIENTO POR LOCAL: cuando el usuario tiene un local asignado (vendedor normal)
- * o el admin seleccionó uno en SelectorDeLocalBar, el caché se lee filtrado por
- * local_id. El servidor ya devuelve solo los datos del local correcto gracias al
- * SQL fix (get_productos usa local_id de usuarios vía android_id). El filtro en
- * caché es una segunda capa de seguridad para el caso en que el admin cargó datos
- * de varios locales y cambia de uno a otro sin internet.
+ * TODO lo que toca el servidor o el caché va filtrado por local_id, leído de
+ * SessionManager en el momento (nunca cacheado), porque el local activo puede
+ * cambiar en caliente si el usuario es admin de varios locales.
  */
 class ProductRepository(
     private val context: Context = AppContextHolder.context
 ) {
     private val db = AppDatabase.obtener(context)
+    private val session = SessionManager(context)
+    //private val trazaRepository: TrazaRepository = TrazaRepository()
 
-    private fun localIdActivo(): Long? = SessionManager(context).getLocalId()
+    private fun localIdActivo(): Long =
+        session.getLocalId() ?: throw IllegalStateException("No hay un local activo seleccionado")
 
     suspend fun getProducts(androidId: String): Result<List<Product>> {
         val localId = localIdActivo()
-        val cacheados = if (localId != null) db.productoDao().obtenerPorLocal(localId)
-                        else db.productoDao().obtenerTodos()
-
+        val cacheados = db.productoDao().obtenerTodos(localId)
         if (cacheados.isNotEmpty()) {
             if (NetworkMonitor.hayInternet(context)) {
                 CoroutineScope(Dispatchers.IO).launch { refrescarDesdeServidor(androidId) }
             }
             return Result.success(cacheados.map { it.toModel() })
         }
-        // Caché vacío — traer del servidor y filtrar en memoria
-        return refrescarDesdeServidor(androidId).map { todos ->
-            val localId2 = localIdActivo()
-            if (localId2 != null) todos.filter { it.local_id == localId2 } else todos
-        }
+        return refrescarDesdeServidor(androidId)
     }
 
-    /**
-     * Trae la verdad del servidor y reemplaza el caché completo.
-     * Devuelve TODOS los productos sin filtrar (para que SyncManager pueda
-     * detectar conflictos de stock en todos los locales del admin).
-     */
+    /** Trae la verdad del servidor (ya filtrada por local_id) y reemplaza el caché de ese local. */
     suspend fun refrescarDesdeServidor(androidId: String): Result<List<Product>> {
+        val localId = localIdActivo()
         return try {
             val productos = SupabaseClientProvider.client.postgrest
-                .rpc("get_productos", buildJsonObject { put("p_android_id", androidId) })
+                .rpc("get_productos", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
                 .decodeList<Product>()
-            db.productoDao().limpiar()
-            db.productoDao().insertarTodos(productos.map { it.toEntity() })
+            db.productoDao().limpiarDeLocal(localId)
+            db.productoDao().insertarTodos(productos.map { it.toEntity(localId) })
             Result.success(productos)
         } catch (e: Exception) {
             Result.failure(e)
@@ -80,27 +75,20 @@ class ProductRepository(
 
     suspend fun createProduct(
         androidId: String, nombre: String, precio: Double, stock: Double,
-        ubicacion: String, categoria: String, almacenId: String? = null
+        ubicacion: String, categoria: String
     ): Result<Unit> {
         val localId = localIdActivo()
+        // Id temporal negativo para que se pueda mostrar en la lista antes de sincronizar.
         val idTemporal = -System.currentTimeMillis()
-        // El id temporal incluye local_id para que aparezca en la lista del local correcto
-        val producto = Product(idTemporal, nombre, precio, stock, ubicacion, categoria, almacenId, localId)
-        db.productoDao().insertarUno(producto.toEntity())
+        val producto = Product(idTemporal, nombre, precio, stock, ubicacion, categoria, localId)
+        db.productoDao().insertarUno(producto.toEntity(localId))
 
         val payload = buildJsonObject {
-            put("p_android_id", androidId)
-            put("p_nombre", nombre)
-            put("p_precio", precio)
-            put("p_stock", stock)
-            put("p_almacen_id", almacenId)
-            put("p_ubicacion", ubicacion)
-            put("p_categoria", categoria)
-            // El servidor resuelve local_id desde android_id, pero lo incluimos
-            // por si la versión del RPC ya lo acepta como parámetro opcional.
-            if (localId != null) put("p_local_id", localId)
+            put("p_android_id", androidId); put("p_local_id", localId); put("p_nombre", nombre); put("p_precio", precio)
+            put("p_stock", stock); put("p_ubicacion", ubicacion); put("p_categoria", categoria)
         }
         encolarYSincronizar(androidId, "crear_producto", payload, idTemporal)
+        //trazaRepository.registrar(androidId, "crear_producto", nombre)
         return Result.success(Unit)
     }
 
@@ -108,14 +96,16 @@ class ProductRepository(
         androidId: String, id: Long, nombre: String, precio: Double, stock: Double,
         ubicacion: String, categoria: String
     ): Result<Unit> {
-        db.productoDao().obtenerPorId(id)?.let {
+        val localId = localIdActivo()
+        db.productoDao().obtenerPorId(id, localId)?.let {
             db.productoDao().insertarUno(it.copy(nombre = nombre, precio = precio, stock = stock, ubicacion = ubicacion, categoria = categoria))
         }
         val payload = buildJsonObject {
-            put("p_android_id", androidId); put("p_id", id); put("p_nombre", nombre)
+            put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id); put("p_nombre", nombre)
             put("p_precio", precio); put("p_stock", stock); put("p_ubicacion", ubicacion); put("p_categoria", categoria)
         }
         encolarYSincronizar(androidId, "actualizar_producto", payload)
+        //trazaRepository.registrar(androidId, "actualizar_producto", "$nombre (id=$id)")
         return Result.success(Unit)
     }
 
@@ -125,14 +115,17 @@ class ProductRepository(
     }
 
     suspend fun deleteProduct(androidId: String, id: Long): Result<Unit> {
-        db.productoDao().eliminar(id)
-        val payload = buildJsonObject { put("p_android_id", androidId); put("p_id", id) }
+        val localId = localIdActivo()
+        db.productoDao().eliminar(id, localId)
+        val payload = buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id) }
         encolarYSincronizar(androidId, "eliminar_producto", payload)
+        //trazaRepository.registrar(androidId, "eliminar_producto", "id=$id")
         return Result.success(Unit)
     }
 
+    /** Descuento optimista de stock local, usado por SaleRepository al vender offline. */
     suspend fun descontarStockLocal(id: Long, cantidad: Double) {
-        db.productoDao().descontarStock(id, cantidad)
+        db.productoDao().descontarStock(id, cantidad, localIdActivo())
     }
 
     private suspend fun encolarYSincronizar(androidId: String, tipo: String, payload: kotlinx.serialization.json.JsonObject, idTemporal: Long? = null) {

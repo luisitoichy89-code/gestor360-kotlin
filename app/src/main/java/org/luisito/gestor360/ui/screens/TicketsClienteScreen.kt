@@ -37,8 +37,8 @@ class TicketViewModel(private val repo: TicketRepository = TicketRepository()) :
     private var androidId = ""
 
     fun cargarTickets(aid: String) { androidId = aid; viewModelScope.launch { _s.value = _s.value.copy(isLoading = true); repo.getTickets(aid).onSuccess { _s.value = _s.value.copy(isLoading = false, tickets = it) }.onFailure { _s.value = _s.value.copy(isLoading = false, error = it.message) } } }
-    fun abrirTicket(ticket: Ticket) { _s.value = _s.value.copy(ticketSeleccionado = ticket); viewModelScope.launch { repo.getMensajes(ticket.id!!).onSuccess { _s.value = _s.value.copy(mensajes = it) } } }
-    fun refrescarMensajes() { val t = _s.value.ticketSeleccionado ?: return; viewModelScope.launch { repo.getMensajes(t.id!!).onSuccess { _s.value = _s.value.copy(mensajes = it) } } }
+    fun abrirTicket(ticket: Ticket) { _s.value = _s.value.copy(ticketSeleccionado = ticket); viewModelScope.launch { repo.getMensajes(androidId, ticket.id!!).onSuccess { _s.value = _s.value.copy(mensajes = it) } } }
+    fun refrescarMensajes() { val t = _s.value.ticketSeleccionado ?: return; viewModelScope.launch { repo.getMensajes(androidId, t.id!!).onSuccess { _s.value = _s.value.copy(mensajes = it) } } }
     fun crearTicket(mensaje: String) { viewModelScope.launch { repo.crearTicket(androidId, mensaje).onSuccess { cargarTickets(androidId); _s.value = _s.value.copy(ticketSeleccionado = null) } } }
     fun responder(mensaje: String) { val t = _s.value.ticketSeleccionado ?: return; viewModelScope.launch { repo.responderTicket(androidId, t.id!!, mensaje).onSuccess { abrirTicket(t) } } }
     fun cerrar() { _s.value = TicketUiState() }

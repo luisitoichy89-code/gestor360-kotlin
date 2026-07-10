@@ -13,15 +13,18 @@ data class MermaEntity(
     val motivo: String?,
     val solicitadoPor: Long?,
     val solicitadoPorNombre: String?,
-    val estado: String
+    val estado: String,
+    val localId: Long
 )
 
 fun MermaEntity.toModel() = MermaPendiente(
     id = id, producto_id = productoId, producto_nombre = productoNombre, cantidad = cantidad,
-    motivo = motivo, solicitado_por = solicitadoPor, solicitado_por_nombre = solicitadoPorNombre, estado = estado
+    motivo = motivo, solicitado_por = solicitadoPor, solicitado_por_nombre = solicitadoPorNombre,
+    estado = estado, local_id = localId
 )
 
-fun MermaPendiente.toEntity() = MermaEntity(
+fun MermaPendiente.toEntity(localId: Long) = MermaEntity(
     id = id, productoId = producto_id, productoNombre = producto_nombre, cantidad = cantidad,
-    motivo = motivo, solicitadoPor = solicitado_por, solicitadoPorNombre = solicitado_por_nombre, estado = estado
+    motivo = motivo, solicitadoPor = solicitado_por, solicitadoPorNombre = solicitado_por_nombre,
+    estado = estado, localId = localId
 )

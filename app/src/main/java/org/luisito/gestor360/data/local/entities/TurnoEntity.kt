@@ -11,15 +11,16 @@ data class TurnoEntity(
     val apertura: Double,
     val cierre: Double?,
     val diferencia: Double?,
-    val createdAt: String?
+    val createdAt: String?,
+    val localId: Long
 )
 
 fun TurnoEntity.toModel() = Turno(
     id = id, usuario_id = usuarioId, apertura = apertura, cierre = cierre,
-    diferencia = diferencia, created_at = createdAt
+    diferencia = diferencia, created_at = createdAt, local_id = localId
 )
 
-fun Turno.toEntity() = TurnoEntity(
+fun Turno.toEntity(localId: Long) = TurnoEntity(
     id = id, usuarioId = usuario_id, apertura = apertura, cierre = cierre,
-    diferencia = diferencia, createdAt = created_at
+    diferencia = diferencia, createdAt = created_at, localId = localId
 )

@@ -57,20 +57,12 @@ fun CarritoScreen(
     var metodoVisual by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
-    val sessionManager = remember { org.luisito.gestor360.utils.SessionManager(context) }
+    // Si el admin no activó "Confirmación x SMS" en Aprobaciones, el checkout
+    // se comporta exactamente como antes: del carrito directo a datos del
+    // cliente, sin pasar por el overlay de espera de SMS.
     val smsActivo = remember {
-        org.luisito.gestor360.utils.ConfigManager.confirmacionSmsActiva(context, sessionManager.getClienteId())
-    }
-
-    // Bug fix: CarritoScreen no recibía androidId, así que TarjetaViewModel nunca se
-    // cargaba para vendedores que no habían visitado TarjetasScreen. Ahora lo cargamos
-    // aquí directamente desde la sesión, garantizando que las tarjetas siempre estén
-    // disponibles en el checkout sin importar la ruta de navegación.
-    val androidIdSesion = remember { sessionManager.getAndroidId() }
-    LaunchedEffect(androidIdSesion) {
-        if (androidIdSesion.isNotBlank() && tarjetaUiState.tarjetas.isEmpty()) {
-            tarjetaViewModel.cargar(androidIdSesion)
-        }
+        val sm = org.luisito.gestor360.utils.SessionManager(context)
+        org.luisito.gestor360.utils.ConfigManager.confirmacionSmsActiva(context, sm.getClienteId())
     }
 
     // Observar SMS entrantes cuando estamos en espera

@@ -12,16 +12,16 @@ data class ProductoEntity(
     val stock: Double,
     val ubicacion: String?,
     val categoria: String?,
-    val almacenId: String?,
-    val localId: Long? = null   // nuevo: corresponde a local_id en Supabase
+    /** Local al que pertenece esta fila cacheada. Todas las lecturas del DAO filtran por esto. */
+    val localId: Long
 )
 
 fun ProductoEntity.toModel() = Product(
     id = id, nombre = nombre, precio = precio, stock = stock,
-    ubicacion = ubicacion, categoria = categoria, almacen_id = almacenId, local_id = localId
+    ubicacion = ubicacion, categoria = categoria, local_id = localId
 )
 
-fun Product.toEntity() = ProductoEntity(
+fun Product.toEntity(localId: Long) = ProductoEntity(
     id = id, nombre = nombre, precio = precio, stock = stock,
-    ubicacion = ubicacion, categoria = categoria, almacenId = almacen_id, localId = local_id
+    ubicacion = ubicacion, categoria = categoria, localId = localId
 )

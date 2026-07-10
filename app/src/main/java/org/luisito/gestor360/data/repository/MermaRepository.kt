@@ -13,16 +13,22 @@ import org.luisito.gestor360.data.models.MermaPendiente
 import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.data.sync.SyncWorker
 import org.luisito.gestor360.utils.AppContextHolder
+import org.luisito.gestor360.utils.SessionManager
 
-/** RPC: get_mermas_pendientes, crear_merma, resolver_merma. Offline-first. */
+/** RPC: get_mermas_pendientes, crear_merma, resolver_merma. Offline-first, filtrado por local_id. */
 class MermaRepository(
     private val context: Context = AppContextHolder.context,
     //private val trazaRepository: TrazaRepository = TrazaRepository()
 ) {
     private val db = AppDatabase.obtener(context)
+    private val session = SessionManager(context)
+
+    private fun localIdActivo(): Long =
+        session.getLocalId() ?: throw IllegalStateException("No hay un local activo seleccionado")
 
     suspend fun getPendientes(androidId: String): Result<List<MermaPendiente>> {
-        val cacheadas = db.mermaDao().obtenerPendientes()
+        val localId = localIdActivo()
+        val cacheadas = db.mermaDao().obtenerPendientes(localId)
         if (cacheadas.isNotEmpty()) {
             if (NetworkMonitor.hayInternet(context)) refrescarDesdeServidor(androidId)
             return Result.success(cacheadas.map { it.toModel() })
@@ -31,11 +37,12 @@ class MermaRepository(
     }
 
     suspend fun refrescarDesdeServidor(androidId: String): Result<List<MermaPendiente>> {
+        val localId = localIdActivo()
         return try {
             val mermas = SupabaseClientProvider.client.postgrest
-                .rpc("get_mermas_pendientes", buildJsonObject { put("p_android_id", androidId) })
+                .rpc("get_mermas_pendientes", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
                 .decodeList<MermaPendiente>()
-            db.mermaDao().insertarTodas(mermas.map { it.toEntity() })
+            db.mermaDao().insertarTodas(mermas.map { it.toEntity(localId) })
             Result.success(mermas)
         } catch (e: Exception) {
             Result.failure(e)
@@ -44,15 +51,17 @@ class MermaRepository(
 
     /** El vendedor propone offline: queda visible como pendiente de inmediato, sin descontar stock. */
     suspend fun solicitar(androidId: String, productoId: Long, productoNombre: String, cantidad: Double, motivo: String): Result<Unit> {
+        val localId = localIdActivo()
         val idTemporal = -System.currentTimeMillis()
         db.mermaDao().insertarUna(
             org.luisito.gestor360.data.local.entities.MermaEntity(
                 id = idTemporal, productoId = productoId, productoNombre = productoNombre,
-                cantidad = cantidad, motivo = motivo, solicitadoPor = null, solicitadoPorNombre = null, estado = "pendiente"
+                cantidad = cantidad, motivo = motivo, solicitadoPor = null, solicitadoPorNombre = null,
+                estado = "pendiente", localId = localId
             )
         )
         val payload = buildJsonObject {
-            put("p_android_id", androidId); put("p_producto_id", productoId)
+            put("p_android_id", androidId); put("p_local_id", localId); put("p_producto_id", productoId)
             put("p_cantidad", cantidad); put("p_motivo", motivo)
         }
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "crear_merma", payloadJson = payload.toString(), idLocalTemporal = idTemporal))
@@ -70,10 +79,11 @@ class MermaRepository(
         if (!NetworkMonitor.hayInternet(context)) {
             return Result.failure(IllegalStateException("Necesitas conexión para aprobar o rechazar una merma"))
         }
+        val localId = localIdActivo()
         return try {
-            val params = buildJsonObject { put("p_android_id", androidId); put("p_merma_id", mermaId); put("p_estado", estado) }
+            val params = buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId); put("p_merma_id", mermaId); put("p_estado", estado) }
             SupabaseClientProvider.client.postgrest.rpc("resolver_merma", params)
-            db.mermaDao().actualizarEstado(mermaId, estado)
+            db.mermaDao().actualizarEstado(mermaId, estado, localId)
             //trazaRepository.registrar(androidId, "resolver_merma", "merma_id=$mermaId estado=$estado")
             Result.success(Unit)
         } catch (e: Exception) {

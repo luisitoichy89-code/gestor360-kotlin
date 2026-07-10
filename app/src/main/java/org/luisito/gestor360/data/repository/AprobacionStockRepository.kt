@@ -1,10 +1,13 @@
 package org.luisito.gestor360.data.repository
 
+import android.content.Context
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.luisito.gestor360.data.SupabaseClientProvider
+import org.luisito.gestor360.utils.AppContextHolder
+import org.luisito.gestor360.utils.SessionManager
 
 @Serializable
 data class AprobacionStock(
@@ -18,14 +21,19 @@ data class AprobacionStock(
     val venta_id: String? = null,
     val venta_total: Double? = null,
     val solicitado_por_nombre: String? = null,
+    val local_id: Long? = null,
     val created_at: String? = null
 )
 
-class AprobacionStockRepository {
+class AprobacionStockRepository(private val context: Context = AppContextHolder.context) {
+    private val session = SessionManager(context)
+    private fun localIdActivo(): Long =
+        session.getLocalId() ?: throw IllegalStateException("No hay un local activo seleccionado")
+
     suspend fun getPendientes(androidId: String): Result<List<AprobacionStock>> {
         return try {
             val response = SupabaseClientProvider.client.postgrest
-                .rpc("get_aprobaciones", buildJsonObject { put("p_android_id", androidId) })
+                .rpc("get_aprobaciones", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localIdActivo()) })
                 .decodeList<AprobacionStock>()
             Result.success(response)
         } catch (e: Exception) { Result.failure(e) }
@@ -34,7 +42,8 @@ class AprobacionStockRepository {
     suspend fun solicitarProducto(androidId: String, nombre: String, precio: Double, cantidad: Double): Result<Unit> {
         return try {
             SupabaseClientProvider.client.postgrest.rpc("solicitar_producto", buildJsonObject {
-                put("p_android_id", androidId); put("p_nombre", nombre); put("p_precio", precio); put("p_cantidad", cantidad)
+                put("p_android_id", androidId); put("p_local_id", localIdActivo())
+                put("p_nombre", nombre); put("p_precio", precio); put("p_cantidad", cantidad)
             })
             Result.success(Unit)
         } catch (e: Exception) { Result.failure(e) }
@@ -43,7 +52,8 @@ class AprobacionStockRepository {
     suspend fun solicitarAumento(androidId: String, productoId: Long, cantidad: Double): Result<Unit> {
         return try {
             SupabaseClientProvider.client.postgrest.rpc("solicitar_aumento_stock", buildJsonObject {
-                put("p_android_id", androidId); put("p_producto_id", productoId); put("p_cantidad", cantidad)
+                put("p_android_id", androidId); put("p_local_id", localIdActivo())
+                put("p_producto_id", productoId); put("p_cantidad", cantidad)
             })
             Result.success(Unit)
         } catch (e: Exception) { Result.failure(e) }
@@ -52,7 +62,8 @@ class AprobacionStockRepository {
     suspend fun solicitarAnularVenta(androidId: String, ventaId: String, ventaTotal: Double): Result<Unit> {
         return try {
             SupabaseClientProvider.client.postgrest.rpc("solicitar_anular_venta", buildJsonObject {
-                put("p_android_id", androidId); put("p_venta_id", ventaId); put("p_venta_total", ventaTotal)
+                put("p_android_id", androidId); put("p_local_id", localIdActivo())
+                put("p_venta_id", ventaId); put("p_venta_total", ventaTotal)
             })
             Result.success(Unit)
         } catch (e: Exception) { Result.failure(e) }
@@ -61,7 +72,8 @@ class AprobacionStockRepository {
     suspend fun resolver(androidId: String, id: Long, estado: String, aprobadoPor: Long): Result<Unit> {
         return try {
             SupabaseClientProvider.client.postgrest.rpc("resolver_aprobacion", buildJsonObject {
-                put("p_android_id", androidId); put("p_id", id); put("p_estado", estado); put("p_aprobado_por", aprobadoPor)
+                put("p_android_id", androidId); put("p_local_id", localIdActivo())
+                put("p_id", id); put("p_estado", estado); put("p_aprobado_por", aprobadoPor)
             })
             Result.success(Unit)
         } catch (e: Exception) { Result.failure(e) }

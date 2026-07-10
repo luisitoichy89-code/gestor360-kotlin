@@ -17,10 +17,10 @@ class TicketRepository {
         } catch (e: Exception) { Result.failure(e) }
     }
 
-    suspend fun getMensajes(ticketId: Long): Result<List<TicketMensaje>> {
+    suspend fun getMensajes(androidId: String, ticketId: Long): Result<List<TicketMensaje>> {
         return try {
             SupabaseClientProvider.client.postgrest
-                .rpc("get_ticket_mensajes", buildJsonObject { put("p_ticket_id", ticketId) })
+                .rpc("get_ticket_mensajes", buildJsonObject { put("p_android_id", androidId); put("p_ticket_id", ticketId) })
                 .decodeList<TicketMensaje>().let { Result.success(it) }
         } catch (e: Exception) { Result.failure(e) }
     }

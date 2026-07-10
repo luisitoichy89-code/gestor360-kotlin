@@ -2,13 +2,20 @@ package org.luisito.gestor360.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.local.AppDatabase
 import org.luisito.gestor360.data.models.Local
 import org.luisito.gestor360.data.repository.LocalRepository
+import org.luisito.gestor360.data.sync.NetworkMonitor
+import org.luisito.gestor360.data.sync.SyncWorker
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 
@@ -19,6 +26,15 @@ data class LocalSeleccionUiState(
     val error: String? = null
 )
 
+/**
+ * Dueño de la selección de "local activo". Es la ÚNICA vía por la que el
+ * local_id activo cambia: al elegir, lo persiste en SessionManager (fuente de
+ * verdad que leen TODOS los repositorios para armar p_local_id) y limpia el
+ * caché Room, porque el caché de Producto/Venta/Tarjeta/Merma/Turno queda
+ * filtrado por local_id y mezclar datos de dos locales en la misma tabla
+ * local sería exactamente el mismo bug que estamos arreglando, solo que
+ * offline.
+ */
 class LocalSeleccionViewModel(
     private val repository: LocalRepository = LocalRepository()
 ) : ViewModel() {
@@ -31,45 +47,55 @@ class LocalSeleccionViewModel(
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             repository.getLocales(androidId)
                 .onSuccess { lista ->
-                    val context = AppContextHolder.context
-                    val session = SessionManager(context)
-
-                    // Restaurar la selección guardada en sesión, o elegir la primera activa
-                    val savedLocalId = session.getLocalId()
-                    val actual = _uiState.value.localSeleccionado
-                        ?: lista.firstOrNull { it.id == savedLocalId }
+                    val sm = SessionManager(AppContextHolder.context)
+                    val idActivo = sm.getLocalId()
+                    val actual = lista.firstOrNull { it.id == idActivo }
                         ?: lista.firstOrNull { it.activo }
                         ?: lista.firstOrNull()
-
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         locales = lista,
                         localSeleccionado = actual
                     )
-
-                    // Aseguramos que la sesión esté actualizada con el local activo
-                    actual?.let { session.setLocalId(it.id) }
+                    // Si el dispositivo no tenía local_id guardado todavía (primer login
+                    // de un admin con varios locales), se fija el default recién resuelto.
+                    if (idActivo == null && actual != null) {
+                        sm.setLocalId(actual.id)
+                    }
                 }
-                .onFailure { e ->
-                    _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
-                }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.message) }
         }
     }
 
-    /**
-     * El admin cambió de local.
-     * 1. Actualiza la sesión → ProductRepository filtrará por el nuevo local_id.
-     * 2. Limpia el caché de productos → la próxima lectura trae del servidor.
-     * Las pantallas de productos/ventas deben observar localSeleccionado y
-     * recargar cuando cambie (LaunchedEffect con localId como key).
-     */
     fun seleccionar(local: Local) {
         _uiState.value = _uiState.value.copy(localSeleccionado = local)
         val context = AppContextHolder.context
-        SessionManager(context).setLocalId(local.id)
+        val sm = SessionManager(context)
+        sm.setLocalId(local.id)
+
         viewModelScope.launch {
-            // Limpiar caché de productos para forzar recarga filtrada por nuevo local
-            AppDatabase.obtener(context).productoDao().limpiar()
+            // El caché local está filtrado por local_id: al cambiar de local activo,
+            // se limpia para no mezclar (ni mostrar por un instante) datos del local anterior.
+            val db = AppDatabase.obtener(context)
+            db.productoDao().limpiar()
+            db.tarjetaDao().limpiar()
+            db.mermaDao().limpiarTodas()
+            db.turnoDao().limpiarTodos()
+            db.ventaDao().limpiarSincronizadas()
+
+            if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
+
+            // Registro informativo en el servidor (auditoría / soporte), no es la fuente
+            // de verdad — si falla o el dispositivo está offline, el cambio de local ya
+            // quedó aplicado igual porque vive en SessionManager.
+            try {
+                SupabaseClientProvider.client.postgrest
+                    .from("local_seleccion_context")
+                    .upsert(buildJsonObject {
+                        put("android_id", sm.getAndroidId())
+                        put("local_id", local.id)
+                    })
+            } catch (_: Exception) { }
         }
     }
 }
