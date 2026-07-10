@@ -27,7 +27,13 @@ import org.luisito.gestor360.data.local.entities.VentaEntity
         TurnoEntity::class, TarjetaEntity::class, MermaEntity::class,
         UserEntity::class, LocalEntity::class
     ],
-    version = 4,
+    // v5: PK compuesta (id, localId) en Producto/Merma/Turno/Tarjeta — antes la PK
+    // era solo "id" y el caché de dos locales con ids de servidor repetidos se
+    // pisaba entre sí (ver comentarios en esas entidades). fallbackToDestructiveMigration
+    // recrea las tablas de caché en el próximo arranque; no hay pérdida real porque
+    // todo esto se resincroniza del servidor (y las acciones pendientes sin
+    // sincronizar viven en AccionPendienteEntity, que no cambió).
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

@@ -1,12 +1,12 @@
 package org.luisito.gestor360.data.local.entities
 
 import androidx.room.Entity
-import androidx.room.PrimaryKey
 import org.luisito.gestor360.data.models.Turno
 
-@Entity(tableName = "turno_cache")
+/** PK compuesta (id, localId): mismo motivo que ProductoEntity. */
+@Entity(tableName = "turno_cache", primaryKeys = ["id", "localId"])
 data class TurnoEntity(
-    @PrimaryKey val id: Long,
+    val id: Long,
     val usuarioId: Long?,
     val apertura: Double,
     val cierre: Double?,

@@ -1,12 +1,12 @@
 package org.luisito.gestor360.data.local.entities
 
 import androidx.room.Entity
-import androidx.room.PrimaryKey
 import org.luisito.gestor360.data.models.MermaPendiente
 
-@Entity(tableName = "mermas_cache")
+/** PK compuesta (id, localId): mismo motivo que ProductoEntity. */
+@Entity(tableName = "mermas_cache", primaryKeys = ["id", "localId"])
 data class MermaEntity(
-    @PrimaryKey val id: Long,
+    val id: Long,
     val productoId: Long,
     val productoNombre: String,
     val cantidad: Double,
