@@ -24,14 +24,6 @@ import java.time.format.DateTimeFormatter
 
 private const val VENTAS_POR_PAGINA = 20
 
-/**
- * "Inventario" (antes "Cierre de caja"): la hoja completa de un día operativo
- * de este local. No hay botón de "abrir turno" — el primer registro del día
- * (una venta, un producto nuevo, una merma...) lo abre solo en el servidor
- * (fn_asegurar_turno_abierto). Lo único manual acá es "Cerrar turno", y solo
- * para el día de hoy. Para días anteriores, con el botón de calendario, la
- * pantalla queda en solo lectura (y solo un admin puede pedirlos).
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InventarioScreen(androidId: String, rol: String, onBack: (() -> Unit)? = null, viewModel: InventarioViewModel = viewModel()) {
@@ -60,7 +52,6 @@ fun InventarioScreen(androidId: String, rol: String, onBack: (() -> Unit)? = nul
                 title = { Text("Inventario", fontWeight = FontWeight.Bold) },
                 navigationIcon = { if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null) } },
                 actions = {
-                    // Botón pequeño de búsqueda: abre el almanaque para elegir el día a revisar.
                     IconButton(onClick = { mostrarDatePicker = true }) { Icon(Icons.Default.CalendarMonth, "Elegir día") }
                     IconButton(onClick = { viewModel.refrescar() }) { Icon(Icons.Default.Refresh, null) }
                     if (dia != null && ventasNoAnuladas.isNotEmpty()) {
@@ -85,31 +76,30 @@ fun InventarioScreen(androidId: String, rol: String, onBack: (() -> Unit)? = nul
             uiState.error != null -> EstadoError(uiState.error ?: "Error") { viewModel.refrescar() }
             dia == null -> EstadoVacio("Sin datos")
             else -> LazyColumn(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-
                 item { EncabezadoDia(uiState.fecha, formatter, dia.solo_lectura) }
-
                 item { TurnoCard(dia.turno, uiState.esHoy && !dia.solo_lectura, uiState.isSaving, onCerrar = { mostrarCerrarTurno = true }) }
-
                 item { SeccionTitulo("Productos nuevos", Icons.Default.AddBox) }
                 if (dia.productos_nuevos.isEmpty()) item { TextoVacioSeccion("Sin productos nuevos este día") }
                 items(dia.productos_nuevos, key = { "pn_${it.id}" }) { p -> ProductoInfoRow(p) }
-
                 item { SeccionTitulo("Productos modificados", Icons.Default.Edit) }
                 if (dia.productos_modificados.isEmpty()) item { TextoVacioSeccion("Sin productos modificados este día") }
                 items(dia.productos_modificados, key = { "pm_${it.id}" }) { p -> ProductoInfoRow(p) }
-
                 item { SeccionTitulo("Devueltos", Icons.Default.AssignmentReturn) }
                 if (dia.devueltos.isEmpty()) item { TextoVacioSeccion("Sin devoluciones este día") }
                 items(dia.devueltos, key = { "dv_${it.id}" }) { d -> DevueltoInfoRow(d) }
-
-                // A partir de acá sí van los montos de dinero — arriba, a propósito, no.
                 item { Spacer(Modifier.height(4.dp)); Divider(); Spacer(Modifier.height(4.dp)) }
                 item { SeccionTitulo("Ventas", Icons.Default.PointOfSale) }
                 item { TotalesVentasCard(dia.totales_ventas) }
                 if (ventasNoAnuladas.isEmpty()) item { TextoVacioSeccion("Sin ventas este día") }
                 items(ventasPagina, key = { "vt_${it.id}" }) { v -> VentaInfoRow(v) }
-                if (ventasNoAnuladas.isNotEmpty()) item { Paginador(paginaSegura, totalPaginasVentas) { paginaVentas = it } }
-
+                if (ventasNoAnuladas.isNotEmpty()) item {
+                    PaginacionBar(
+                        pagina = paginaSegura,
+                        totalPaginas = totalPaginasVentas,
+                        onPaginaAnterior = { paginaVentas = paginaSegura - 1 },
+                        onPaginaSiguiente = { paginaVentas = paginaSegura + 1 }
+                    )
+                }
                 item { Spacer(Modifier.height(56.dp)) }
             }
         }
@@ -149,7 +139,6 @@ fun InventarioScreen(androidId: String, rol: String, onBack: (() -> Unit)? = nul
     }
 }
 
-/** Efectivo que debería haber en caja: apertura + efectivo de ventas + parte en efectivo de las mixtas. */
 private fun InventarioDia.totalEsperadoEnCaja(): Double = totales_ventas.efectivo
 
 @Composable
@@ -215,7 +204,6 @@ private fun TextoVacioSeccion(texto: String) {
     Text(texto, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 26.dp))
 }
 
-/** Fecha + quién (nombre y rol) hizo cada cosa: reemplaza a lo que antes mostraba la pantalla de Trazas. */
 @Composable
 private fun FilaConRol(etiqueta: String, nombre: String?, rol: String?, fecha: String?) {
     Text(
