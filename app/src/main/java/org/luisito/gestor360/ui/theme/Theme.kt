@@ -4,9 +4,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-private val AzulCorporativo = Color(0xFF1E3A8A)
-private val AzulSecundario = Color(0xFF2563EB)
-private val AzulClaro = Color(0xFFEAF2FF)
+// Verde clarito: fondo general más suave, relleno (tarjetas/botones) un
+// escalón más fuerte para que se distinga del fondo sin perder legibilidad.
+private val VerdeFondo = Color(0xFFEAF7EC)
+private val VerdeRelleno = Color(0xFFBFE6C4)
+private val VerdeBoton = Color(0xFFA3DBA9)
 private val Gris900 = Color(0xFF111827)
 private val Gris800 = Color(0xFF1F2937)
 private val Gris700 = Color(0xFF374151)
@@ -19,20 +21,20 @@ private val VerdeExito = Color(0xFF16A34A)
 private val RojoError = Color(0xFFDC2626)
 
 private val LightColorScheme = lightColorScheme(
-    primary = AzulCorporativo,
-    onPrimary = Blanco,
-    primaryContainer = AzulClaro,
-    onPrimaryContainer = AzulCorporativo,
+    primary = VerdeBoton,
+    onPrimary = Gris900,
+    primaryContainer = VerdeRelleno,
+    onPrimaryContainer = Gris900,
     secondary = Gris700,
     onSecondary = Blanco,
-    tertiary = AzulSecundario,
-    onTertiary = Blanco,
-    background = Gris50,
+    tertiary = VerdeBoton,
+    onTertiary = Gris900,
+    background = VerdeFondo,
     onBackground = Gris900,
     surface = Blanco,
     onSurface = Gris900,
-    surfaceVariant = Gris100,
-    onSurfaceVariant = Gris700,
+    surfaceVariant = VerdeRelleno,
+    onSurfaceVariant = Gris900,
     error = RojoError,
     onError = Blanco
 )

@@ -40,12 +40,12 @@ fun DashboardScreen(
     val secciones = buildList {
         add(SeccionDashboard("Ventas", Icons.Default.PointOfSale, "ventas"))
         add(SeccionDashboard("Productos", Icons.Default.Inventory2, "productos"))
-        add(SeccionDashboard("Cierre de Caja", Icons.Default.ReceiptLong, "cierrecaja"))
+        add(SeccionDashboard("Inventario", Icons.Default.ReceiptLong, "inventario"))
         if (esAdmin) {
             add(SeccionDashboard("Tarjetas", Icons.Default.CreditCard, "tarjetas"))
             add(SeccionDashboard("Aprobaciones", Icons.Default.FactCheck, "aprobaciones"))
             add(SeccionDashboard("@soporte", Icons.Default.HeadsetMic, "soporte"))
-            add(SeccionDashboard("Trazas", Icons.Default.History, "trazas"))
+            add(SeccionDashboard("Devolución", Icons.Default.AssignmentReturn, "devolucion"))
         }
     }
 

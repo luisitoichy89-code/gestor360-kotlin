@@ -103,3 +103,21 @@ fun ConfirmarEliminarDialog(nombre: String, onConfirm: () -> Unit, onDismiss: ()
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
     )
 }
+
+@Composable
+fun Paginador(paginaActual: Int, totalPaginas: Int, onCambiarPagina: (Int) -> Unit) {
+    if (totalPaginas <= 1) return
+    androidx.compose.foundation.layout.Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = { if (paginaActual > 0) onCambiarPagina(paginaActual - 1) }, enabled = paginaActual > 0) {
+            Icon(androidx.compose.material.icons.Icons.Default.ChevronLeft, "Anterior")
+        }
+        Text("${paginaActual + 1} / $totalPaginas", style = MaterialTheme.typography.bodyMedium)
+        IconButton(onClick = { if (paginaActual < totalPaginas - 1) onCambiarPagina(paginaActual + 1) }, enabled = paginaActual < totalPaginas - 1) {
+            Icon(androidx.compose.material.icons.Icons.Default.ChevronRight, "Siguiente")
+        }
+    }
+}

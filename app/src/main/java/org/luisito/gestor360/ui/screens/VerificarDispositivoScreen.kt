@@ -83,7 +83,7 @@ fun VerificarDispositivoScreen(onDispositivoAutorizado: (User) -> Unit, viewMode
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Image(painterResource(R.drawable.gestor360_logo_bandera), "Gestor360", Modifier.size(80.dp))
+            Image(painterResource(R.drawable.logo_splash), "Gestor360", Modifier.size(80.dp))
             Spacer(Modifier.height(16.dp))
             Text("Gestor360", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Text("Verificación de dispositivo requerida", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

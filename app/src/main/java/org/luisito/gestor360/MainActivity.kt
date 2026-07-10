@@ -49,8 +49,8 @@ private sealed class PantallaInterna {
     object Tarjetas : PantallaInterna()
     object Aprobaciones : PantallaInterna()
     object TicketsSoporte : PantallaInterna()
-    object CierreCaja : PantallaInterna()
-    object Trazas : PantallaInterna()
+    object Inventario : PantallaInterna()
+    object Devolucion : PantallaInterna()
     object Conflictos : PantallaInterna()
 }
 
@@ -150,11 +150,11 @@ fun Gestor360App() {
                                 pantalla = when (ruta) {
                                     "ventas" -> PantallaInterna.Ventas
                                     "productos" -> PantallaInterna.Productos
-                                    "cierrecaja" -> PantallaInterna.CierreCaja
+                                    "inventario" -> PantallaInterna.Inventario
                                     "tarjetas" -> if (esAdmin) PantallaInterna.Tarjetas else PantallaInterna.Home
                                     "aprobaciones" -> if (esAdmin) PantallaInterna.Aprobaciones else PantallaInterna.Home
                                     "soporte" -> PantallaInterna.TicketsSoporte
-                                    "trazas" -> if (esAdmin) PantallaInterna.Trazas else PantallaInterna.Home
+                                    "devolucion" -> if (esAdmin) PantallaInterna.Devolucion else PantallaInterna.Home
                                     else -> PantallaInterna.Home
                                 }
                             },
@@ -171,11 +171,11 @@ fun Gestor360App() {
                         onVentaConfirmada = { pantalla = PantallaInterna.Ventas }
                     )
                     is PantallaInterna.Productos -> ProductosScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home })
-                    is PantallaInterna.CierreCaja -> CierreCajaScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
+                    is PantallaInterna.Inventario -> InventarioScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home })
                     is PantallaInterna.Tarjetas -> if (esAdmin) TarjetasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
-                    is PantallaInterna.Aprobaciones -> if (esAdmin) AprobacionesScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
+                    is PantallaInterna.Aprobaciones -> if (esAdmin) AprobacionesScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
                     is PantallaInterna.TicketsSoporte -> TicketsClienteScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
-                    is PantallaInterna.Trazas -> if (esAdmin) TrazasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
+                    is PantallaInterna.Devolucion -> if (esAdmin) DevolucionScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
                     is PantallaInterna.Conflictos -> ConflictosScreen(onBack = { pantalla = PantallaInterna.Home })
                 }
             }

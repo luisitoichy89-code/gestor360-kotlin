@@ -11,6 +11,7 @@ import org.luisito.gestor360.data.repository.AprobacionStockRepository
 
 data class AprobacionStockUiState(
     val isLoading: Boolean = false,
+    val isSaving: Boolean = false,
     val pendientes: List<AprobacionStock> = emptyList(),
     val mensaje: String? = null,
     val error: String? = null
@@ -33,27 +34,29 @@ class AprobacionStockViewModel(
         }
     }
 
-    fun solicitarProducto(nombre: String, precio: Double, cantidad: Double) {
+    fun solicitarProducto(androidId: String, nombre: String, precio: Double, cantidad: Double) {
         viewModelScope.launch {
-            repository.solicitarProducto(androidIdActual, nombre, precio, cantidad)
-                .onSuccess { _uiState.value = _uiState.value.copy(mensaje = "Producto enviado a aprobación"); cargar(androidIdActual) }
-                .onFailure { _uiState.value = _uiState.value.copy(error = it.message) }
+            repository.solicitarProducto(androidId, nombre, precio, cantidad)
+                .onSuccess { _uiState.value = _uiState.value.copy(mensaje = "Producto enviado a aprobación"); cargar(androidId) }
+                .onFailure { _uiState.value = _uiState.value.copy(error = it.message ?: "No se pudo enviar la solicitud") }
         }
     }
 
-    fun solicitarAumento(productoId: Long, cantidad: Double) {
+    fun solicitarAumento(androidId: String, productoId: Long, cantidad: Double) {
         viewModelScope.launch {
-            repository.solicitarAumento(androidIdActual, productoId, cantidad)
-                .onSuccess { _uiState.value = _uiState.value.copy(mensaje = "Aumento enviado a aprobación"); cargar(androidIdActual) }
-                .onFailure { _uiState.value = _uiState.value.copy(error = it.message) }
+            repository.solicitarAumento(androidId, productoId, cantidad)
+                .onSuccess { _uiState.value = _uiState.value.copy(mensaje = "Aumento enviado a aprobación"); cargar(androidId) }
+                .onFailure { _uiState.value = _uiState.value.copy(error = it.message ?: "No se pudo enviar la solicitud") }
         }
     }
 
     fun resolver(id: Long, estado: String, aprobadoPor: Long) {
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             repository.resolver(androidIdActual, id, estado, aprobadoPor)
                 .onSuccess { cargar(androidIdActual) }
                 .onFailure { _uiState.value = _uiState.value.copy(error = it.message) }
+            _uiState.value = _uiState.value.copy(isSaving = false)
         }
     }
 

@@ -20,9 +20,14 @@ import kotlin.math.round
 
 data class TopVendido(val nombre: String, val total: Double)
 
+/**
+ * Offline-first. registrar_venta inserta UN producto por llamada (no el
+ * carrito completo) y "ventas" no guarda producto_nombre — solo producto_id.
+ * Todo va filtrado/etiquetado con el local_id activo (SessionManager).
+ */
 class SaleRepository(
     private val context: Context = AppContextHolder.context,
-    private val productRepository: ProductRepository = ProductRepository(context)
+    private val productRepository: ProductRepository = ProductRepository(context),
 ) {
     private val db = AppDatabase.obtener(context)
     private val session = SessionManager(context)
@@ -32,6 +37,11 @@ class SaleRepository(
 
     data class DatosCliente(val ci: String, val telefono: String, val nombre: String, val banco: String)
 
+    /**
+     * Guarda local YA (stock descontado al instante + fila de venta visible de
+     * inmediato) y encola una acción por cada producto del carrito. Si hay
+     * internet, dispara sincronización en el momento; si no, queda pendiente.
+     */
     suspend fun guardarVenta(
         androidId: String, carrito: List<CartItem>, metodo: String,
         montoEfectivo: Double, montoTransferencia: Double, cliente: DatosCliente? = null
@@ -47,6 +57,7 @@ class SaleRepository(
                 val efectivoItem = round(montoEfectivo * ratio * 100) / 100
                 val transferenciaItem = round(montoTransferencia * ratio * 100) / 100
 
+                // 1. Aplicar YA en local: baja el stock cacheado y agrega la venta a la vista.
                 productRepository.descontarStockLocal(item.productId, item.cantidad)
                 val ventaLocal = Sale(
                     id = null, producto_id = item.productId, cantidad = item.cantidad, total = item.subtotal,
@@ -56,6 +67,7 @@ class SaleRepository(
                 )
                 db.ventaDao().insertarUna(ventaLocal.toEntity(localId, sincronizada = false))
 
+                // 2. Encolar la llamada real para cuando haya internet.
                 val payload = buildJsonObject {
                     put("p_android_id", androidId); put("p_local_id", localId); put("p_producto_id", item.productId)
                     put("p_cantidad", item.cantidad); put("p_total", item.subtotal)
@@ -64,7 +76,7 @@ class SaleRepository(
                 }
                 db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "registrar_venta", payloadJson = payload.toString()))
             } catch (_: Exception) {
-                // Si un item falla, continuar con los demás
+                // Si un item falla, continuar con los demás en vez de abortar toda la venta.
             }
         }
 
@@ -72,6 +84,11 @@ class SaleRepository(
         return Result.success(Unit)
     }
 
+    /**
+     * Anular una venta necesita internet sí o sí (no tiene sentido encolarla:
+     * si el dispositivo está offline es porque la venta a anular tampoco se
+     * sincronizó todavía).
+     */
     suspend fun anularVenta(androidId: String, ventaId: String): Result<Unit> {
         if (!NetworkMonitor.hayInternet(context)) {
             return Result.failure(IllegalStateException("Necesitas conexión para anular una venta"))
@@ -88,6 +105,7 @@ class SaleRepository(
         }
     }
 
+    /** Lee del caché local primero (ya filtrado por local); refresca de fondo si hay internet. */
     suspend fun getSales(androidId: String): Result<List<Sale>> {
         val localId = localIdActivo()
         val cacheadas = db.ventaDao().obtenerTodas(localId)
@@ -98,6 +116,7 @@ class SaleRepository(
             val ventas = SupabaseClientProvider.client.postgrest
                 .rpc("get_ventas", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
                 .decodeList<Sale>()
+            // No se borra el caché entero aquí: podría haber ventas locales sin sincronizar todavía.
             db.ventaDao().insertarTodas(ventas.map { it.toEntity(localId, sincronizada = true) })
             Result.success((cacheadas.map { it.toModel() } + ventas).distinctBy { it.id ?: it.hashCode().toString() })
         } catch (e: Exception) {
@@ -105,6 +124,7 @@ class SaleRepository(
         }
     }
 
+    /** ventas + nombre de producto ya resuelto (join en memoria contra productos). */
     suspend fun getSalesConNombre(androidId: String): Result<List<Pair<Sale, String>>> {
         return try {
             val ventas = getSales(androidId).getOrThrow()

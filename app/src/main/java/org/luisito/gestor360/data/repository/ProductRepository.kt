@@ -18,6 +18,17 @@ import org.luisito.gestor360.data.sync.SyncWorker
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 
+/**
+ * Offline-first: lee siempre de Room primero (nunca bloquea esperando la red).
+ * Crear/editar/eliminar se aplican al instante en el caché local y se encolan
+ * en "acciones_pendientes"; si hay internet se dispara una sincronización de
+ * inmediato, pero aunque falle, la acción ya quedó guardada para reintentarse
+ * después (WorkManager o el botón "Sincronizar ahora").
+ *
+ * TODO lo que toca el servidor o el caché va filtrado por local_id, leído de
+ * SessionManager en el momento (nunca cacheado), porque el local activo puede
+ * cambiar en caliente si el usuario es admin de varios locales.
+ */
 class ProductRepository(
     private val context: Context = AppContextHolder.context
 ) {
@@ -39,6 +50,7 @@ class ProductRepository(
         return refrescarDesdeServidor(androidId)
     }
 
+    /** Trae la verdad del servidor (ya filtrada por local_id) y reemplaza el caché de ese local. */
     suspend fun refrescarDesdeServidor(androidId: String): Result<List<Product>> {
         val localId = localIdActivo()
         return try {
@@ -65,6 +77,7 @@ class ProductRepository(
         ubicacion: String, categoria: String
     ): Result<Unit> {
         val localId = localIdActivo()
+        // Id temporal negativo para que se pueda mostrar en la lista antes de sincronizar.
         val idTemporal = -(System.currentTimeMillis() * 1000 + (Math.random() * 1000).toLong())
         val producto = Product(idTemporal, nombre, precio, stock, ubicacion, categoria, localId)
         db.productoDao().insertarUno(producto.toEntity(localId))
@@ -106,6 +119,7 @@ class ProductRepository(
         return Result.success(Unit)
     }
 
+    /** Descuento optimista de stock local, usado por SaleRepository al vender offline. */
     suspend fun descontarStockLocal(id: Long, cantidad: Double) {
         db.productoDao().descontarStock(id, cantidad, localIdActivo())
     }
