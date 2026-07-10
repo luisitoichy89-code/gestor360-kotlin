@@ -1,11 +1,15 @@
 package org.luisito.gestor360.data.repository
 
+import android.content.Context
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.luisito.gestor360.data.SupabaseClientProvider
+import org.luisito.gestor360.data.local.AppDatabase
+import org.luisito.gestor360.data.local.UserEntity
 import org.luisito.gestor360.data.models.User
+import org.luisito.gestor360.utils.AppContextHolder
 import java.time.LocalDate
 
 sealed class VerificacionResultado {
@@ -14,15 +18,20 @@ sealed class VerificacionResultado {
     object UsuarioInactivo : VerificacionResultado()
     data class LicenciaVencida(val diasVencida: Long) : VerificacionResultado()
     object LicenciaInactiva : VerificacionResultado()
+    object SinConexionPrimerInicio : VerificacionResultado()
     data class Error(val mensaje: String) : VerificacionResultado()
 }
 
 @Serializable
 private data class LicenciaFila(val cliente_id: String, val activo: Boolean, val expiracion: String)
 
-class DeviceVerificationRepository {
+class DeviceVerificationRepository(
+    private val context: Context = AppContextHolder.context
+) {
+    private val db = AppDatabase.obtener(context)
 
     suspend fun verificar(androidId: String): VerificacionResultado {
+        // 1. Intentar online
         return try {
             val usuarios = SupabaseClientProvider.client.postgrest.rpc(
                 "get_usuarios", buildJsonObject { put("p_android_id", androidId) }
@@ -42,8 +51,34 @@ class DeviceVerificationRepository {
                 val diasVencida = java.time.temporal.ChronoUnit.DAYS.between(expiracion, hoy)
                 return VerificacionResultado.LicenciaVencida(diasVencida)
             }
+
+            // Guardar en Room para acceso offline
+            db.userDao().insertar(UserEntity(
+                id = usuario.android_id ?: androidId,
+                authId = usuario.auth_id ?: "",
+                username = usuario.username,
+                nombre = usuario.nombre,
+                rol = usuario.rol,
+                localId = usuario.local_id ?: 0L,
+                activo = usuario.activo
+            ))
+
             VerificacionResultado.Autorizado(usuario)
-        } catch (e: Exception) { VerificacionResultado.Error(e.message ?: "Error") }
+        } catch (e: Exception) {
+            // 2. Offline: cargar desde Room
+            val userLocal = db.userDao().obtenerPorId(androidId)
+            if (userLocal != null) {
+                val usuario = User(
+                    id = 0L, auth_id = userLocal.authId, cliente_id = "",
+                    username = userLocal.username, nombre = userLocal.nombre,
+                    rol = userLocal.rol, pin = null, android_id = userLocal.id,
+                    local_id = userLocal.localId, activo = userLocal.activo
+                )
+                VerificacionResultado.Autorizado(usuario)
+            } else {
+                VerificacionResultado.SinConexionPrimerInicio
+            }
+        }
     }
 
     fun validarPin(usuario: User, pin: String): Boolean = usuario.pin == pin

@@ -22,9 +22,10 @@ import org.luisito.gestor360.data.local.entities.VentaEntity
 @Database(
     entities = [
         ProductoEntity::class, AccionPendienteEntity::class, VentaEntity::class, ConflictoEntity::class,
-        TurnoEntity::class, TarjetaEntity::class, MermaEntity::class
+        TurnoEntity::class, TarjetaEntity::class, MermaEntity::class,
+        UserEntity::class
     ],
-    version = 3, // v3: se agrega localId a productos/ventas/tarjetas/mermas/turnos (aislamiento por local)
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -35,6 +36,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun turnoDao(): TurnoDao
     abstract fun tarjetaDao(): TarjetaDao
     abstract fun mermaDao(): MermaDao
+    abstract fun userDao(): UserDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
