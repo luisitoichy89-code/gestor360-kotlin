@@ -57,6 +57,7 @@ class DeviceVerificationRepository(
                 username = usuario.username,
                 nombre = usuario.nombre,
                 rol = usuario.rol,
+                pin = usuario.pin,
                 localId = usuario.local_id,
                 activo = usuario.activo
             ))
@@ -68,7 +69,7 @@ class DeviceVerificationRepository(
                 val usuario = User(
                     id = 0L, auth_id = userLocal.authId, cliente_id = "",
                     username = userLocal.username, nombre = userLocal.nombre,
-                    rol = userLocal.rol, pin = null, android_id = userLocal.id,
+                    rol = userLocal.rol, pin = userLocal.pin, android_id = userLocal.id,
                     local_id = userLocal.localId, activo = userLocal.activo
                 )
                 VerificacionResultado.Autorizado(usuario)
