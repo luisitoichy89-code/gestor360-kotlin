@@ -40,11 +40,10 @@ class MermaRepository(
             val mermas = SupabaseClientProvider.client.postgrest
                 .rpc("get_mermas_pendientes", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
                 .decodeList<MermaPendiente>()
-            db.mermaDao().insertarTodas(mermas.map { it.toEntity() })
+            db.mermaDao().insertarTodas(mermas.map { it.toEntity(localId) })
             Result.success(mermas)
         } catch (e: Exception) {
-            val cacheadas = db.mermaDao().obtenerPendientes(localId)
-            if (cacheadas.isNotEmpty()) Result.success(cacheadas.map { it.toModel() }) else Result.failure(e)
+            Result.failure(e)
         }
     }
 
@@ -54,8 +53,8 @@ class MermaRepository(
         db.mermaDao().insertarUna(
             org.luisito.gestor360.data.local.entities.MermaEntity(
                 id = idTemporal, productoId = productoId, productoNombre = productoNombre,
-                cantidad = cantidad, motivo = motivo, solicitadoPor = null, solicitadoPorNombre = null, estado = "pendiente",
-                localId = localId
+                cantidad = cantidad, motivo = motivo, solicitadoPor = null, solicitadoPorNombre = null,
+                estado = "pendiente", localId = localId
             )
         )
         val payload = buildJsonObject {

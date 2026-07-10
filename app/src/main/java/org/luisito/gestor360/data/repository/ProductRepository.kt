@@ -46,11 +46,10 @@ class ProductRepository(
                 .rpc("get_productos", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
                 .decodeList<Product>()
             db.productoDao().limpiarDeLocal(localId)
-            db.productoDao().insertarTodos(productos.map { it.toEntity() })
+            db.productoDao().insertarTodos(productos.map { it.toEntity(localId) })
             Result.success(productos)
         } catch (e: Exception) {
-            val cacheados = db.productoDao().obtenerTodos(localId)
-            if (cacheados.isNotEmpty()) Result.success(cacheados.map { it.toModel() }) else Result.failure(e)
+            Result.failure(e)
         }
     }
 
@@ -63,12 +62,12 @@ class ProductRepository(
 
     suspend fun createProduct(
         androidId: String, nombre: String, precio: Double, stock: Double,
-        ubicacion: String, categoria: String, localIdParam: Long? = null
+        ubicacion: String, categoria: String
     ): Result<Unit> {
-        val localId = localIdParam ?: localIdActivo()
+        val localId = localIdActivo()
         val idTemporal = -(System.currentTimeMillis() * 1000 + (Math.random() * 1000).toLong())
         val producto = Product(idTemporal, nombre, precio, stock, ubicacion, categoria, localId)
-        db.productoDao().insertarUno(producto.toEntity())
+        db.productoDao().insertarUno(producto.toEntity(localId))
 
         val payload = buildJsonObject {
             put("p_android_id", androidId); put("p_local_id", localId); put("p_nombre", nombre); put("p_precio", precio)
@@ -108,8 +107,7 @@ class ProductRepository(
     }
 
     suspend fun descontarStockLocal(id: Long, cantidad: Double) {
-        val localId = localIdActivo()
-        db.productoDao().descontarStock(id, cantidad, localId)
+        db.productoDao().descontarStock(id, cantidad, localIdActivo())
     }
 
     private suspend fun encolarYSincronizar(androidId: String, tipo: String, payload: kotlinx.serialization.json.JsonObject, idTemporal: Long? = null) {

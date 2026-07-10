@@ -45,14 +45,15 @@ class TarjetaRepository(
             val tarjetas = SupabaseClientProvider.client.postgrest
                 .rpc("get_tarjetas", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
                 .decodeList<Tarjeta>()
-            db.tarjetaDao().limpiarLocal(localId)
+            db.tarjetaDao().limpiar()
             db.tarjetaDao().insertarTodas(tarjetas.map { it.toEntity(localId) })
             Result.success(tarjetas)
         } catch (e: Exception) {
-            val cacheadas = db.tarjetaDao().obtenerTodas(localId)
-            if (cacheadas.isNotEmpty()) Result.success(cacheadas.map { it.toModel() }) else Result.failure(e)
+            Result.failure(e)
         }
     }
+
+    suspend fun limpiarCache() { db.tarjetaDao().limpiar() }
 
     suspend fun crearTarjeta(androidId: String, banco: String, numero: String, titular: String): Result<Unit> {
         val localId = localIdActivo()
@@ -71,9 +72,10 @@ class TarjetaRepository(
         if (!NetworkMonitor.hayInternet(context)) return Result.failure(IllegalStateException("Necesitas conexión para editar una tarjeta"))
         val localId = localIdActivo()
         return try {
-            SupabaseClientProvider.client.postgrest.rpc(
-                "editar_tarjeta", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id); put("p_banco", banco); put("p_numero", numero); put("p_titular", titular) }
-            )
+            val params = buildJsonObject {
+                put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id); put("p_banco", banco); put("p_numero", numero); put("p_titular", titular)
+            }
+            SupabaseClientProvider.client.postgrest.rpc("editar_tarjeta", params)
             db.tarjetaDao().insertarUna(TarjetaEntity(id, banco, numero, titular, activo = true, localId = localId))
             Result.success(Unit)
         } catch (e: Exception) {
