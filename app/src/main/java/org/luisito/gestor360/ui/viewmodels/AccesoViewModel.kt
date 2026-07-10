@@ -38,6 +38,8 @@ class AccesoViewModel(
                     _uiState.value = _uiState.value.copy(verificando = false, mensajeError = "La licencia del negocio no está activa. Contacta al admin.")
                 is VerificacionResultado.LicenciaVencida ->
                     _uiState.value = _uiState.value.copy(verificando = false, mensajeError = "La licencia del negocio venció hace ${resultado.diasVencida} días. Debe renovarse para continuar.")
+                is VerificacionResultado.SinConexionPrimerInicio ->
+                    _uiState.value = _uiState.value.copy(verificando = false, mensajeError = "Primer inicio requiere conexión a internet.")
                 is VerificacionResultado.Error ->
                     _uiState.value = _uiState.value.copy(verificando = false, mensajeError = resultado.mensaje)
             }
