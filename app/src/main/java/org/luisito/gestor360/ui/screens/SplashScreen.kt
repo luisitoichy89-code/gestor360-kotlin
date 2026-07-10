@@ -27,7 +27,7 @@ fun SplashScreen(onFinished: () -> Unit) {
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFFA3DBA9)), contentAlignment = Alignment.Center) {
         Image(
-            painter = painterResource(R.drawable.logo_splash),
+            painter = painterResource(R.drawable.gestor360_logo_bandera),
             contentDescription = "Gestor360",
             modifier = Modifier.size(180.dp),
             contentScale = ContentScale.Fit
