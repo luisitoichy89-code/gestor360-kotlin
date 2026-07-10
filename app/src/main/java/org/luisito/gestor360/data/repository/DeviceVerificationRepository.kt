@@ -31,7 +31,6 @@ class DeviceVerificationRepository(
     private val db = AppDatabase.obtener(context)
 
     suspend fun verificar(androidId: String): VerificacionResultado {
-        // 1. Intentar online
         return try {
             val usuarios = SupabaseClientProvider.client.postgrest.rpc(
                 "get_usuarios", buildJsonObject { put("p_android_id", androidId) }
@@ -52,21 +51,19 @@ class DeviceVerificationRepository(
                 return VerificacionResultado.LicenciaVencida(diasVencida)
             }
 
-            // Guardar en Room para acceso offline
-            db.userDao().insertar(UserEntity(
+            db.userDao().insertUser(UserEntity(
                 id = usuario.android_id ?: androidId,
                 authId = usuario.auth_id ?: "",
                 username = usuario.username,
                 nombre = usuario.nombre,
                 rol = usuario.rol,
-                localId = usuario.local_id ?: 0L,
+                localId = usuario.local_id,
                 activo = usuario.activo
             ))
 
             VerificacionResultado.Autorizado(usuario)
         } catch (e: Exception) {
-            // 2. Offline: cargar desde Room
-            val userLocal = db.userDao().obtenerPorId(androidId)
+            val userLocal = db.userDao().getUserById(androidId)
             if (userLocal != null) {
                 val usuario = User(
                     id = 0L, auth_id = userLocal.authId, cliente_id = "",
