@@ -11,8 +11,9 @@ data class TarjetaEntity(
     val numero: String,
     val titular: String?,
     val activo: Boolean,
-    val localId: Long
+    val localId: Long? = null
 )
 
 fun TarjetaEntity.toModel() = Tarjeta(id = id, banco = banco, numero = numero, titular = titular, activo = activo, local_id = localId)
-fun Tarjeta.toEntity(localId: Long) = TarjetaEntity(id = id, banco = banco, numero = numero, titular = titular, activo = activo, localId = localId)
+
+fun Tarjeta.toEntity(localId: Long?) = TarjetaEntity(id = id, banco = banco, numero = numero, titular = titular, activo = activo, localId = localId)

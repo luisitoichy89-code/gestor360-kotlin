@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import org.luisito.gestor360.data.local.dao.AccionPendienteDao
 import org.luisito.gestor360.data.local.dao.ConflictoDao
+import org.luisito.gestor360.data.local.dao.LocalDao
 import org.luisito.gestor360.data.local.dao.MermaDao
 import org.luisito.gestor360.data.local.dao.ProductoDao
 import org.luisito.gestor360.data.local.dao.TarjetaDao
@@ -13,6 +14,7 @@ import org.luisito.gestor360.data.local.dao.TurnoDao
 import org.luisito.gestor360.data.local.dao.VentaDao
 import org.luisito.gestor360.data.local.entities.AccionPendienteEntity
 import org.luisito.gestor360.data.local.entities.ConflictoEntity
+import org.luisito.gestor360.data.local.entities.LocalEntity
 import org.luisito.gestor360.data.local.entities.MermaEntity
 import org.luisito.gestor360.data.local.entities.ProductoEntity
 import org.luisito.gestor360.data.local.entities.TarjetaEntity
@@ -23,9 +25,9 @@ import org.luisito.gestor360.data.local.entities.VentaEntity
     entities = [
         ProductoEntity::class, AccionPendienteEntity::class, VentaEntity::class, ConflictoEntity::class,
         TurnoEntity::class, TarjetaEntity::class, MermaEntity::class,
-        UserEntity::class
+        UserEntity::class, LocalEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -37,6 +39,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun tarjetaDao(): TarjetaDao
     abstract fun mermaDao(): MermaDao
     abstract fun userDao(): UserDao
+    abstract fun localDao(): LocalDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
