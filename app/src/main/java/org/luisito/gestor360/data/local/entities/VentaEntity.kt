@@ -3,6 +3,7 @@ package org.luisito.gestor360.data.local.entities
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import org.luisito.gestor360.data.models.Sale
+import java.util.UUID
 
 @Entity(tableName = "ventas_cache")
 data class VentaEntity(
@@ -19,7 +20,6 @@ data class VentaEntity(
     val clienteTel: String?,
     val clienteNombre: String?,
     val createdAt: String?,
-    /** false mientras solo existe en este dispositivo, todavía no confirmada por el servidor. */
     val sincronizada: Boolean = true
 )
 
@@ -30,7 +30,7 @@ fun VentaEntity.toModel() = Sale(
 )
 
 fun Sale.toEntity(localId: Long, sincronizada: Boolean = true) = VentaEntity(
-    id = id ?: "local_${System.nanoTime()}", productoId = producto_id, cantidad = cantidad, total = total,
+    id = id ?: "local_${UUID.randomUUID()}", productoId = producto_id, cantidad = cantidad, total = total,
     metodo = metodo, efectivo = efectivo, transferencia = transferencia, usuarioId = usuario_id,
     localId = localId, clienteCi = cliente_ci, clienteTel = cliente_tel, clienteNombre = cliente_nombre,
     createdAt = created_at, sincronizada = sincronizada

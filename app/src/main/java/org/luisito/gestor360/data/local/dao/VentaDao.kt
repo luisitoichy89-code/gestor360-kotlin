@@ -8,7 +8,7 @@ interface VentaDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertarTodas(ventas: List<VentaEntity>)
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertarUna(venta: VentaEntity)
 
     @Query("SELECT * FROM ventas_cache WHERE localId = :localId ORDER BY createdAt DESC")
