@@ -7,6 +7,7 @@ import kotlinx.serialization.json.jsonObject
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.local.AppDatabase
 import org.luisito.gestor360.data.local.entities.ConflictoEntity
+import org.luisito.gestor360.data.repository.AprobacionStockRepository
 import org.luisito.gestor360.data.repository.MermaRepository
 import org.luisito.gestor360.data.repository.ProductRepository
 import org.luisito.gestor360.data.repository.TarjetaRepository
@@ -28,13 +29,13 @@ data class SyncResultado(val exitosas: Int, val fallidas: Int, val error: String
  * detecta conflictos (ej. stock negativo).
  */
 class SyncManager(private val context: Context) {
-
     private val db = AppDatabase.obtener(context)
     private val session = SessionManager(context)
     private val productRepository = ProductRepository(context)
     private val tarjetaRepository = TarjetaRepository(context)
     private val mermaRepository = MermaRepository(context)
     private val turnoRepository = TurnoRepository(context)
+    private val aprobacionStockRepository = AprobacionStockRepository(context)
 
     suspend fun sincronizar(androidId: String): SyncResultado {
         if (androidId.isBlank()) return SyncResultado(0, 0, "Sin sesión activa")
@@ -74,13 +75,13 @@ class SyncManager(private val context: Context) {
             tarjetaRepository.refrescarDesdeServidor(androidId)
             mermaRepository.refrescarDesdeServidor(androidId)
             turnoRepository.refrescarDesdeServidor(androidId)
+            aprobacionStockRepository.refrescarDesdeServidor(androidId)
         }
 
         db.accionPendienteDao().limpiarSincronizadas()
         db.ventaDao().limpiarSincronizadas()
         db.mermaDao().limpiarResueltas()
         db.turnoDao().limpiarCerrados()
-
         return SyncResultado(exitosas, fallidas, null)
     }
 

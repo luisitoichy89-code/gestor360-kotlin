@@ -10,9 +10,11 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.local.AppDatabase
+import org.luisito.gestor360.data.local.entities.AccionPendienteEntity
 import org.luisito.gestor360.data.local.entities.toEntity
 import org.luisito.gestor360.data.local.entities.toModel
 import org.luisito.gestor360.data.sync.NetworkMonitor
+import org.luisito.gestor360.data.sync.SyncWorker
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 
@@ -36,6 +38,10 @@ data class AprobacionStock(
  * Offline-first (antes pedía siempre en vivo y devolvía vacío sin internet):
  * getPendientes lee primero el caché de aprobaciones_cache (ver
  * AprobacionStockCacheEntity) y refresca en background si hay internet.
+ * solicitarAumento (agregar a stock un producto existente) sigue el mismo
+ * patrón que Merma/Devolucion.solicitar: guarda optimista en caché con id
+ * temporal negativo y encola en acciones_pendientes para sincronizar cuando
+ * vuelva la conexión.
  * Resolver (aprobar/rechazar) sigue requiriendo conexión sí o sí: mueve stock
  * real del lado del servidor, mismo criterio que Merma/Devolucion.resolver.
  */
@@ -99,14 +105,24 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
         } catch (e: Exception) { Result.failure(e) }
     }
 
-    suspend fun solicitarAumento(androidId: String, productoId: Long, cantidad: Double): Result<Unit> {
-        return try {
-            SupabaseClientProvider.client.postgrest.rpc("solicitar_aumento_stock", buildJsonObject {
-                put("p_android_id", androidId); put("p_local_id", localIdActivo())
-                put("p_producto_id", productoId); put("p_cantidad", cantidad)
-            })
-            Result.success(Unit)
-        } catch (e: Exception) { Result.failure(e) }
+    /** El vendedor propone offline: queda visible como pendiente de inmediato, igual que Merma/Devolucion.solicitar. */
+    suspend fun solicitarAumento(androidId: String, productoId: Long, productoNombre: String, cantidad: Double): Result<Unit> {
+        val localId = localIdActivo()
+        val idTemporal = -(System.currentTimeMillis() * 1000 + (Math.random() * 1000).toLong())
+        val actuales = db.aprobacionStockCacheDao().obtener(localId)?.toModel() ?: emptyList()
+        val nueva = AprobacionStock(
+            id = idTemporal, producto_id = productoId, producto_nombre = productoNombre,
+            cantidad = cantidad, tipo = "aumento", estado = "pendiente", local_id = localId
+        )
+        db.aprobacionStockCacheDao().guardar((listOf(nueva) + actuales).toEntity(localId))
+
+        val payload = buildJsonObject {
+            put("p_android_id", androidId); put("p_local_id", localId)
+            put("p_producto_id", productoId); put("p_cantidad", cantidad)
+        }
+        db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "solicitar_aumento_stock", payloadJson = payload.toString(), idLocalTemporal = idTemporal))
+        if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
+        return Result.success(Unit)
     }
 
     suspend fun solicitarAnularVenta(androidId: String, ventaId: String, ventaTotal: Double): Result<Unit> {

@@ -43,9 +43,9 @@ class AprobacionStockViewModel(
         }
     }
 
-    fun solicitarAumento(androidId: String, productoId: Long, cantidad: Double) {
+    fun solicitarAumento(androidId: String, productoId: Long, productoNombre: String, cantidad: Double) {
         viewModelScope.launch {
-            repository.solicitarAumento(androidId, productoId, cantidad)
+            repository.solicitarAumento(androidId, productoId, productoNombre, cantidad)
                 .onSuccess { _uiState.value = _uiState.value.copy(mensaje = "Aumento enviado a aprobación"); cargar(androidId) }
                 .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo enviar la solicitud")) }
         }
@@ -68,6 +68,7 @@ class AprobacionStockViewModel(
                 .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo enviar la anulación")) }
         }
     }
+
     fun clearMensaje() { _uiState.value = _uiState.value.copy(mensaje = null) }
     fun clearError() { _uiState.value = _uiState.value.copy(error = null) }
 }
