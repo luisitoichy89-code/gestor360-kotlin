@@ -47,7 +47,7 @@ class DevolucionRepository(private val context: Context = AppContextHolder.conte
             return Result.success(cacheadas.toModel())
         }
         if (!NetworkMonitor.hayInternet(context)) {
-            return Result.failure(IllegalStateException("Sin conexión y sin datos guardados todavía"))
+            return Result.success(emptyList())
         }
         return refrescarDesdeServidor(androidId)
     }

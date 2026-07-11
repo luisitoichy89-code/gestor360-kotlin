@@ -15,9 +15,8 @@ import org.luisito.gestor360.data.sync.SyncWorker
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 
-/** RPC: get_mermas_pendientes, crear_merma, resolver_merma. Offline-first, filtrado por local_id. */
 class MermaRepository(
-    private val context: Context = AppContextHolder.context,
+    private val context: Context = AppContextHolder.context
 ) {
     private val db = AppDatabase.obtener(context)
     private val session = SessionManager(context)
@@ -32,6 +31,9 @@ class MermaRepository(
             if (NetworkMonitor.hayInternet(context)) refrescarDesdeServidor(androidId)
             return Result.success(cacheadas.map { it.toModel() })
         }
+        if (!NetworkMonitor.hayInternet(context)) {
+            return Result.success(emptyList())
+        }
         return refrescarDesdeServidor(androidId)
     }
 
@@ -44,11 +46,11 @@ class MermaRepository(
             db.mermaDao().insertarTodas(mermas.map { it.toEntity(localId) })
             Result.success(mermas)
         } catch (e: Exception) {
-            Result.failure(e)
+            val cacheadas = db.mermaDao().obtenerPendientes(localId)
+            if (cacheadas.isNotEmpty()) Result.success(cacheadas.map { it.toModel() }) else Result.failure(e)
         }
     }
 
-    /** El vendedor propone offline: queda visible como pendiente de inmediato, sin descontar stock. */
     suspend fun solicitar(androidId: String, productoId: Long, productoNombre: String, cantidad: Double, motivo: String): Result<Unit> {
         val localId = localIdActivo()
         val idTemporal = -(System.currentTimeMillis() * 1000 + (Math.random() * 1000).toLong())
@@ -68,11 +70,6 @@ class MermaRepository(
         return Result.success(Unit)
     }
 
-    /**
-     * Aprobar/rechazar descuenta stock real del lado del servidor — necesita
-     * conexión sí o sí, para no arriesgarse a aprobar dos veces la misma merma
-     * desde dos dispositivos offline.
-     */
     suspend fun resolver(androidId: String, mermaId: Long, estado: String): Result<Unit> {
         if (!NetworkMonitor.hayInternet(context)) {
             return Result.failure(IllegalStateException("Necesitas conexión para aprobar o rechazar una merma"))
