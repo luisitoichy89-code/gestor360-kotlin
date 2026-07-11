@@ -48,7 +48,6 @@ class TarjetaRepository(
             val tarjetas = SupabaseClientProvider.client.postgrest
                 .rpc("get_tarjetas", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
                 .decodeList<Tarjeta>()
-            // db.tarjetaDao().limpiar()
             db.tarjetaDao().insertarTodas(tarjetas.map { it.toEntity(localId) })
             Result.success(tarjetas)
         } catch (e: Exception) {
@@ -57,7 +56,7 @@ class TarjetaRepository(
         }
     }
 
-    suspend fun limpiarCache() { // db.tarjetaDao().limpiar() }
+    suspend fun limpiarCache() { }
 
     suspend fun crearTarjeta(androidId: String, banco: String, numero: String, titular: String): Result<Unit> {
         val localId = localIdActivo()
