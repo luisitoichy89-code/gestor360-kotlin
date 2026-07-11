@@ -95,6 +95,6 @@ private fun TarjetaFormDialog(tarjeta: Tarjeta?, isSaving: Boolean, onDismiss: (
             OutlinedTextField(titular, { titular = it }, label = { Text("Titular (opcional)") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
         }},
         confirmButton = { TextButton(enabled = valido && !isSaving, onClick = { onGuardar(banco.trim(), numero.trim(), titular.trim()) }) { Text(if (isSaving) "Guardando..." else "Guardar") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
+        dismissButton = { TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }
     )
 }

@@ -41,7 +41,11 @@ class AccesoViewModel(
                 is VerificacionResultado.SinConexionPrimerInicio ->
                     _uiState.value = _uiState.value.copy(verificando = false, mensajeError = "Primer inicio requiere conexión a internet.")
                 is VerificacionResultado.Error ->
-                    _uiState.value = _uiState.value.copy(verificando = false, mensajeError = resultado.mensaje)
+                    _uiState.value = _uiState.value.copy(
+                        verificando = false,
+                        mensajeError = resultado.mensaje.takeIf { it.isNotBlank() && it.length < 100 }
+                            ?: "No se pudo verificar el dispositivo. Verifica tu conexión e intenta de nuevo."
+                    )
             }
         }
     }
@@ -49,7 +53,7 @@ class AccesoViewModel(
     fun validarPin(pin: String): Boolean {
         val usuario = _uiState.value.usuarioVerificado ?: return false
         val correcto = repository.validarPin(usuario, pin)
-        if (!correcto) _uiState.value = _uiState.value.copy(pinError = "PIN incorrecto")
+        if (!correcto) _uiState.value = _uiState.value.copy(pinError = "El PIN no es correcto. Intenta de nuevo.")
         return correcto
     }
 

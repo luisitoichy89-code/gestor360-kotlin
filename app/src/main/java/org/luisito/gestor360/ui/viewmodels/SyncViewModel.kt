@@ -34,9 +34,11 @@ class SyncViewModel(application: Application) : AndroidViewModel(application) {
             _sincronizando.value = true
             val resultado = SyncManager(getApplication()).sincronizar(androidId)
             _mensaje.value = when {
-                resultado.error != null -> resultado.error
+                resultado.error != null ->
+                    "No se pudo completar la sincronización. Verifica tu conexión e intenta de nuevo."
                 resultado.exitosas == 0 && resultado.fallidas == 0 -> "Todo al día, nada pendiente"
-                else -> "Sincronizado: ${resultado.exitosas} ok, ${resultado.fallidas} con error"
+                resultado.fallidas > 0 -> "Se sincronizaron ${resultado.exitosas}, pero ${resultado.fallidas} no se pudieron enviar. Se reintentará automáticamente."
+                else -> "Sincronización completada: ${resultado.exitosas} cambios enviados"
             }
             _sincronizando.value = false
         }

@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.luisito.gestor360.data.SupabaseClientProvider
+import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 
@@ -27,16 +28,20 @@ data class AprobacionStock(
 
 class AprobacionStockRepository(private val context: Context = AppContextHolder.context) {
     private val session = SessionManager(context)
+
     private fun localIdActivo(): Long =
         session.getLocalId() ?: throw IllegalStateException("No hay un local activo seleccionado")
 
     suspend fun getPendientes(androidId: String): Result<List<AprobacionStock>> {
+        if (!NetworkMonitor.hayInternet(context)) {
+            return Result.success(emptyList())
+        }
         return try {
             val response = SupabaseClientProvider.client.postgrest
                 .rpc("get_aprobaciones", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localIdActivo()) })
                 .decodeList<AprobacionStock>()
             Result.success(response)
-        } catch (e: Exception) { Result.failure(e) }
+        } catch (e: Exception) { Result.success(emptyList()) }
     }
 
     suspend fun solicitarProducto(androidId: String, nombre: String, precio: Double, cantidad: Double): Result<Unit> {

@@ -9,6 +9,7 @@ import kotlinx.coroutines.launch
 import org.luisito.gestor360.data.models.InventarioDia
 import org.luisito.gestor360.data.repository.InventarioRepository
 import java.time.LocalDate
+import org.luisito.gestor360.ui.util.mensajeAmigable
 
 data class InventarioUiState(
     val isLoading: Boolean = false,
@@ -44,7 +45,7 @@ class InventarioViewModel(
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             repository.getInventarioDia(androidIdActual, fecha)
                 .onSuccess { dia -> _uiState.value = _uiState.value.copy(isLoading = false, dia = dia) }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.message) }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.mensajeAmigable("No se pudo cargar el inventario del día")) }
         }
     }
 
@@ -56,7 +57,7 @@ class InventarioViewModel(
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             repository.cerrarTurno(androidIdActual, turno.id, cierreContado)
                 .onSuccess { refrescar() }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.message) }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo cerrar el turno")) }
             _uiState.value = _uiState.value.copy(isSaving = false)
         }
     }

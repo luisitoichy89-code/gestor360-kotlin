@@ -16,12 +16,8 @@ import org.luisito.gestor360.data.sync.SyncWorker
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 
-/**
- * RPC: get_tarjetas, crear_tarjeta, editar_tarjeta, activar_tarjeta, eliminar_tarjeta.
- * Offline-first: mismo patrón que Producto/Merma/Turno, filtrado por local_id.
- */
 class TarjetaRepository(
-    private val context: Context = AppContextHolder.context,
+    private val context: Context = AppContextHolder.context
 ) {
     private val db = AppDatabase.obtener(context)
     private val session = SessionManager(context)
@@ -35,6 +31,9 @@ class TarjetaRepository(
         if (cacheadas.isNotEmpty()) {
             if (NetworkMonitor.hayInternet(context)) refrescarDesdeServidor(androidId)
             return Result.success(cacheadas.map { it.toModel() })
+        }
+        if (!NetworkMonitor.hayInternet(context)) {
+            return Result.success(emptyList())
         }
         return refrescarDesdeServidor(androidId)
     }
@@ -53,7 +52,8 @@ class TarjetaRepository(
             db.tarjetaDao().insertarTodas(tarjetas.map { it.toEntity(localId) })
             Result.success(tarjetas)
         } catch (e: Exception) {
-            Result.failure(e)
+            val cacheadas = db.tarjetaDao().obtenerTodas(localId)
+            if (cacheadas.isNotEmpty()) Result.success(cacheadas.map { it.toModel() }) else Result.failure(e)
         }
     }
 
@@ -72,8 +72,6 @@ class TarjetaRepository(
         return Result.success(Unit)
     }
 
-    // Requiere internet porque editar una cuenta bancaria no es algo que quieras
-    // "reproducir" a ciegas si el servidor tiene una versión más reciente.
     suspend fun editarTarjeta(androidId: String, id: Long, banco: String, numero: String, titular: String): Result<Unit> {
         if (!NetworkMonitor.hayInternet(context)) return Result.failure(IllegalStateException("Necesitas conexión para editar una tarjeta"))
         val localId = localIdActivo()
@@ -91,7 +89,6 @@ class TarjetaRepository(
 
     suspend fun setActivo(androidId: String, id: Long, activo: Boolean): Result<Unit> {
         val localId = localIdActivo()
-        // Esto sí se puede aplicar optimista y encolar: es un simple on/off.
         db.tarjetaDao().setActivo(id, activo, localId)
         val payload = buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id); put("p_activo", activo) }
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "activar_tarjeta", payloadJson = payload.toString()))

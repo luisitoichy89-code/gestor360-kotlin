@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.luisito.gestor360.data.models.Product
 import org.luisito.gestor360.data.repository.ProductRepository
+import org.luisito.gestor360.ui.util.mensajeAmigable
 
 data class ProductUiState(
     val isLoading: Boolean = false,
@@ -31,7 +32,7 @@ class ProductViewModel(
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             repository.getProducts(androidId)
                 .onSuccess { lista -> _uiState.value = _uiState.value.copy(isLoading = false, productos = lista) }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.message ?: "Error al cargar productos") }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.mensajeAmigable("No se pudieron cargar los productos")) }
         }
     }
 
@@ -44,7 +45,7 @@ class ProductViewModel(
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             repository.createProduct(androidIdActual, nombre, precio, stock, ubicacion, categoria)
                 .onSuccess { refrescar() }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.message) }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo guardar el producto")) }
             _uiState.value = _uiState.value.copy(isSaving = false)
         }
     }
@@ -54,7 +55,7 @@ class ProductViewModel(
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             repository.updateProduct(androidIdActual, id, nombre, precio, stock, ubicacion, categoria)
                 .onSuccess { refrescar() }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.message) }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo actualizar el producto")) }
             _uiState.value = _uiState.value.copy(isSaving = false)
         }
     }
@@ -63,7 +64,7 @@ class ProductViewModel(
         viewModelScope.launch {
             repository.registrarMerma(androidIdActual, producto, cantidad)
                 .onSuccess { refrescar() }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.message) }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo registrar la merma")) }
         }
     }
 
@@ -71,7 +72,7 @@ class ProductViewModel(
         viewModelScope.launch {
             repository.deleteProduct(androidIdActual, id)
                 .onSuccess { refrescar() }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.message) }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo eliminar el producto")) }
         }
     }
 

@@ -18,6 +18,7 @@ import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.data.sync.SyncWorker
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
+import org.luisito.gestor360.ui.util.mensajeAmigable
 
 data class LocalSeleccionUiState(
     val isLoading: Boolean = false,
@@ -63,7 +64,7 @@ class LocalSeleccionViewModel(
                         sm.setLocalId(actual.id)
                     }
                 }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.message) }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.mensajeAmigable("No se pudieron cargar los locales")) }
         }
     }
 

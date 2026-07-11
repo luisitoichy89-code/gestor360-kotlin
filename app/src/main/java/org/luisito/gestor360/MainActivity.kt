@@ -48,7 +48,6 @@ private sealed class PantallaInterna {
     object Productos : PantallaInterna()
     object Tarjetas : PantallaInterna()
     object Aprobaciones : PantallaInterna()
-    object TicketsSoporte : PantallaInterna()
     object Inventario : PantallaInterna()
     object Devolucion : PantallaInterna()
     object Conflictos : PantallaInterna()
@@ -153,7 +152,6 @@ fun Gestor360App() {
                                     "inventario" -> PantallaInterna.Inventario
                                     "tarjetas" -> if (esAdmin) PantallaInterna.Tarjetas else PantallaInterna.Home
                                     "aprobaciones" -> if (esAdmin) PantallaInterna.Aprobaciones else PantallaInterna.Home
-                                    "soporte" -> PantallaInterna.TicketsSoporte
                                     "devolucion" -> if (esAdmin) PantallaInterna.Devolucion else PantallaInterna.Home
                                     else -> PantallaInterna.Home
                                 }
@@ -174,7 +172,6 @@ fun Gestor360App() {
                     is PantallaInterna.Inventario -> InventarioScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home })
                     is PantallaInterna.Tarjetas -> if (esAdmin) TarjetasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
                     is PantallaInterna.Aprobaciones -> if (esAdmin) AprobacionesScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
-                    is PantallaInterna.TicketsSoporte -> TicketsClienteScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
                     is PantallaInterna.Devolucion -> if (esAdmin) DevolucionScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
                     is PantallaInterna.Conflictos -> ConflictosScreen(onBack = { pantalla = PantallaInterna.Home })
                 }

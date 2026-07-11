@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.luisito.gestor360.data.repository.AprobacionStock
 import org.luisito.gestor360.data.repository.AprobacionStockRepository
+import org.luisito.gestor360.ui.util.mensajeAmigable
 
 data class AprobacionStockUiState(
     val isLoading: Boolean = false,
@@ -30,7 +31,7 @@ class AprobacionStockViewModel(
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             repository.getPendientes(androidId)
                 .onSuccess { _uiState.value = _uiState.value.copy(isLoading = false, pendientes = it) }
-                .onFailure { _uiState.value = _uiState.value.copy(isLoading = false, error = it.message) }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.mensajeAmigable("No se pudieron cargar las aprobaciones pendientes")) }
         }
     }
 
@@ -38,7 +39,7 @@ class AprobacionStockViewModel(
         viewModelScope.launch {
             repository.solicitarProducto(androidId, nombre, precio, cantidad)
                 .onSuccess { _uiState.value = _uiState.value.copy(mensaje = "Producto enviado a aprobación"); cargar(androidId) }
-                .onFailure { _uiState.value = _uiState.value.copy(error = it.message ?: "No se pudo enviar la solicitud") }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo enviar la solicitud")) }
         }
     }
 
@@ -46,7 +47,7 @@ class AprobacionStockViewModel(
         viewModelScope.launch {
             repository.solicitarAumento(androidId, productoId, cantidad)
                 .onSuccess { _uiState.value = _uiState.value.copy(mensaje = "Aumento enviado a aprobación"); cargar(androidId) }
-                .onFailure { _uiState.value = _uiState.value.copy(error = it.message ?: "No se pudo enviar la solicitud") }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo enviar la solicitud")) }
         }
     }
 
@@ -55,7 +56,7 @@ class AprobacionStockViewModel(
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             repository.resolver(androidIdActual, id, estado, aprobadoPor)
                 .onSuccess { cargar(androidIdActual) }
-                .onFailure { _uiState.value = _uiState.value.copy(error = it.message) }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo resolver la solicitud")) }
             _uiState.value = _uiState.value.copy(isSaving = false)
         }
     }
@@ -64,7 +65,7 @@ class AprobacionStockViewModel(
         viewModelScope.launch {
             repository.solicitarAnularVenta(androidId, ventaId, ventaTotal)
                 .onSuccess { _uiState.value = _uiState.value.copy(mensaje = "Anulación enviada a aprobación"); cargar(androidId) }
-                .onFailure { _uiState.value = _uiState.value.copy(error = it.message) }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo enviar la anulación")) }
         }
     }
     fun clearMensaje() { _uiState.value = _uiState.value.copy(mensaje = null) }

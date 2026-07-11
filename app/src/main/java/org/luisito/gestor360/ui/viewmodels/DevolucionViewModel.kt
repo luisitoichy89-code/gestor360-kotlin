@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.luisito.gestor360.data.models.Devolucion
 import org.luisito.gestor360.data.repository.DevolucionRepository
+import org.luisito.gestor360.ui.util.mensajeAmigable
 
 data class DevolucionUiState(
     val isLoading: Boolean = false,
@@ -30,7 +31,7 @@ class DevolucionViewModel(
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             repository.getPendientes(androidId)
                 .onSuccess { _uiState.value = _uiState.value.copy(isLoading = false, pendientes = it) }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.message) }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.mensajeAmigable("No se pudieron cargar las devoluciones pendientes")) }
         }
     }
 
@@ -41,7 +42,7 @@ class DevolucionViewModel(
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             repository.solicitar(androidId, productoId, productoNombre, cantidad, metodo, motivo)
                 .onSuccess { _uiState.value = _uiState.value.copy(mensaje = "Devolución enviada a aprobación"); onListo() }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.message ?: "No se pudo enviar la devolución") }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo enviar la devolución")) }
             _uiState.value = _uiState.value.copy(isSaving = false)
         }
     }
@@ -51,7 +52,7 @@ class DevolucionViewModel(
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             repository.resolver(androidIdActual, id, "aprobada", destino)
                 .onSuccess { refrescar() }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.message) }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo aprobar la devolución")) }
             _uiState.value = _uiState.value.copy(isSaving = false)
         }
     }

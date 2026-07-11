@@ -116,7 +116,7 @@ fun VentasScreen(
                     if (err == null) { selectedProduct = null; cantidad = "" }
                 }) { Text("Agregar", fontWeight = FontWeight.Bold) }
             },
-            dismissButton = { TextButton(onClick = { selectedProduct = null }) { Text("Cancelar") } }
+            dismissButton = { TextButton(onClick = { selectedProduct = null }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }
         )
     }
 

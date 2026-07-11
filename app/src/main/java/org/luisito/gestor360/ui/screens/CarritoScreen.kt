@@ -189,7 +189,7 @@ fun CarritoScreen(
                     paso = PasoCheckout.Ninguno
                 }) { Text(if (uiState.isSaving) "Guardando..." else "Aceptar", fontWeight = FontWeight.Bold) }
             },
-            dismissButton = { TextButton(onClick = { paso = PasoCheckout.Ninguno }) { Text("Cancelar") } }
+            dismissButton = { TextButton(onClick = { paso = PasoCheckout.Ninguno }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }
         )
 
         is PasoCheckout.DatosTransferencia -> DatosClienteDialog(
@@ -233,7 +233,7 @@ fun CarritoScreen(
                         paso = if (smsActivo) PasoCheckout.EsperandoSMS(uiState.totalCarrito - ef, "Mixto") else PasoCheckout.DatosMixtoTransferencia
                     }) { Text("Continuar", fontWeight = FontWeight.Bold) }
                 },
-                dismissButton = { TextButton(onClick = { paso = PasoCheckout.Ninguno }) { Text("Cancelar") } }
+                dismissButton = { TextButton(onClick = { paso = PasoCheckout.Ninguno }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }
             )
         }
 
@@ -288,7 +288,7 @@ fun CarritoScreen(
                         datosMixto = DatosMixto()
                     }) { Text(if (uiState.isSaving) "Guardando..." else "Confirmar", fontWeight = FontWeight.Bold) }
                 },
-                dismissButton = { TextButton(onClick = { paso = PasoCheckout.MontoMixto }) { Text("Cancelar") } }
+                dismissButton = { TextButton(onClick = { paso = PasoCheckout.MontoMixto }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }
             )
         }
     }
@@ -345,6 +345,6 @@ private fun DatosClienteDialog(titulo: String, monto: Double, tarjetas: List<Tar
                 if (tarjeta != null) onConfirmar(ci.trim(), tel.trim(), nombre.trim(), tarjeta)
             }) { Text("Confirmar", fontWeight = FontWeight.Bold) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
+        dismissButton = { TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }
     )
 }

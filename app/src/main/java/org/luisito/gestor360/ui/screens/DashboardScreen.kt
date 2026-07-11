@@ -10,10 +10,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import org.luisito.gestor360.data.repository.TicketRepository
 
 private data class SeccionDashboard(val titulo: String, val icono: ImageVector, val ruta: String)
 
@@ -27,15 +25,6 @@ fun DashboardScreen(
     onLogout: () -> Unit
 ) {
     val esAdmin = userRol == "admin"
-    var mensajesSinLeer by remember { mutableStateOf(0L) }
-
-    // Se refresca cada vez que entras al Dashboard (ej. al volver de Soporte
-    // después de marcar los mensajes como leídos).
-    LaunchedEffect(androidId) {
-        if (esAdmin && androidId.isNotBlank()) {
-            TicketRepository().contarNoLeidos(androidId).onSuccess { mensajesSinLeer = it }
-        }
-    }
 
     val secciones = buildList {
         add(SeccionDashboard("Ventas", Icons.Default.PointOfSale, "ventas"))
@@ -44,7 +33,6 @@ fun DashboardScreen(
         if (esAdmin) {
             add(SeccionDashboard("Tarjetas", Icons.Default.CreditCard, "tarjetas"))
             add(SeccionDashboard("Aprobaciones", Icons.Default.FactCheck, "aprobaciones"))
-            add(SeccionDashboard("@soporte", Icons.Default.HeadsetMic, "soporte"))
             add(SeccionDashboard("Devolución", Icons.Default.AssignmentReturn, "devolucion"))
         }
     }
@@ -52,18 +40,22 @@ fun DashboardScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Gestor360") },
+                title = { Text("Gestor360", color = MaterialTheme.colorScheme.onSurface) },
                 navigationIcon = {
                     IconButton(onClick = onLogout) {
-                        Icon(Icons.Default.Logout, "Cerrar sesión", tint = Color.White)
+                        Icon(Icons.Default.Logout, "Cerrar sesión", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 },
                 actions = {
-                    Text("👤 $username", color = Color.White, modifier = Modifier.padding(end = 8.dp))
+                    Text(
+                        "👤 $username",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
         }
@@ -81,30 +73,17 @@ fun DashboardScreen(
                 modifier = Modifier.fillMaxSize().padding(padding)
             ) {
                 items(secciones) { seccion ->
-                    Box {
-                        ElevatedCard(
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = {
-                                if (seccion.ruta == "soporte") mensajesSinLeer = 0L // se marcan leídos al abrir la pantalla
-                                onNavigate(seccion.ruta)
-                            }
+                    ElevatedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { onNavigate(seccion.ruta) }
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Icon(seccion.icono, null, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary)
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(seccion.titulo, style = MaterialTheme.typography.titleSmall)
-                            }
-                        }
-                        if (seccion.ruta == "soporte" && mensajesSinLeer > 0) {
-                            Badge(
-                                containerColor = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)
-                            ) {
-                                Text(if (mensajesSinLeer > 99) "99+" else mensajesSinLeer.toString())
-                            }
+                            Icon(seccion.icono, null, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(seccion.titulo, style = MaterialTheme.typography.titleSmall)
                         }
                     }
                 }

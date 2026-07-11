@@ -14,6 +14,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -131,7 +132,11 @@ fun PaymentDialog(
                         "mixto" -> onConfirm(metodo, ef, tr)
                     }
                 },
-                enabled = !isProcessing
+                enabled = !isProcessing,
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    containerColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                    contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary
+                )
             ) {
                 if (isProcessing) {
                     CircularProgressIndicator(modifier = Modifier.height(20.dp))
@@ -141,7 +146,12 @@ fun PaymentDialog(
             }
         },
         dismissButton = {
-            Button(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss,
+                colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                    contentColor = androidx.compose.material3.MaterialTheme.colorScheme.error
+                )
+            ) {
                 Text("Cancelar")
             }
         }

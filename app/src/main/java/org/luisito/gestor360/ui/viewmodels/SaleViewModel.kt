@@ -10,6 +10,7 @@ import org.luisito.gestor360.data.models.CartItem
 import org.luisito.gestor360.data.models.Product
 import org.luisito.gestor360.data.repository.ProductRepository
 import org.luisito.gestor360.data.repository.SaleRepository
+import org.luisito.gestor360.ui.util.mensajeAmigable
 
 data class SaleUiState(
     val isLoading: Boolean = false,
@@ -36,7 +37,7 @@ class SaleViewModel(
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             productRepository.getProducts(androidId)
                 .onSuccess { _uiState.value = _uiState.value.copy(isLoading = false, productos = it) }
-                .onFailure { _uiState.value = _uiState.value.copy(isLoading = false, error = it.message) }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.mensajeAmigable("No se pudieron cargar los productos")) }
         }
     }
 
@@ -74,7 +75,7 @@ class SaleViewModel(
                     iniciar(androidIdActual)
                 }
                 .onFailure { e ->
-                    _uiState.value = _uiState.value.copy(isSaving = false, error = e.message ?: "No se pudo guardar la venta")
+                    _uiState.value = _uiState.value.copy(isSaving = false, error = e.mensajeAmigable("No se pudo guardar la venta"))
                 }
         }
     }
@@ -87,7 +88,7 @@ class SaleViewModel(
     fun anularVenta(ventaId: String) {
         viewModelScope.launch {
             saleRepository.anularVenta(androidIdActual, ventaId)
-                .onFailure { _uiState.value = _uiState.value.copy(error = it.message) }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo anular la venta")) }
         }
     }
 

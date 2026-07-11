@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.luisito.gestor360.data.models.Tarjeta
 import org.luisito.gestor360.data.repository.TarjetaRepository
+import org.luisito.gestor360.ui.util.mensajeAmigable
 
 data class TarjetaUiState(
     val isLoading: Boolean = false,
@@ -32,7 +33,7 @@ class TarjetaViewModel(
             repository.limpiarCache()
             repository.getTarjetas(androidId)
                 .onSuccess { lista -> _uiState.value = _uiState.value.copy(isLoading = false, tarjetas = lista) }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.message) }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.mensajeAmigable("No se pudieron cargar las tarjetas")) }
         }
     }
 
@@ -45,7 +46,7 @@ class TarjetaViewModel(
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             repository.crearTarjeta(androidIdActual, banco, numero, titular)
                 .onSuccess { refrescar() }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.message) }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo guardar la tarjeta")) }
             _uiState.value = _uiState.value.copy(isSaving = false)
         }
     }
@@ -55,7 +56,7 @@ class TarjetaViewModel(
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             repository.editarTarjeta(androidIdActual, id, banco, numero, titular)
                 .onSuccess { refrescar() }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.message) }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo actualizar la tarjeta")) }
             _uiState.value = _uiState.value.copy(isSaving = false)
         }
     }

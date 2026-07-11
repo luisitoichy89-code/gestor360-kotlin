@@ -118,7 +118,10 @@ fun ConfirmarEliminarDialog(nombre: String, onConfirm: () -> Unit, onDismiss: ()
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancelar") }
+            TextButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+            ) { Text("Cancelar") }
         }
     )
 }

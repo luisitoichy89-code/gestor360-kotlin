@@ -134,7 +134,7 @@ fun InventarioScreen(androidId: String, rol: String, onBack: (() -> Unit)? = nul
                     mostrarDatePicker = false
                 }) { Text("Ver este día") }
             },
-            dismissButton = { TextButton(onClick = { mostrarDatePicker = false }) { Text("Cancelar") } }
+            dismissButton = { TextButton(onClick = { mostrarDatePicker = false }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }
         ) { DatePicker(state = datePickerState) }
     }
 }
@@ -293,7 +293,7 @@ private fun CerrarTurnoDialog(efectivoEsperado: Double, isSaving: Boolean, onDis
         Card(shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) { Text("Esperado: $efectivoEsperado CUP", Modifier.padding(12.dp), fontWeight = FontWeight.Bold) }
         Spacer(Modifier.height(12.dp))
         OutlinedTextField(monto, { monto = it }, label = { Text("Efectivo contado") }, singleLine = true, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
-    } }, confirmButton = { TextButton(enabled = (monto.toDoubleOrNull() ?: -1.0) >= 0 && !isSaving, onClick = { onCerrar(monto.toDoubleOrNull() ?: 0.0) }) { Text(if (isSaving) "Cerrando..." else "Cerrar") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } })
+    } }, confirmButton = { TextButton(enabled = (monto.toDoubleOrNull() ?: -1.0) >= 0 && !isSaving, onClick = { onCerrar(monto.toDoubleOrNull() ?: 0.0) }) { Text(if (isSaving) "Cerrando..." else "Cerrar") } }, dismissButton = { TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } })
 }
 
 private fun construirDatosExportacion(dia: InventarioDia, ventas: List<VentaInfo>): ReporteExporter.DatosCierreCaja {

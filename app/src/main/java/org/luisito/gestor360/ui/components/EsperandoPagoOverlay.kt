@@ -8,7 +8,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -31,77 +30,83 @@ fun EsperandoPagoOverlay(
         label = "dots"
     )
 
+    // Fondo semitransparente sobre la pantalla anterior; la tarjeta central
+    // usa los mismos colores del tema (superficie clara, texto negro) para
+    // mantener consistencia visual con el resto de la app.
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.85f)),
+            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f)),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(32.dp)
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 8.dp,
+            modifier = Modifier.padding(24.dp)
         ) {
-            Spacer(modifier = Modifier.weight(1f))
-
-            Text(
-                text = "Procesando pago",
-                style = MaterialTheme.typography.headlineSmall,
-                color = Color.White,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Esperando confirmación por SMS",
-                style = MaterialTheme.typography.bodyLarge,
-                color = Color.White.copy(alpha = 0.7f)
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Monto: $montoEsperado CUP",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.6f)
-            )
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Text(
-                text = ".".repeat(dotCount.toInt()),
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontSize = 40.sp,
-                    letterSpacing = 12.sp
-                ),
-                color = Color(0xFF81C784),
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.fillMaxWidth()
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(28.dp)
             ) {
-                Button(
-                    onClick = onCancelarPago,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFC62828),
-                        contentColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Text("Cancelar pago", fontWeight = FontWeight.Bold)
-                }
+                Text(
+                    text = "Procesando pago",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Esperando confirmación por SMS",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Monto: $montoEsperado CUP",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(24.dp))
 
-                Button(
-                    onClick = onConfirmarVisual,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF2E7D32),
-                        contentColor = Color.White
+                Text(
+                    text = ".".repeat(dotCount.toInt()),
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontSize = 40.sp,
+                        letterSpacing = 12.sp
                     ),
-                    shape = RoundedCornerShape(14.dp)
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(28.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Confirmé visual", fontWeight = FontWeight.Bold)
+                    OutlinedButton(
+                        onClick = onCancelarPago,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text("Cancelar pago", fontWeight = FontWeight.Bold)
+                    }
+
+                    Button(
+                        onClick = onConfirmarVisual,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text("Confirmé visual", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
