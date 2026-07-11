@@ -79,7 +79,7 @@ class LocalSeleccionViewModel(
 
         viewModelScope.launch {
             try {
-                SupabaseClientProvider.client.postgrest
+                SupabaseClientProvider.client
                     .from("local_seleccion_context")
                     .upsert(buildJsonObject {
                         put("android_id", sm.getAndroidId())
