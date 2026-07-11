@@ -99,7 +99,7 @@ fun ProductosScreen(
 
     productoParaMerma?.let { p -> MermaDialog(p, esAdmin, if (esAdmin) uiState.isSaving else mermaUiState.isSaving, { productoParaMerma = null }) { cantidad, motivo -> if (esAdmin) { viewModel.registrarMerma(p, cantidad); productoParaMerma = null } else { mermaViewModel.solicitar(androidId = androidId, productoId = p.id, productoNombre = p.nombre, cantidad = cantidad, motivo = motivo, onListo = { productoParaMerma = null }) } } }
 
-    productoParaDevolucion?.let { p -> DevolucionDialog(p, devolucionUiState.isSaving, { productoParaDevolucion = null }) { cantidad, metodo, motivo -> devolucionViewModel.solicitar(androidId = androidId, productoId = p.id, cantidad = cantidad, metodo = metodo, motivo = motivo, onListo = { productoParaDevolucion = null }) } }
+    productoParaDevolucion?.let { p -> DevolucionDialog(p, devolucionUiState.isSaving, { productoParaDevolucion = null }) { cantidad, metodo, motivo -> devolucionViewModel.solicitar(androidId = androidId, productoId = p.id, productoNombre = p.nombre, cantidad = cantidad, metodo = metodo, motivo = motivo, onListo = { productoParaDevolucion = null }) } }
 
     if (esAdmin) productoAEliminar?.let { p -> ConfirmarEliminarDialog(p.nombre, { viewModel.eliminar(p.id); productoAEliminar = null }, { productoAEliminar = null }) }
 }

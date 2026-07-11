@@ -36,10 +36,10 @@ class DevolucionViewModel(
 
     fun refrescar() { if (androidIdActual.isNotBlank()) cargar(androidIdActual) }
 
-    fun solicitar(androidId: String, productoId: Long, cantidad: Double, metodo: String, motivo: String, onListo: () -> Unit = {}) {
+    fun solicitar(androidId: String, productoId: Long, productoNombre: String, cantidad: Double, metodo: String, motivo: String, onListo: () -> Unit = {}) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
-            repository.solicitar(androidId, productoId, cantidad, metodo, motivo)
+            repository.solicitar(androidId, productoId, productoNombre, cantidad, metodo, motivo)
                 .onSuccess { _uiState.value = _uiState.value.copy(mensaje = "Devolución enviada a aprobación"); onListo() }
                 .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.message ?: "No se pudo enviar la devolución") }
             _uiState.value = _uiState.value.copy(isSaving = false)

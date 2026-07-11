@@ -53,7 +53,16 @@ fun TicketsClienteScreen(androidId: String, onBack: () -> Unit, vm: TicketViewMo
 
     LaunchedEffect(s.ticketSeleccionado?.id) { while (true) { delay(5000); vm.refrescarMensajes() } }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Soporte") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Volver") } }) }, floatingActionButton = { FloatingActionButton(onClick = { mostrarCrear = true }) { Icon(Icons.Default.Add, "Nuevo ticket") } }) { padding ->
+    Scaffold(
+        topBar = { TopAppBar(title = { Text("Soporte") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Volver") } }) },
+        floatingActionButton = {
+            // Solo se muestra en la lista de tickets: dentro del chat de un ticket
+            // tapaba el botón de enviar del final de la pantalla.
+            if (s.ticketSeleccionado == null) {
+                FloatingActionButton(onClick = { mostrarCrear = true }) { Icon(Icons.Default.Add, "Nuevo ticket") }
+            }
+        }
+    ) { padding ->
         if (s.ticketSeleccionado != null) {
             val ticket = s.ticketSeleccionado; var nuevoMensaje by remember { mutableStateOf("") }; var sending by remember { mutableStateOf(false) }
             Column(Modifier.fillMaxSize().padding(padding)) {

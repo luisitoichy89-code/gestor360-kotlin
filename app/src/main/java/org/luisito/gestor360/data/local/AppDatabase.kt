@@ -6,6 +6,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import org.luisito.gestor360.data.local.dao.AccionPendienteDao
 import org.luisito.gestor360.data.local.dao.ConflictoDao
+import org.luisito.gestor360.data.local.dao.DevolucionCacheDao
+import org.luisito.gestor360.data.local.dao.InventarioCacheDao
 import org.luisito.gestor360.data.local.dao.LocalDao
 import org.luisito.gestor360.data.local.dao.MermaDao
 import org.luisito.gestor360.data.local.dao.ProductoDao
@@ -14,6 +16,8 @@ import org.luisito.gestor360.data.local.dao.TurnoDao
 import org.luisito.gestor360.data.local.dao.VentaDao
 import org.luisito.gestor360.data.local.entities.AccionPendienteEntity
 import org.luisito.gestor360.data.local.entities.ConflictoEntity
+import org.luisito.gestor360.data.local.entities.DevolucionCacheEntity
+import org.luisito.gestor360.data.local.entities.InventarioCacheEntity
 import org.luisito.gestor360.data.local.entities.LocalEntity
 import org.luisito.gestor360.data.local.entities.MermaEntity
 import org.luisito.gestor360.data.local.entities.ProductoEntity
@@ -25,7 +29,7 @@ import org.luisito.gestor360.data.local.entities.VentaEntity
     entities = [
         ProductoEntity::class, AccionPendienteEntity::class, VentaEntity::class, ConflictoEntity::class,
         TurnoEntity::class, TarjetaEntity::class, MermaEntity::class,
-        UserEntity::class, LocalEntity::class
+        UserEntity::class, LocalEntity::class, InventarioCacheEntity::class, DevolucionCacheEntity::class
     ],
     // v5: PK compuesta (id, localId) en Producto/Merma/Turno/Tarjeta — antes la PK
     // era solo "id" y el caché de dos locales con ids de servidor repetidos se
@@ -33,7 +37,12 @@ import org.luisito.gestor360.data.local.entities.VentaEntity
     // recrea las tablas de caché en el próximo arranque; no hay pérdida real porque
     // todo esto se resincroniza del servidor (y las acciones pendientes sin
     // sincronizar viven en AccionPendienteEntity, que no cambió).
-    version = 5,
+    //
+    // v6: se agregan inventario_cache y devoluciones_cache para que
+    // InventarioRepository y DevolucionRepository queden offline-first (antes
+    // pegaban directo al servidor, sin caché — ver auditoría). Misma lógica de
+    // fallbackToDestructiveMigration: se recrean tablas de caché, cero pérdida real.
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -46,6 +55,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun mermaDao(): MermaDao
     abstract fun userDao(): UserDao
     abstract fun localDao(): LocalDao
+    abstract fun inventarioCacheDao(): InventarioCacheDao
+    abstract fun devolucionCacheDao(): DevolucionCacheDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
