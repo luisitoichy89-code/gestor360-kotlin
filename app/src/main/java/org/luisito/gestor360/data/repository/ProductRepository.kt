@@ -133,13 +133,22 @@ class ProductRepository(
         }
     }
 
-    suspend fun precargarLocal(androidId: String, localId: Long) {
-        try {
+    /**
+     * Precarga el caché de UN local específico (puede no ser el local activo
+     * ahora mismo — así el admin puede tener el local 2 listo sin haber
+     * "entrado" a él todavía). Nunca borra lo que ya había en caché si la
+     * llamada de red falla: solo reemplaza cuando la descarga fue exitosa.
+     */
+    suspend fun precargarLocal(androidId: String, localId: Long): Result<Unit> {
+        return try {
             val productos = SupabaseClientProvider.client.postgrest
                 .rpc("get_productos", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
                 .decodeList<Product>()
             db.productoDao().limpiarDeLocal(localId)
             db.productoDao().insertarTodos(productos.map { it.toEntity(localId) })
-        } catch (_: Exception) { }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }

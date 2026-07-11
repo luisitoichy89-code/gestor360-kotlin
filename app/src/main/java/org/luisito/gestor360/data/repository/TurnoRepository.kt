@@ -92,4 +92,22 @@ class TurnoRepository(
             Result.failure(e)
         }
     }
+
+    /** Precarga el turno activo de UN local específico, sin depender del local activo en sesión. */
+    suspend fun precargarLocal(androidId: String, localId: Long): Result<Unit> {
+        return try {
+            val turno = SupabaseClientProvider.client.postgrest
+                .rpc("obtener_turno_activo", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
+                .decodeList<Turno>()
+                .firstOrNull()
+            if (turno != null) {
+                db.turnoDao().insertar(
+                    TurnoEntity(turno.id, turno.usuario_id, turno.apertura, turno.cierre, turno.diferencia, turno.created_at, localId)
+                )
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

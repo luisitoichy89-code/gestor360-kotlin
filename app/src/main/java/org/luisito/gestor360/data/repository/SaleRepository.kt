@@ -144,4 +144,21 @@ class SaleRepository(
                 .take(5)
         }
     }
+
+    /**
+     * Precarga el caché de ventas de UN local específico, sin depender del
+     * local activo en sesión. No borra ventas locales sin sincronizar
+     * (mismo criterio que getSales): solo agrega/actualiza lo que llega del servidor.
+     */
+    suspend fun precargarLocal(androidId: String, localId: Long): Result<Unit> {
+        return try {
+            val ventas = SupabaseClientProvider.client.postgrest
+                .rpc("get_ventas", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
+                .decodeList<Sale>()
+            db.ventaDao().insertarTodas(ventas.map { it.toEntity(localId, sincronizada = true) })
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

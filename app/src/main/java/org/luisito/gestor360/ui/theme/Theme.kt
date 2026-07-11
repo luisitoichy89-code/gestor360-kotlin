@@ -3,21 +3,29 @@ package org.luisito.gestor360.ui.theme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 
+// Tema único de Gestor360°: fondo claro, texto siempre negro, y dos acentos
+// con función fija — azul para acciones, rojo para cancelar/eliminar.
+// Nada de blanco ni verde como color de texto o de marca.
 private val LightColorScheme = lightColorScheme(
-    primary = AzulAccion,
-    onPrimary = SurfaceWhite,
+    primary = Azul,
+    onPrimary = TextBlack,
     primaryContainer = AzulClaro,
-    onPrimaryContainer = AzulOscuro,
+    onPrimaryContainer = TextBlack,
 
     secondary = AzulOscuro,
-    onSecondary = SurfaceWhite,
+    onSecondary = TextBlack,
     secondaryContainer = AzulClaro,
-    onSecondaryContainer = AzulOscuro,
+    onSecondaryContainer = TextBlack,
 
     tertiary = AzulOscuro,
-    onTertiary = SurfaceWhite,
+    onTertiary = TextBlack,
     tertiaryContainer = AzulClaro,
-    onTertiaryContainer = AzulOscuro,
+    onTertiaryContainer = TextBlack,
+
+    error = Rojo,
+    onError = TextBlack,
+    errorContainer = RojoClaro,
+    onErrorContainer = TextBlack,
 
     background = BackgroundLight,
     onBackground = TextBlack,
@@ -25,21 +33,16 @@ private val LightColorScheme = lightColorScheme(
     surface = SurfaceWhite,
     onSurface = TextBlack,
     surfaceVariant = SurfaceVariantGray,
-    onSurfaceVariant = TextBlack,
+    onSurfaceVariant = TextGray,
 
-    outline = BorderGray,
-    outlineVariant = BorderGray,
-
-    error = Rojo,
-    onError = SurfaceWhite,
-    errorContainer = RojoClaro,
-    onErrorContainer = RojoOscuro
+    outline = Outline
 )
 
 @Composable
 fun Gestor360Theme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = LightColorScheme,
+        typography = Typography(),
         content = content
     )
 }

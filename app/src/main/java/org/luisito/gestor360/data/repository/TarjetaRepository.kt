@@ -58,6 +58,19 @@ class TarjetaRepository(
 
     suspend fun limpiarCache() { }
 
+    /** Precarga las tarjetas de UN local específico, sin depender del local activo en sesión. */
+    suspend fun precargarLocal(androidId: String, localId: Long): Result<Unit> {
+        return try {
+            val tarjetas = SupabaseClientProvider.client.postgrest
+                .rpc("get_tarjetas", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
+                .decodeList<Tarjeta>()
+            db.tarjetaDao().insertarTodas(tarjetas.map { it.toEntity(localId) })
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun crearTarjeta(androidId: String, banco: String, numero: String, titular: String): Result<Unit> {
         val localId = localIdActivo()
         val idTemporal = -(System.currentTimeMillis() * 1000 + (Math.random() * 1000).toLong())

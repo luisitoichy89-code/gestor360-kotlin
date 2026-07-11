@@ -70,6 +70,20 @@ class SessionManager(context: Context) {
 
     fun getAndroidId(): String = prefs.getString("android_id", "") ?: ""
 
+    /**
+     * Marca de tiempo (epoch ms) de la última precarga EXITOSA del caché de
+     * un local específico. Sirve para: (1) no repetir descargas pesadas de
+     * datos si ya se sincronizó hace poco (ahorro de datos), y (2) poder
+     * mostrarle al admin "local 2 actualizado hace 3h" en vez de fallar en
+     * silencio cuando no hay internet.
+     */
+    fun getUltimaPrecarga(localId: Long): Long =
+        prefs.getLong("ultima_precarga_$localId", 0L)
+
+    fun setUltimaPrecarga(localId: Long, timestampMs: Long) {
+        prefs.edit().putLong("ultima_precarga_$localId", timestampMs).apply()
+    }
+
     fun clear() {
         prefs.edit().clear().apply()
     }

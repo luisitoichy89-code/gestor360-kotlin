@@ -78,4 +78,19 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             Result.failure(e)
         }
     }
+
+    /** Precarga el inventario del día de HOY para un local específico (no necesariamente el activo). */
+    suspend fun precargarLocal(androidId: String, localId: Long, fecha: LocalDate = LocalDate.now()): Result<Unit> {
+        return try {
+            val resultado = SupabaseClientProvider.client.postgrest
+                .rpc("get_inventario_dia", buildJsonObject {
+                    put("p_android_id", androidId); put("p_local_id", localId); put("p_fecha", fecha.toString())
+                })
+                .decodeAs<InventarioDia>()
+            db.inventarioCacheDao().guardar(resultado.toEntity(localId, fecha.toString()))
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

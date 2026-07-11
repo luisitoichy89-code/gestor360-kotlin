@@ -87,4 +87,17 @@ class MermaRepository(
 
     suspend fun aprobar(androidId: String, mermaId: Long): Result<Unit> = resolver(androidId, mermaId, "aprobada")
     suspend fun rechazar(androidId: String, mermaId: Long): Result<Unit> = resolver(androidId, mermaId, "rechazada")
+
+    /** Precarga las mermas pendientes de UN local específico, sin depender del local activo en sesión. */
+    suspend fun precargarLocal(androidId: String, localId: Long): Result<Unit> {
+        return try {
+            val mermas = SupabaseClientProvider.client.postgrest
+                .rpc("get_mermas_pendientes", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
+                .decodeList<MermaPendiente>()
+            db.mermaDao().insertarTodas(mermas.map { it.toEntity(localId) })
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

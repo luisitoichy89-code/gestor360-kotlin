@@ -104,4 +104,17 @@ class DevolucionRepository(private val context: Context = AppContextHolder.conte
             Result.success(Unit)
         } catch (e: Exception) { Result.failure(e) }
     }
+
+    /** Precarga las devoluciones pendientes de UN local específico, sin depender del local activo en sesión. */
+    suspend fun precargarLocal(androidId: String, localId: Long): Result<Unit> {
+        return try {
+            val lista = SupabaseClientProvider.client.postgrest
+                .rpc("get_devoluciones", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
+                .decodeList<Devolucion>()
+            db.devolucionCacheDao().guardar(lista.toEntity(localId))
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

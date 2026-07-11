@@ -2,8 +2,6 @@ package org.luisito.gestor360.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,8 +11,7 @@ import kotlinx.serialization.json.put
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.models.Local
 import org.luisito.gestor360.data.repository.LocalRepository
-import org.luisito.gestor360.data.repository.ProductRepository
-import org.luisito.gestor360.data.sync.NetworkMonitor
+import org.luisito.gestor360.data.sync.PrecargaLocalesWorker
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 import org.luisito.gestor360.ui.util.mensajeAmigable
@@ -51,24 +48,14 @@ class LocalSeleccionViewModel(
                     if (idActivo == null && actual != null) {
                         sm.setLocalId(actual.id)
                     }
-                    // Precargar caché de todos los locales en segundo plano
-                    if (NetworkMonitor.hayInternet(AppContextHolder.context)) {
-                        precargarDatosLocales(androidId, lista)
-                    }
+                    // Precarga TODOS los locales del admin en segundo plano, no solo
+                    // el activo. Se encola con WorkManager: si no hay internet ahora,
+                    // Android la ejecuta solo cuando vuelva la conexión, aunque esta
+                    // pantalla ya se haya cerrado — así el local 2 no se queda vacío
+                    // solo porque el admin nunca "entró" a él con datos.
+                    PrecargaLocalesWorker.encolar(AppContextHolder.context)
                 }
                 .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.mensajeAmigable("No se pudieron cargar los locales")) }
-        }
-    }
-
-    private fun precargarDatosLocales(androidId: String, locales: List<Local>) {
-        val context = AppContextHolder.context
-        val productRepo = ProductRepository(context)
-        CoroutineScope(Dispatchers.IO).launch {
-            for (local in locales) {
-                try {
-                    productRepo.precargarLocal(androidId, local.id)
-                } catch (_: Exception) { }
-            }
         }
     }
 
@@ -77,9 +64,14 @@ class LocalSeleccionViewModel(
         val sm = SessionManager(AppContextHolder.context)
         sm.setLocalId(local.id)
 
+        // Al cambiar de local también se nudge la precarga (respeta el intervalo
+        // mínimo de SessionManager, así que si ya estaba fresco no vuelve a bajar
+        // los mismos datos y no gasta datos móviles de más).
+        PrecargaLocalesWorker.encolar(AppContextHolder.context)
+
         viewModelScope.launch {
             try {
-                SupabaseClientProvider.client
+                SupabaseClientProvider.client.postgrest
                     .from("local_seleccion_context")
                     .upsert(buildJsonObject {
                         put("android_id", sm.getAndroidId())
