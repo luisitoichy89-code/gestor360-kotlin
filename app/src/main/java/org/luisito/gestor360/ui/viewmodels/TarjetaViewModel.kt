@@ -30,7 +30,6 @@ class TarjetaViewModel(
         androidIdActual = androidId
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-            repository.limpiarCache()
             repository.getTarjetas(androidId)
                 .onSuccess { lista -> _uiState.value = _uiState.value.copy(isLoading = false, tarjetas = lista) }
                 .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.mensajeAmigable("No se pudieron cargar las tarjetas")) }
