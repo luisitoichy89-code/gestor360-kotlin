@@ -17,6 +17,7 @@ data class InventarioDia(
     val productos_modificados: List<ProductoInfo> = emptyList(),
     val devueltos: List<DevueltoInfo> = emptyList(),
     val ventas: List<VentaInfo> = emptyList(),
+    val productos_vendidos: List<ProductoVendidoInfo> = emptyList(),
     val totales_ventas: TotalesVentas = TotalesVentas()
 )
 
@@ -37,7 +38,10 @@ data class ProductoInfo(
     val nombre: String,
     val precio: Double = 0.0,
     val stock: Double = 0.0,
-    val fecha: String? = null
+    val ubicacion: String? = null,
+    val fecha: String? = null,
+    val solicitado_por_nombre: String? = null,
+    val resuelto_por_nombre: String? = null
 )
 
 @Serializable
@@ -65,7 +69,24 @@ data class VentaInfo(
     val anulada: Boolean = false,
     val usuario_nombre: String? = null,
     val usuario_rol: String? = null,
-    val fecha: String? = null
+    val fecha: String? = null,
+    val cliente_ci: String? = null,
+    val cliente_tel: String? = null,
+    val cliente_nombre: String? = null,
+    val tarjeta_banco: String? = null,
+    val tarjeta_numero: String? = null,
+    val tarjeta_titular: String? = null
+)
+
+/** Fila de "PRODUCTOS VENDIDOS" del reporte: nombre + los 5 totales pedidos. */
+@Serializable
+data class ProductoVendidoInfo(
+    val nombre: String,
+    val total_vendido: Double = 0.0,
+    val total_actual: Double = 0.0,
+    val total_agregado: Double = 0.0,
+    val total_merma: Double = 0.0,
+    val total_inicial: Double = 0.0
 )
 
 @Serializable

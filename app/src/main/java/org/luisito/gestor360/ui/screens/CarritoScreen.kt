@@ -45,6 +45,7 @@ private data class DatosMixto(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CarritoScreen(
+    androidId: String,
     onBack: () -> Unit,
     onVentaConfirmada: () -> Unit,
     viewModel: SaleViewModel = viewModel(),
@@ -57,6 +58,11 @@ fun CarritoScreen(
     var metodoVisual by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Bug: esta pantalla nunca pedía las tarjetas, por eso no aparecían
+    // (ni para vendedor ni para admin) al ir a cobrar una venta.
+    LaunchedEffect(androidId) { tarjetaViewModel.cargar(androidId) }
+    val tarjetasActivas = tarjetaUiState.tarjetas.filter { it.activo }
     // Si el admin no activó "Confirmación x SMS" en Aprobaciones, el checkout
     // se comporta exactamente como antes: del carrito directo a datos del
     // cliente, sin pasar por el overlay de espera de SMS.
@@ -145,7 +151,10 @@ fun CarritoScreen(
                                     Spacer(Modifier.height(2.dp))
                                     Text("${item.cantidad.toInt()} × ${item.subtotal} CUP", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
-                                FilledIconButton(onClick = { viewModel.quitarDelCarrito(i) }) { Icon(Icons.Default.Delete, "Eliminar") }
+                                FilledIconButton(
+                                    onClick = { viewModel.quitarDelCarrito(i) },
+                                    modifier = Modifier.size(48.dp)
+                                ) { Icon(Icons.Default.Delete, "Eliminar", modifier = Modifier.size(24.dp)) }
                             }
                         }
                     }
@@ -158,10 +167,19 @@ fun CarritoScreen(
                     }
                 }
                 Spacer(Modifier.height(16.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button({ paso = PasoCheckout.ConfirmarEfectivo }, Modifier.weight(1f), enabled = !uiState.isSaving, shape = RoundedCornerShape(14.dp)) { Text("EFC") }
-                    Button({ paso = if (smsActivo) PasoCheckout.EsperandoSMS(uiState.totalCarrito, "Total") else PasoCheckout.DatosTransferencia }, Modifier.weight(1f), enabled = !uiState.isSaving, shape = RoundedCornerShape(14.dp)) { Text("TFR") }
-                    Button({ paso = PasoCheckout.MontoMixto }, Modifier.weight(1f), enabled = !uiState.isSaving, shape = RoundedCornerShape(14.dp)) { Text("MXT") }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(
+                        { paso = PasoCheckout.ConfirmarEfectivo }, Modifier.weight(1f).height(64.dp),
+                        enabled = !uiState.isSaving, shape = RoundedCornerShape(14.dp)
+                    ) { Text("EFC", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+                    Button(
+                        { paso = if (smsActivo) PasoCheckout.EsperandoSMS(uiState.totalCarrito, "Total") else PasoCheckout.DatosTransferencia }, Modifier.weight(1f).height(64.dp),
+                        enabled = !uiState.isSaving, shape = RoundedCornerShape(14.dp)
+                    ) { Text("TFR", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+                    Button(
+                        { paso = PasoCheckout.MontoMixto }, Modifier.weight(1f).height(64.dp),
+                        enabled = !uiState.isSaving, shape = RoundedCornerShape(14.dp)
+                    ) { Text("MXT", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
                 }
             }
         }
@@ -184,22 +202,26 @@ fun CarritoScreen(
                 }
             },
             confirmButton = {
-                TextButton(enabled = !uiState.isSaving, onClick = {
-                    viewModel.confirmarVenta("cash", uiState.totalCarrito, 0.0, 0L, null)
-                    paso = PasoCheckout.Ninguno
-                }) { Text(if (uiState.isSaving) "Guardando..." else "Aceptar", fontWeight = FontWeight.Bold) }
-            },
-            dismissButton = { TextButton(onClick = { paso = PasoCheckout.Ninguno }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }
+                BotonesDialogoGrandes(
+                    textoConfirmar = if (uiState.isSaving) "Guardando..." else "Aceptar",
+                    confirmarHabilitado = !uiState.isSaving,
+                    onCancelar = { paso = PasoCheckout.Ninguno },
+                    onConfirmar = {
+                        viewModel.confirmarVenta("cash", uiState.totalCarrito, 0.0, 0L, null)
+                        paso = PasoCheckout.Ninguno
+                    }
+                )
+            }
         )
 
         is PasoCheckout.DatosTransferencia -> DatosClienteDialog(
             titulo = "Transferencia",
             monto = uiState.totalCarrito,
-            tarjetas = tarjetaUiState.tarjetas,
+            tarjetas = tarjetasActivas,
             onDismiss = { paso = PasoCheckout.Ninguno; metodoVisual = false }
         ) { ci, tel, nombre, tarjeta ->
             val metodo = if (metodoVisual) "transfer_visual" else "transfer"
-            viewModel.confirmarVenta(metodo, 0.0, uiState.totalCarrito, 0L, SaleRepository.DatosCliente(ci, tel, nombre, "${tarjeta.banco} · ${tarjeta.numero}"))
+            viewModel.confirmarVenta(metodo, 0.0, uiState.totalCarrito, 0L, SaleRepository.DatosCliente(ci, tel, nombre, tarjeta?.let { "${it.banco} · ${it.numero}" }, tarjeta?.id))
             paso = PasoCheckout.Ninguno
             metodoVisual = false
         }
@@ -228,12 +250,16 @@ fun CarritoScreen(
                 },
                 confirmButton = {
                     val ef = efTexto.toDoubleOrNull() ?: 0.0
-                    TextButton(enabled = ef > 0 && ef < uiState.totalCarrito, onClick = {
-                        datosMixto = datosMixto.copy(efectivo = ef)
-                        paso = if (smsActivo) PasoCheckout.EsperandoSMS(uiState.totalCarrito - ef, "Mixto") else PasoCheckout.DatosMixtoTransferencia
-                    }) { Text("Continuar", fontWeight = FontWeight.Bold) }
-                },
-                dismissButton = { TextButton(onClick = { paso = PasoCheckout.Ninguno }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }
+                    BotonesDialogoGrandes(
+                        textoConfirmar = "Continuar",
+                        confirmarHabilitado = ef > 0 && ef < uiState.totalCarrito,
+                        onCancelar = { paso = PasoCheckout.Ninguno },
+                        onConfirmar = {
+                            datosMixto = datosMixto.copy(efectivo = ef)
+                            paso = if (smsActivo) PasoCheckout.EsperandoSMS(uiState.totalCarrito - ef, "Mixto") else PasoCheckout.DatosMixtoTransferencia
+                        }
+                    )
+                }
             )
         }
 
@@ -242,12 +268,12 @@ fun CarritoScreen(
             DatosClienteDialog(
                 titulo = "Mixto - Transferencia",
                 monto = restante,
-                tarjetas = tarjetaUiState.tarjetas,
+                tarjetas = tarjetasActivas,
                 onDismiss = { paso = PasoCheckout.MontoMixto; metodoVisual = false }
             ) { ci, tel, nombre, tarjeta ->
                 val metodo = if (metodoVisual) "mixed_visual" else "mixed"
                 datosMixto = datosMixto.copy(ci = ci, tel = tel, nombre = nombre, tarjeta = tarjeta)
-                viewModel.confirmarVenta(metodo, datosMixto.efectivo, restante, 0L, SaleRepository.DatosCliente(ci, tel, nombre, "${tarjeta.banco} · ${tarjeta.numero}"))
+                viewModel.confirmarVenta(metodo, datosMixto.efectivo, restante, 0L, SaleRepository.DatosCliente(ci, tel, nombre, tarjeta?.let { "${it.banco} · ${it.numero}" }, tarjeta?.id))
                 paso = PasoCheckout.Ninguno
                 datosMixto = DatosMixto()
                 metodoVisual = false
@@ -278,29 +304,63 @@ fun CarritoScreen(
                     }
                 },
                 confirmButton = {
-                    TextButton(enabled = !uiState.isSaving, onClick = {
-                        val tarjeta = datosMixto.tarjeta ?: return@TextButton
-                        viewModel.confirmarVenta(
-                            "mixed", datosMixto.efectivo, restante, 0L,
-                            SaleRepository.DatosCliente(datosMixto.ci, datosMixto.tel, datosMixto.nombre, "${tarjeta.banco} · ${tarjeta.numero}")
-                        )
-                        paso = PasoCheckout.Ninguno
-                        datosMixto = DatosMixto()
-                    }) { Text(if (uiState.isSaving) "Guardando..." else "Confirmar", fontWeight = FontWeight.Bold) }
-                },
-                dismissButton = { TextButton(onClick = { paso = PasoCheckout.MontoMixto }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }
+                    BotonesDialogoGrandes(
+                        textoConfirmar = if (uiState.isSaving) "Guardando..." else "Confirmar",
+                        confirmarHabilitado = !uiState.isSaving,
+                        onCancelar = { paso = PasoCheckout.MontoMixto },
+                        onConfirmar = {
+                            viewModel.confirmarVenta(
+                                "mixed", datosMixto.efectivo, restante, 0L,
+                                SaleRepository.DatosCliente(datosMixto.ci, datosMixto.tel, datosMixto.nombre, datosMixto.tarjeta?.let { "${it.banco} · ${it.numero}" }, datosMixto.tarjeta?.id)
+                            )
+                            paso = PasoCheckout.Ninguno
+                            datosMixto = DatosMixto()
+                        }
+                    )
+                }
             )
         }
     }
 }
 
+/**
+ * Fila de botones grande dividida a la mitad (Cancelar / Confirmar), para que
+ * sea fácil de presionar. Se usa en el slot confirmButton de los AlertDialog,
+ * dejando dismissButton vacío, así ocupa el ancho completo del diálogo.
+ */
+@Composable
+private fun BotonesDialogoGrandes(
+    textoConfirmar: String,
+    confirmarHabilitado: Boolean,
+    onCancelar: () -> Unit,
+    onConfirmar: () -> Unit,
+    textoCancelar: String = "Cancelar"
+) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        OutlinedButton(
+            onClick = onCancelar,
+            modifier = Modifier.weight(1f).height(52.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+        ) { Text(textoCancelar, fontWeight = FontWeight.Bold) }
+        Button(
+            onClick = onConfirmar,
+            enabled = confirmarHabilitado,
+            modifier = Modifier.weight(1f).height(52.dp),
+            shape = RoundedCornerShape(14.dp)
+        ) { Text(textoConfirmar, fontWeight = FontWeight.Bold) }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DatosClienteDialog(titulo: String, monto: Double, tarjetas: List<Tarjeta>, onDismiss: () -> Unit, onConfirmar: (String, String, String, Tarjeta) -> Unit) {
+private fun DatosClienteDialog(titulo: String, monto: Double, tarjetas: List<Tarjeta>, onDismiss: () -> Unit, onConfirmar: (String, String, String, Tarjeta?) -> Unit) {
     var ci by remember { mutableStateOf("") }
     var tel by remember { mutableStateOf("") }
     var nombre by remember { mutableStateOf("") }
-    var tarjetaSel by remember { mutableStateOf(tarjetas.firstOrNull()) }
+    // Ya no se preselecciona ninguna tarjeta: el vendedor/admin ve "Seleccionar"
+    // y elegir cuenta es opcional, para no bloquear la venta por datos.
+    var tarjetaSel by remember { mutableStateOf<Tarjeta?>(null) }
     var menuAbierto by remember { mutableStateOf(false) }
 
     AlertDialog(
@@ -317,12 +377,12 @@ private fun DatosClienteDialog(titulo: String, monto: Double, tarjetas: List<Tar
                 }
                 Spacer(Modifier.height(12.dp))
                 if (tarjetas.isEmpty()) {
-                    Text("No hay tarjetas disponibles", color = MaterialTheme.colorScheme.error)
+                    Text("No hay tarjetas disponibles", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 } else {
                     ExposedDropdownMenuBox(menuAbierto, { menuAbierto = it }) {
                         OutlinedTextField(
-                            tarjetaSel?.let { "${it.banco} · ${it.numero}" } ?: "", {},
-                            readOnly = true, label = { Text("Cuenta destino") },
+                            tarjetaSel?.let { "${it.banco} · ${it.numero}" } ?: "Seleccionar", {},
+                            readOnly = true, label = { Text("Cuenta destino (opcional)") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(menuAbierto) },
                             modifier = Modifier.fillMaxWidth().menuAnchor(), shape = RoundedCornerShape(14.dp)
                         )
@@ -332,19 +392,20 @@ private fun DatosClienteDialog(titulo: String, monto: Double, tarjetas: List<Tar
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                OutlinedTextField(ci, { ci = it.filter { c -> c.isDigit() } }, label = { Text("CI") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
+                OutlinedTextField(ci, { ci = it.filter { c -> c.isDigit() } }, label = { Text("CI (opcional)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(tel, { tel = it.filter { c -> c.isDigit() } }, label = { Text("Teléfono") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
+                OutlinedTextField(tel, { tel = it.filter { c -> c.isDigit() } }, label = { Text("Teléfono (opcional)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(nombre, { nombre = it }, label = { Text("Nombre") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
+                OutlinedTextField(nombre, { nombre = it }, label = { Text("Nombre (opcional)") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
             }
         },
         confirmButton = {
-            val tarjeta = tarjetaSel
-            TextButton(enabled = ci.isNotBlank() && tarjeta != null, onClick = {
-                if (tarjeta != null) onConfirmar(ci.trim(), tel.trim(), nombre.trim(), tarjeta)
-            }) { Text("Confirmar", fontWeight = FontWeight.Bold) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }
+            BotonesDialogoGrandes(
+                textoConfirmar = "Confirmar",
+                confirmarHabilitado = true,
+                onCancelar = onDismiss,
+                onConfirmar = { onConfirmar(ci.trim(), tel.trim(), nombre.trim(), tarjetaSel) }
+            )
+        }
     )
 }

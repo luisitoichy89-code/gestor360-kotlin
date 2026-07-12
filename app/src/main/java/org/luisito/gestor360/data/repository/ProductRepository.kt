@@ -106,9 +106,19 @@ class ProductRepository(
         return Result.success(Unit)
     }
 
-    suspend fun registrarMerma(androidId: String, producto: Product, cantidad: Double): Result<Unit> {
+    suspend fun registrarMerma(androidId: String, producto: Product, cantidad: Double, motivo: String = "Merma"): Result<Unit> {
+        val localId = localIdActivo()
         val nuevoStock = (producto.stock - cantidad).coerceAtLeast(0.0)
-        return updateProduct(androidId, producto.id, producto.nombre, producto.precio, nuevoStock, producto.ubicacion ?: "", producto.categoria ?: "")
+        // Aplicar YA en el caché local (optimista), igual que updateProduct.
+        db.productoDao().obtenerPorId(producto.id, localId)?.let {
+            db.productoDao().insertarUno(it.copy(stock = nuevoStock))
+        }
+        val payload = buildJsonObject {
+            put("p_android_id", androidId); put("p_local_id", localId); put("p_producto_id", producto.id)
+            put("p_cantidad", cantidad); put("p_motivo", motivo)
+        }
+        encolarYSincronizar(androidId, "registrar_merma_admin", payload)
+        return Result.success(Unit)
     }
 
     suspend fun deleteProduct(androidId: String, id: Long): Result<Unit> {

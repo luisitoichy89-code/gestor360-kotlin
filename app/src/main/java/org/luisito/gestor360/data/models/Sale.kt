@@ -18,6 +18,9 @@ data class Sale(
     val cliente_ci: String? = null,
     val cliente_tel: String? = null,
     val cliente_nombre: String? = null,
+    // NUEVO: tarjeta usada para cobrar (transferencia o mixta). Ya no es
+    // obligatoria: puede quedar null si no se seleccionó ninguna.
+    val tarjeta_id: Long? = null,
     val created_at: String? = null,
     val updated_at: String? = null
 )

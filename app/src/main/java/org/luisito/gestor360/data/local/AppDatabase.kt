@@ -50,7 +50,12 @@ import org.luisito.gestor360.data.local.entities.VentaEntity
     // quede offline-first por local (antes pedía siempre en vivo y devolvía vacío
     // sin internet — la última pieza que faltaba para que un admin pueda cambiar
     // de local sin internet y ver todo, no solo con el local con el que entró).
-    version = 7,
+    // v8: se agrega tarjetaId a VentaEntity (ventas_cache) — ahora la venta
+    // guarda qué tarjeta se usó para cobrar. Misma lógica de
+    // fallbackToDestructiveMigration: se recrea la tabla de caché, cero
+    // pérdida real (las ventas ya sincronizadas se vuelven a traer del
+    // servidor; las pendientes de sincronizar viven en AccionPendienteEntity).
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

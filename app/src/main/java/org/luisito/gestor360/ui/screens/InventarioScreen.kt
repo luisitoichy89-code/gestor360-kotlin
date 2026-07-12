@@ -24,6 +24,9 @@ import java.time.format.DateTimeFormatter
 
 private const val VENTAS_POR_PAGINA = 20
 
+/** Fila calculada de "TARJETA": una cuenta + cuánto entró por ella ese día. */
+private data class TarjetaResumen(val etiqueta: String, val titular: String?, val total: Double)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InventarioScreen(androidId: String, rol: String, onBack: (() -> Unit)? = null, viewModel: InventarioViewModel = viewModel()) {
@@ -44,6 +47,21 @@ fun InventarioScreen(androidId: String, rol: String, onBack: (() -> Unit)? = nul
     val totalPaginasVentas = maxOf(1, (ventasNoAnuladas.size + VENTAS_POR_PAGINA - 1) / VENTAS_POR_PAGINA)
     val paginaSegura = paginaVentas.coerceIn(0, totalPaginasVentas - 1)
     val ventasPagina = ventasNoAnuladas.drop(paginaSegura * VENTAS_POR_PAGINA).take(VENTAS_POR_PAGINA)
+
+    // TARJETA: agrupa por cuenta y suma solo la parte transferida a esa cuenta
+    // (en una venta mixta, el efectivo no cuenta para ninguna tarjeta).
+    val tarjetasResumen = remember(ventasNoAnuladas) {
+        ventasNoAnuladas
+            .filter { !it.tarjeta_numero.isNullOrBlank() }
+            .groupBy { Triple(it.tarjeta_banco, it.tarjeta_numero, it.tarjeta_titular) }
+            .map { (clave, filas) -> TarjetaResumen("${clave.first ?: ""} · ${clave.second}", clave.third, filas.sumOf { it.transferencia }) }
+            .sortedByDescending { it.total }
+    }
+
+    // PAGOS POR TARJETAS: cada venta por transferencia/mixta que sí tiene tarjeta seleccionada.
+    val pagosPorTarjeta = remember(ventasNoAnuladas) {
+        ventasNoAnuladas.filter { (it.metodo == "transfer" || it.metodo == "transfer_visual" || it.metodo == "mixed" || it.metodo == "mixed_visual") && !it.tarjeta_numero.isNullOrBlank() }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -78,18 +96,36 @@ fun InventarioScreen(androidId: String, rol: String, onBack: (() -> Unit)? = nul
             else -> LazyColumn(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 item { EncabezadoDia(uiState.fecha, formatter, dia.solo_lectura) }
                 item { TurnoCard(dia.turno, uiState.esHoy && !dia.solo_lectura, uiState.isSaving, onCerrar = { mostrarCerrarTurno = true }) }
-                item { SeccionTitulo("Productos nuevos", Icons.Default.AddBox) }
+
+                item { Spacer(Modifier.height(4.dp)); Divider(); Spacer(Modifier.height(4.dp)) }
+                item { TotalesGeneralesCard(dia.totales_ventas) }
+
+                item { SeccionTitulo("Tarjeta", Icons.Default.CreditCard) }
+                if (tarjetasResumen.isEmpty()) item { TextoVacioSeccion("Sin cobros por tarjeta este día") }
+                items(tarjetasResumen, key = { "tj_${it.etiqueta}" }) { t -> TarjetaResumenRow(t) }
+
+                item { SeccionTitulo("Productos vendidos", Icons.Default.PointOfSale) }
+                if (dia.productos_vendidos.isEmpty()) item { TextoVacioSeccion("Sin ventas este día") }
+                items(dia.productos_vendidos, key = { "pv_${it.nombre}" }) { p -> ProductoVendidoRow(p) }
+
+                item { SeccionTitulo("Pagos por tarjetas", Icons.Default.CreditCard) }
+                if (pagosPorTarjeta.isEmpty()) item { TextoVacioSeccion("Sin pagos por tarjeta este día") }
+                items(pagosPorTarjeta, key = { "pg_${it.id}" }) { v -> PagoTarjetaRow(v) }
+
+                item { SeccionTitulo("Productos nuevos ingresados", Icons.Default.AddBox) }
                 if (dia.productos_nuevos.isEmpty()) item { TextoVacioSeccion("Sin productos nuevos este día") }
-                items(dia.productos_nuevos, key = { "pn_${it.id}" }) { p -> ProductoInfoRow(p) }
+                items(dia.productos_nuevos, key = { "pn_${it.id}" }) { p -> ProductoNuevoRow(p) }
+
+                item { Spacer(Modifier.height(4.dp)); Divider(); Spacer(Modifier.height(4.dp)) }
                 item { SeccionTitulo("Productos modificados", Icons.Default.Edit) }
                 if (dia.productos_modificados.isEmpty()) item { TextoVacioSeccion("Sin productos modificados este día") }
                 items(dia.productos_modificados, key = { "pm_${it.id}" }) { p -> ProductoInfoRow(p) }
                 item { SeccionTitulo("Devueltos", Icons.Default.AssignmentReturn) }
                 if (dia.devueltos.isEmpty()) item { TextoVacioSeccion("Sin devoluciones este día") }
                 items(dia.devueltos, key = { "dv_${it.id}" }) { d -> DevueltoInfoRow(d) }
+
                 item { Spacer(Modifier.height(4.dp)); Divider(); Spacer(Modifier.height(4.dp)) }
-                item { SeccionTitulo("Ventas", Icons.Default.PointOfSale) }
-                item { TotalesVentasCard(dia.totales_ventas) }
+                item { SeccionTitulo("Detalle de ventas", Icons.Default.Receipt) }
                 if (ventasNoAnuladas.isEmpty()) item { TextoVacioSeccion("Sin ventas este día") }
                 items(ventasPagina, key = { "vt_${it.id}" }) { v -> VentaInfoRow(v) }
                 if (ventasNoAnuladas.isNotEmpty()) item {
@@ -195,7 +231,7 @@ private fun SeccionTitulo(texto: String, icono: androidx.compose.ui.graphics.vec
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(icono, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(6.dp))
-        Text(texto, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        Text(texto.uppercase(), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -222,6 +258,23 @@ private fun ProductoInfoRow(p: ProductoInfo) {
         Column(Modifier.padding(12.dp)) {
             Text(p.nombre, fontWeight = FontWeight.Bold)
             Text("Stock actual: ${p.stock.toInt()}", style = MaterialTheme.typography.bodySmall)
+            if (!p.fecha.isNullOrBlank()) Text(p.fecha.take(16).replace("T", " "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** PRODUCTOS NUEVOS INGRESADOS: nombre, cantidad, ubicación. Solo llegan aquí los ya aprobados. */
+@Composable
+private fun ProductoNuevoRow(p: ProductoInfo) {
+    Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            Text(p.nombre, fontWeight = FontWeight.Bold)
+            Text("Cantidad: ${p.stock.toInt()}", style = MaterialTheme.typography.bodySmall)
+            Text("Ubicación: ${p.ubicacion ?: "—"}", style = MaterialTheme.typography.bodySmall)
+            if (!p.solicitado_por_nombre.isNullOrBlank() && p.solicitado_por_nombre != p.resuelto_por_nombre)
+                Text("Propuesto por: ${p.solicitado_por_nombre}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (!p.resuelto_por_nombre.isNullOrBlank())
+                Text("Registrado por: ${p.resuelto_por_nombre}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (!p.fecha.isNullOrBlank()) Text(p.fecha.take(16).replace("T", " "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -266,14 +319,15 @@ private fun VentaInfoRow(v: VentaInfo) {
     }
 }
 
+/** TOTAL EFECTIVO / TOTAL TRANSFERENCIA / TOTAL GENERADO. */
 @Composable
-private fun TotalesVentasCard(totales: TotalesVentas) {
+private fun TotalesGeneralesCard(totales: TotalesVentas) {
     ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
-            FilaResumenDinero("Efectivo", totales.efectivo)
-            FilaResumenDinero("Transferencia", totales.transferencia)
+            FilaResumenDinero("Total efectivo", totales.efectivo)
+            FilaResumenDinero("Total transferencia", totales.transferencia)
             Divider(modifier = Modifier.padding(vertical = 8.dp))
-            FilaResumenDinero("Total (${totales.cantidad_ventas} ventas)", totales.efectivo + totales.transferencia, destacado = true)
+            FilaResumenDinero("Total generado (${totales.cantidad_ventas} ventas)", totales.efectivo + totales.transferencia, destacado = true)
         }
     }
 }
@@ -283,6 +337,54 @@ private fun FilaResumenDinero(etiqueta: String, valor: Double, destacado: Boolea
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(etiqueta, style = if (destacado) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium)
         Text("$valor CUP", style = if (destacado) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium, fontWeight = if (destacado) FontWeight.Bold else FontWeight.Normal, color = if (destacado) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+/** Fila de la sección "Tarjeta": cuenta + cuánto entró por ella. */
+@Composable
+private fun TarjetaResumenRow(t: TarjetaResumen) {
+    Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Column {
+                Text(t.etiqueta, fontWeight = FontWeight.Bold)
+                if (!t.titular.isNullOrBlank()) Text(t.titular, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text("${t.total} CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+/** Fila de "PRODUCTOS VENDIDOS": nombre + los 5 totales pedidos. */
+@Composable
+private fun ProductoVendidoRow(p: ProductoVendidoInfo) {
+    Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            Text(p.nombre, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(4.dp))
+            Text("Total vendidos: ${p.total_vendido}", style = MaterialTheme.typography.bodySmall)
+            Text("Total actual: ${p.total_actual}", style = MaterialTheme.typography.bodySmall)
+            Text("Total agregados: ${p.total_agregado}", style = MaterialTheme.typography.bodySmall)
+            Text("Total merma: ${p.total_merma}", style = MaterialTheme.typography.bodySmall)
+            Text("Total inicial: ${p.total_inicial}", style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+/** Fila de "PAGOS POR TARJETAS": cuenta + monto + datos del cliente si se cargaron. */
+@Composable
+private fun PagoTarjetaRow(v: VentaInfo) {
+    Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text("${v.tarjeta_banco ?: ""} · ${v.tarjeta_numero}", fontWeight = FontWeight.Bold)
+                Text("${v.transferencia} CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            }
+            if (!v.tarjeta_titular.isNullOrBlank()) Text("Titular de la cuenta: ${v.tarjeta_titular}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(4.dp))
+            Text("Cliente: ${v.cliente_nombre?.takeIf { it.isNotBlank() } ?: "—"}", style = MaterialTheme.typography.bodySmall)
+            Text("Teléfono: ${v.cliente_tel?.takeIf { it.isNotBlank() } ?: "—"}", style = MaterialTheme.typography.bodySmall)
+            Text("CI: ${v.cliente_ci?.takeIf { it.isNotBlank() } ?: "—"}", style = MaterialTheme.typography.bodySmall)
+        }
     }
 }
 

@@ -19,6 +19,7 @@ data class VentaEntity(
     val clienteCi: String?,
     val clienteTel: String?,
     val clienteNombre: String?,
+    val tarjetaId: Long?,
     val createdAt: String?,
     val sincronizada: Boolean = true
 )
@@ -26,12 +27,13 @@ data class VentaEntity(
 fun VentaEntity.toModel() = Sale(
     id = id, producto_id = productoId, cantidad = cantidad, total = total, metodo = metodo,
     efectivo = efectivo, transferencia = transferencia, usuario_id = usuarioId, local_id = localId,
-    cliente_ci = clienteCi, cliente_tel = clienteTel, cliente_nombre = clienteNombre, created_at = createdAt
+    cliente_ci = clienteCi, cliente_tel = clienteTel, cliente_nombre = clienteNombre,
+    tarjeta_id = tarjetaId, created_at = createdAt
 )
 
 fun Sale.toEntity(localId: Long, sincronizada: Boolean = true) = VentaEntity(
     id = id ?: "local_${UUID.randomUUID()}", productoId = producto_id, cantidad = cantidad, total = total,
     metodo = metodo, efectivo = efectivo, transferencia = transferencia, usuarioId = usuario_id,
     localId = localId, clienteCi = cliente_ci, clienteTel = cliente_tel, clienteNombre = cliente_nombre,
-    createdAt = created_at, sincronizada = sincronizada
+    tarjetaId = tarjeta_id, createdAt = created_at, sincronizada = sincronizada
 )

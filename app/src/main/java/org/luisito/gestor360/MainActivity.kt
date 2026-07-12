@@ -165,6 +165,7 @@ fun Gestor360App() {
                         onIrACarrito = { pantalla = PantallaInterna.Carrito }
                     )
                     is PantallaInterna.Carrito -> CarritoScreen(
+                        androidId = androidId,
                         onBack = { pantalla = PantallaInterna.Ventas },
                         onVentaConfirmada = { pantalla = PantallaInterna.Ventas }
                     )

@@ -35,7 +35,7 @@ class SaleRepository(
     private fun localIdActivo(): Long =
         session.getLocalId() ?: throw IllegalStateException("No hay un local activo seleccionado")
 
-    data class DatosCliente(val ci: String, val telefono: String, val nombre: String, val banco: String)
+    data class DatosCliente(val ci: String, val telefono: String, val nombre: String, val banco: String? = null, val tarjetaId: Long? = null)
 
     /**
      * Guarda local YA (stock descontado al instante + fila de venta visible de
@@ -63,6 +63,7 @@ class SaleRepository(
                     id = null, producto_id = item.productId, cantidad = item.cantidad, total = item.subtotal,
                     metodo = metodo, efectivo = efectivoItem, transferencia = transferenciaItem, local_id = localId,
                     cliente_ci = cliente?.ci, cliente_tel = cliente?.telefono, cliente_nombre = cliente?.nombre,
+                    tarjeta_id = cliente?.tarjetaId,
                     created_at = java.time.LocalDateTime.now().toString()
                 )
                 db.ventaDao().insertarUna(ventaLocal.toEntity(localId, sincronizada = false))
@@ -73,6 +74,7 @@ class SaleRepository(
                     put("p_cantidad", item.cantidad); put("p_total", item.subtotal)
                     put("p_metodo", metodo); put("p_efectivo", efectivoItem); put("p_transferencia", transferenciaItem)
                     put("p_cliente_ci", cliente?.ci ?: ""); put("p_cliente_tel", cliente?.telefono ?: ""); put("p_cliente_nombre", cliente?.nombre ?: "")
+                    cliente?.tarjetaId?.let { put("p_tarjeta_id", it) }
                 }
                 db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "registrar_venta", payloadJson = payload.toString()))
             } catch (_: Exception) {

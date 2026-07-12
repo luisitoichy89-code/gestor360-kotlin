@@ -105,18 +105,31 @@ fun VentasScreen(
                         cantidad, { cantidad = it.filter { c -> c.isDigit() || c == '.' } },
                         label = { Text("Cantidad") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true, shape = RoundedCornerShape(14.dp)
+                        singleLine = true, shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth()
                     )
+                    Spacer(Modifier.height(20.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedButton(
+                            onClick = { selectedProduct = null },
+                            modifier = Modifier.weight(1f).height(52.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        ) { Text("Cancelar", fontWeight = FontWeight.Bold) }
+                        Button(
+                            onClick = {
+                                val c = cantidad.toDoubleOrNull() ?: 0.0
+                                val err = viewModel.agregarAlCarrito(selectedProduct!!, c)
+                                if (err == null) { selectedProduct = null; cantidad = "" }
+                            },
+                            modifier = Modifier.weight(1f).height(52.dp),
+                            shape = RoundedCornerShape(14.dp)
+                        ) { Text("Agregar", fontWeight = FontWeight.Bold) }
+                    }
                 }
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    val c = cantidad.toDoubleOrNull() ?: 0.0
-                    val err = viewModel.agregarAlCarrito(selectedProduct!!, c)
-                    if (err == null) { selectedProduct = null; cantidad = "" }
-                }) { Text("Agregar", fontWeight = FontWeight.Bold) }
-            },
-            dismissButton = { TextButton(onClick = { selectedProduct = null }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }
+            confirmButton = {},
+            dismissButton = {}
         )
     }
 
@@ -126,16 +139,24 @@ fun VentasScreen(
             title = { Text("Cancelar venta", fontWeight = FontWeight.Bold) },
             text = { Text("¿Estás seguro de cancelar la venta? Se vaciará el carrito.") },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.limpiarCarrito()
-                        mostrarCancelarVenta = false
-                        onBack()
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) { Text("Cancelar venta", fontWeight = FontWeight.Bold) }
-            },
-            dismissButton = { TextButton(onClick = { mostrarCancelarVenta = false }) { Text("Volver") } }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(
+                        onClick = { mostrarCancelarVenta = false },
+                        modifier = Modifier.weight(1f).height(52.dp),
+                        shape = RoundedCornerShape(14.dp)
+                    ) { Text("Volver", fontWeight = FontWeight.Bold) }
+                    Button(
+                        onClick = {
+                            viewModel.limpiarCarrito()
+                            mostrarCancelarVenta = false
+                            onBack()
+                        },
+                        modifier = Modifier.weight(1f).height(52.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) { Text("Cancelar venta", fontWeight = FontWeight.Bold) }
+                }
+            }
         )
     }
 }
