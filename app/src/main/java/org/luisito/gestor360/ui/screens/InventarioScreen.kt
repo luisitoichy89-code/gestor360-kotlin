@@ -120,6 +120,9 @@ fun InventarioScreen(androidId: String, rol: String, onBack: (() -> Unit)? = nul
                 item { SeccionTitulo("Productos modificados", Icons.Default.Edit) }
                 if (dia.productos_modificados.isEmpty()) item { TextoVacioSeccion("Sin productos modificados este día") }
                 items(dia.productos_modificados, key = { "pm_${it.id}" }) { p -> ProductoInfoRow(p) }
+                item { SeccionTitulo("Productos eliminados", Icons.Default.Delete) }
+                if (dia.productos_eliminados.isEmpty()) item { TextoVacioSeccion("Sin productos eliminados este día") }
+                items(dia.productos_eliminados, key = { "pe_${it.id}" }) { p -> ProductoEliminadoRow(p) }
                 item { SeccionTitulo("Devueltos", Icons.Default.AssignmentReturn) }
                 if (dia.devueltos.isEmpty()) item { TextoVacioSeccion("Sin devoluciones este día") }
                 items(dia.devueltos, key = { "dv_${it.id}" }) { d -> DevueltoInfoRow(d) }
@@ -264,6 +267,18 @@ private fun ProductoInfoRow(p: ProductoInfo) {
 }
 
 /** PRODUCTOS NUEVOS INGRESADOS: nombre, cantidad, ubicación. Solo llegan aquí los ya aprobados. */
+@Composable
+private fun ProductoEliminadoRow(p: ProductoEliminadoInfo) {
+    Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            Text(p.nombre, fontWeight = FontWeight.Bold)
+            Text("Stock al borrarse: ${p.stock.toInt()}", style = MaterialTheme.typography.bodySmall)
+            if (!p.resuelto_por_nombre.isNullOrBlank()) Text("Eliminado por: ${p.resuelto_por_nombre}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (!p.fecha.isNullOrBlank()) Text(p.fecha.take(16).replace("T", " "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
 @Composable
 private fun ProductoNuevoRow(p: ProductoInfo) {
     Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {

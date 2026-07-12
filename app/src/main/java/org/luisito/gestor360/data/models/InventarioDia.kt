@@ -15,6 +15,7 @@ data class InventarioDia(
     val turno: TurnoInfo? = null,
     val productos_nuevos: List<ProductoInfo> = emptyList(),
     val productos_modificados: List<ProductoInfo> = emptyList(),
+    val productos_eliminados: List<ProductoEliminadoInfo> = emptyList(),
     val devueltos: List<DevueltoInfo> = emptyList(),
     val ventas: List<VentaInfo> = emptyList(),
     val productos_vendidos: List<ProductoVendidoInfo> = emptyList(),
@@ -41,6 +42,15 @@ data class ProductoInfo(
     val ubicacion: String? = null,
     val fecha: String? = null,
     val solicitado_por_nombre: String? = null,
+    val resuelto_por_nombre: String? = null
+)
+
+@Serializable
+data class ProductoEliminadoInfo(
+    val id: Long,
+    val nombre: String,
+    val stock: Double = 0.0,
+    val fecha: String? = null,
     val resuelto_por_nombre: String? = null
 )
 

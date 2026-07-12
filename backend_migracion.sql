@@ -368,6 +368,33 @@ begin
 end;
 $function$;
 
+-- Permitir el tipo 'eliminacion' (borrado de producto) en aprobaciones.
+alter table public.aprobaciones drop constraint if exists aprobaciones_tipo_check;
+alter table public.aprobaciones add constraint aprobaciones_tipo_check
+  check (tipo in ('producto','aumento','anular_venta','eliminacion'));
+
+-- eliminar_producto: admin borra un producto. Se guarda el nombre/stock que
+-- tenía ANTES de borrarlo (auto-aprobado), porque una vez borrado ya no hay
+-- fila en "productos" a la que referenciar.
+create or replace function public.eliminar_producto(p_android_id text, p_local_id bigint, p_id bigint)
+returns void
+language plpgsql security definer set search_path to 'public'
+as $function$
+declare v_usuario_id bigint; v_nombre text; v_stock numeric;
+begin
+  select id into v_usuario_id from usuarios where android_id = p_android_id limit 1;
+  if v_usuario_id is null then raise exception 'Usuario no encontrado'; end if;
+
+  select nombre, stock into v_nombre, v_stock from productos where id = p_id and local_id = p_local_id;
+  if v_nombre is null then raise exception 'Producto no encontrado'; end if;
+
+  delete from productos where id = p_id and local_id = p_local_id;
+
+  insert into aprobaciones (producto_id, producto_nombre, cantidad, tipo, estado, local_id, solicitado_por, resuelto_por, resuelto_at)
+  values (null, v_nombre, v_stock, 'eliminacion', 'aprobado', p_local_id, v_usuario_id, v_usuario_id, now());
+end;
+$function$;
+
 -- ---------------------------------------------------------------------
 -- 4) get_inventario_dia: recreada. Ojo con las secciones marcadas
 --    "AJUSTAR": ahí necesito que confirmes/mandes los nombres reales de
@@ -391,6 +418,7 @@ declare
   v_productos_vendidos jsonb;
   v_totales jsonb;
   v_solo_lectura boolean;
+  v_productos_eliminados jsonb;
 begin
   select id, rol into v_usuario_id, v_rol from usuarios where android_id = p_android_id limit 1;
   if v_usuario_id is null then raise exception 'Usuario no encontrado'; end if;
@@ -502,12 +530,23 @@ begin
   from ventas v
   where v.local_id = p_local_id and v.created_at::date = p_fecha and v.anulada = false;
 
+  -- Productos eliminados ese día (auditoría: nombre + stock que tenía al borrarse)
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id', a.id, 'nombre', a.producto_nombre, 'stock', a.cantidad, 'fecha', a.resuelto_at,
+    'resuelto_por_nombre', ur.nombre
+  ) order by a.resuelto_at desc), '[]'::jsonb)
+  into v_productos_eliminados
+  from aprobaciones a
+  left join usuarios ur on ur.id = a.resuelto_por
+  where a.local_id = p_local_id and a.tipo = 'eliminacion' and a.resuelto_at::date = p_fecha;
+
   return jsonb_build_object(
     'fecha', p_fecha,
     'solo_lectura', v_solo_lectura,
     'turno', v_turno,
     'productos_nuevos', v_productos_nuevos,
     'productos_modificados', v_productos_modificados,
+    'productos_eliminados', v_productos_eliminados,
     'devueltos', v_devueltos,
     'ventas', v_ventas,
     'productos_vendidos', v_productos_vendidos,

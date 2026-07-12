@@ -49,7 +49,20 @@ class SaleRepository(
         if (carrito.isEmpty()) return Result.failure(IllegalStateException("El carrito está vacío"))
         val totalVenta = carrito.sumOf { it.subtotal }
         if (totalVenta <= 0.0) return Result.failure(IllegalStateException("El total de la venta debe ser mayor a 0"))
-        val localId = localIdActivo()
+        val localId = try {
+            localIdActivo()
+        } catch (e: Exception) {
+            return Result.failure(e)
+        }
+
+        // Antes: un catch vacío por ítem tragaba cualquier error (Room, FK,
+        // lo que sea) y esta función siempre terminaba en Result.success(Unit)
+        // pasara lo que pasara — la UI vaciaba el carrito y mostraba "venta
+        // confirmada" aunque NINGÚN ítem se hubiera guardado. Ahora: se sigue
+        // intentando todo el carrito (un ítem roto no bloquea a los demás),
+        // pero se registran los fallos y, si hubo alguno, se devuelve
+        // Result.failure con el detalle — nunca un éxito falso.
+        val fallos = mutableListOf<Pair<CartItem, Exception>>()
 
         for (item in carrito) {
             try {
@@ -77,12 +90,19 @@ class SaleRepository(
                     cliente?.tarjetaId?.let { put("p_tarjeta_id", it) }
                 }
                 db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "registrar_venta", payloadJson = payload.toString()))
-            } catch (_: Exception) {
-                // Si un item falla, continuar con los demás en vez de abortar toda la venta.
+            } catch (e: Exception) {
+                android.util.Log.e("SaleRepository", "guardarVenta: falló el ítem ${item.nombre} (id=${item.productId})", e)
+                fallos += item to e
             }
         }
 
         if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
+
+        if (fallos.isNotEmpty()) {
+            val detalle = fallos.joinToString(", ") { (item, e) -> "${item.nombre}: ${e.message ?: e::class.simpleName}" }
+            val guardados = carrito.size - fallos.size
+            return Result.failure(IllegalStateException("Se guardaron $guardados de ${carrito.size} productos. Fallaron: $detalle"))
+        }
         return Result.success(Unit)
     }
 
