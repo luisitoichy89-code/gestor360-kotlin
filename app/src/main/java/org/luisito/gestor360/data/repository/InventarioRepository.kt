@@ -51,8 +51,8 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
 
     /** Trae la verdad del servidor (ya filtrada por local_id) y actualiza el caché de ese día. */
     suspend fun refrescarDesdeServidor(androidId: String, fecha: LocalDate): Result<InventarioDia> {
-        val localId = localIdActivo()
         return try {
+            val localId = localIdActivo()
             val resultado = SupabaseClientProvider.client.postgrest
                 .rpc("get_inventario_dia", buildJsonObject {
                     put("p_android_id", androidId); put("p_local_id", localId); put("p_fecha", fecha.toString())

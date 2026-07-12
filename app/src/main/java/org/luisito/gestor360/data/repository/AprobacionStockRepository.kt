@@ -34,6 +34,17 @@ data class AprobacionStock(
     val created_at: String? = null
 )
 
+/**
+ * Offline-first (antes pedía siempre en vivo y devolvía vacío sin internet):
+ * getPendientes lee primero el caché de aprobaciones_cache (ver
+ * AprobacionStockCacheEntity) y refresca en background si hay internet.
+ * solicitarAumento (agregar a stock un producto existente) sigue el mismo
+ * patrón que Merma/Devolucion.solicitar: guarda optimista en caché con id
+ * temporal negativo y encola en acciones_pendientes para sincronizar cuando
+ * vuelva la conexión.
+ * Resolver (aprobar/rechazar) sigue requiriendo conexión sí o sí: mueve stock
+ * real del lado del servidor, mismo criterio que Merma/Devolucion.resolver.
+ */
 class AprobacionStockRepository(private val context: Context = AppContextHolder.context) {
     private val db = AppDatabase.obtener(context)
     private val session = SessionManager(context)
@@ -56,6 +67,7 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
         return refrescarDesdeServidor(androidId)
     }
 
+    /** Trae la verdad del servidor (ya filtrada por local_id) y reemplaza el caché de ese local. */
     suspend fun refrescarDesdeServidor(androidId: String): Result<List<AprobacionStock>> {
         val localId = localIdActivo()
         return try {
@@ -70,6 +82,7 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
         }
     }
 
+    /** Precarga las aprobaciones pendientes de UN local específico, sin depender del local activo en sesión. */
     suspend fun precargarLocal(androidId: String, localId: Long): Result<Unit> {
         return try {
             val response = SupabaseClientProvider.client.postgrest
@@ -82,6 +95,7 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
         }
     }
 
+    /** El vendedor propone offline: queda visible como pendiente de inmediato, igual que solicitarAumento/Merma/Devolucion. */
     suspend fun solicitarProducto(androidId: String, nombre: String, precio: Double, cantidad: Double): Result<Unit> {
         val localId = localIdActivo()
         val idTemporal = -(System.currentTimeMillis() * 1000 + (Math.random() * 1000).toLong())
@@ -101,6 +115,7 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
         return Result.success(Unit)
     }
 
+    /** El vendedor propone offline: queda visible como pendiente de inmediato, igual que Merma/Devolucion.solicitar. */
     suspend fun solicitarAumento(androidId: String, productoId: Long, productoNombre: String, cantidad: Double): Result<Unit> {
         val localId = localIdActivo()
         val idTemporal = -(System.currentTimeMillis() * 1000 + (Math.random() * 1000).toLong())

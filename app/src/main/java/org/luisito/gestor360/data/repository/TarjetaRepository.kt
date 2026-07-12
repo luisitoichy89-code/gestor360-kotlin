@@ -84,19 +84,20 @@ class TarjetaRepository(
         return Result.success(Unit)
     }
 
+    /** Offline-first, igual que crearTarjeta/updateProduct: aplica ya en caché y encola.
+     * Antes bloqueaba con "Necesitas conexión" mientras crear sí funcionaba offline —
+     * inconsistente, dado que el admin no depende de aprobación para nada acá. */
     suspend fun editarTarjeta(androidId: String, id: Long, banco: String, numero: String, titular: String): Result<Unit> {
-        if (!NetworkMonitor.hayInternet(context)) return Result.failure(IllegalStateException("Necesitas conexión para editar una tarjeta"))
         val localId = localIdActivo()
-        return try {
-            val params = buildJsonObject {
-                put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id); put("p_banco", banco); put("p_numero", numero); put("p_titular", titular)
-            }
-            SupabaseClientProvider.client.postgrest.rpc("editar_tarjeta", params)
-            db.tarjetaDao().insertarUna(TarjetaEntity(id, banco, numero, titular, activo = true, localId = localId))
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
+        val activoActual = db.tarjetaDao().obtenerTodas(localId).find { it.id == id }?.activo ?: true
+        db.tarjetaDao().insertarUna(TarjetaEntity(id, banco, numero, titular, activo = activoActual, localId = localId))
+
+        val payload = buildJsonObject {
+            put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id); put("p_banco", banco); put("p_numero", numero); put("p_titular", titular)
         }
+        db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "editar_tarjeta", payloadJson = payload.toString()))
+        if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
+        return Result.success(Unit)
     }
 
     suspend fun setActivo(androidId: String, id: Long, activo: Boolean): Result<Unit> {

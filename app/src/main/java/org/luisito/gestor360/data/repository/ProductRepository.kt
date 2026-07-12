@@ -52,8 +52,8 @@ class ProductRepository(
 
     /** Trae la verdad del servidor (ya filtrada por local_id) y reemplaza el caché de ese local. */
     suspend fun refrescarDesdeServidor(androidId: String): Result<List<Product>> {
-        val localId = localIdActivo()
         return try {
+            val localId = localIdActivo()
             val productos = SupabaseClientProvider.client.postgrest
                 .rpc("get_productos", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
                 .decodeList<Product>()
