@@ -43,6 +43,7 @@ class MermaRepository(
             val mermas = SupabaseClientProvider.client.postgrest
                 .rpc("get_mermas_pendientes", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
                 .decodeList<MermaPendiente>()
+            db.mermaDao().limpiarPendientesDeLocal(localId)
             db.mermaDao().insertarTodas(mermas.map { it.toEntity(localId) })
             Result.success(mermas)
         } catch (e: Exception) {
@@ -94,6 +95,7 @@ class MermaRepository(
             val mermas = SupabaseClientProvider.client.postgrest
                 .rpc("get_mermas_pendientes", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
                 .decodeList<MermaPendiente>()
+            db.mermaDao().limpiarPendientesDeLocal(localId)
             db.mermaDao().insertarTodas(mermas.map { it.toEntity(localId) })
             Result.success(Unit)
         } catch (e: Exception) {

@@ -17,6 +17,9 @@ interface VentaDao {
     @Query("DELETE FROM ventas_cache WHERE sincronizada = 1")
     suspend fun limpiarSincronizadas()
 
+    @Query("DELETE FROM ventas_cache WHERE localId = :localId")
+    suspend fun limpiarDeLocal(localId: Long)
+
     @Query("DELETE FROM ventas_cache WHERE id = :id")
     suspend fun eliminar(id: String)
 }

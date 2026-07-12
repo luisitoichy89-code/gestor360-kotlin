@@ -36,6 +36,7 @@ class SyncManager(private val context: Context) {
     private val mermaRepository = MermaRepository(context)
     private val turnoRepository = TurnoRepository(context)
     private val aprobacionStockRepository = AprobacionStockRepository(context)
+    private val saleRepository = org.luisito.gestor360.data.repository.SaleRepository(context)
 
     suspend fun sincronizar(androidId: String): SyncResultado {
         if (androidId.isBlank()) return SyncResultado(0, 0, "Sin sesión activa")
@@ -72,6 +73,7 @@ class SyncManager(private val context: Context) {
 
         if (session.getLocalId() != null) {
             refrescarProductosYDetectarConflictos(androidId)
+            saleRepository.refrescarDesdeServidor(androidId)
             tarjetaRepository.refrescarDesdeServidor(androidId)
             mermaRepository.refrescarDesdeServidor(androidId)
             turnoRepository.refrescarDesdeServidor(androidId)
@@ -98,6 +100,11 @@ class SyncManager(private val context: Context) {
                 ?.let { db.turnoDao().reemplazarIdTemporal(idTemporal, it, localId) }
             "crear_tarjeta" -> runCatching { respuesta.decodeAs<Long>() }.getOrNull()
                 ?.let { db.tarjetaDao().reemplazarIdTemporal(idTemporal, it, localId) }
+            // Faltaba este caso: la fila local de la merma pedida offline se quedaba
+            // con id temporal para siempre, nunca se emparejaba con la real del
+            // servidor (ver MermaRepository.solicitar + limpiarPendientesDeLocal).
+            "crear_merma" -> runCatching { respuesta.decodeAs<Long>() }.getOrNull()
+                ?.let { db.mermaDao().reemplazarIdTemporal(idTemporal, it, localId) }
         }
     }
 

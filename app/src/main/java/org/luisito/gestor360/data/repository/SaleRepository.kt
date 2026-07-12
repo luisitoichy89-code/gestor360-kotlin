@@ -127,6 +127,29 @@ class SaleRepository(
         }
     }
 
+    /**
+     * Reemplaza (no acumula) el caché de ventas de este local con la verdad del
+     * servidor. Se llama al terminar de sincronizar: sin esto, cada venta hecha
+     * offline se queda para siempre en el caché con su id temporal y
+     * sincronizada=false — nada la marca como sincronizada ni la reemplaza por la
+     * fila real, así que getSales() termina mostrando la venta DUPLICADA (la local
+     * vieja + la real del servidor) apenas hay señal, e infla los totales del
+     * reporte de inventario.
+     */
+    suspend fun refrescarDesdeServidor(androidId: String): Result<List<Sale>> {
+        val localId = localIdActivo()
+        return try {
+            val ventas = SupabaseClientProvider.client.postgrest
+                .rpc("get_ventas", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
+                .decodeList<Sale>()
+            db.ventaDao().limpiarDeLocal(localId)
+            db.ventaDao().insertarTodas(ventas.map { it.toEntity(localId, sincronizada = true) })
+            Result.success(ventas)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     /** Lee del caché local primero (ya filtrado por local); refresca de fondo si hay internet. */
     suspend fun getSales(androidId: String): Result<List<Sale>> {
         val localId = localIdActivo()
