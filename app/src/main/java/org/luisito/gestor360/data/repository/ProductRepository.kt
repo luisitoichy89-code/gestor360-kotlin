@@ -18,17 +18,6 @@ import org.luisito.gestor360.data.sync.SyncWorker
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 
-/**
- * Offline-first: lee siempre de Room primero (nunca bloquea esperando la red).
- * Crear/editar/eliminar se aplican al instante en el caché local y se encolan
- * en "acciones_pendientes"; si hay internet se dispara una sincronización de
- * inmediato, pero aunque falle, la acción ya quedó guardada para reintentarse
- * después (WorkManager o el botón "Sincronizar ahora").
- *
- * TODO lo que toca el servidor o el caché va filtrado por local_id, leído de
- * SessionManager en el momento (nunca cacheado), porque el local activo puede
- * cambiar en caliente si el usuario es admin de varios locales.
- */
 class ProductRepository(
     private val context: Context = AppContextHolder.context
 ) {
@@ -47,10 +36,12 @@ class ProductRepository(
             }
             return Result.success(cacheados.map { it.toModel() })
         }
+        if (!NetworkMonitor.hayInternet(context)) {
+            return Result.success(emptyList())
+        }
         return refrescarDesdeServidor(androidId)
     }
 
-    /** Trae la verdad del servidor (ya filtrada por local_id) y reemplaza el caché de ese local. */
     suspend fun refrescarDesdeServidor(androidId: String): Result<List<Product>> {
         return try {
             val localId = localIdActivo()
@@ -77,7 +68,6 @@ class ProductRepository(
         ubicacion: String, categoria: String
     ): Result<Unit> {
         val localId = localIdActivo()
-        // Id temporal negativo para que se pueda mostrar en la lista antes de sincronizar.
         val idTemporal = -(System.currentTimeMillis() * 1000 + (Math.random() * 1000).toLong())
         val producto = Product(idTemporal, nombre, precio, stock, ubicacion, categoria, localId)
         db.productoDao().insertarUno(producto.toEntity(localId))
@@ -109,7 +99,6 @@ class ProductRepository(
     suspend fun registrarMerma(androidId: String, producto: Product, cantidad: Double, motivo: String = "Merma"): Result<Unit> {
         val localId = localIdActivo()
         val nuevoStock = (producto.stock - cantidad).coerceAtLeast(0.0)
-        // Aplicar YA en el caché local (optimista), igual que updateProduct.
         db.productoDao().obtenerPorId(producto.id, localId)?.let {
             db.productoDao().insertarUno(it.copy(stock = nuevoStock))
         }
@@ -129,7 +118,6 @@ class ProductRepository(
         return Result.success(Unit)
     }
 
-    /** Descuento optimista de stock local, usado por SaleRepository al vender offline. */
     suspend fun descontarStockLocal(id: Long, cantidad: Double) {
         db.productoDao().descontarStock(id, cantidad, localIdActivo())
     }
@@ -143,12 +131,6 @@ class ProductRepository(
         }
     }
 
-    /**
-     * Precarga el caché de UN local específico (puede no ser el local activo
-     * ahora mismo — así el admin puede tener el local 2 listo sin haber
-     * "entrado" a él todavía). Nunca borra lo que ya había en caché si la
-     * llamada de red falla: solo reemplaza cuando la descarga fue exitosa.
-     */
     suspend fun precargarLocal(androidId: String, localId: Long): Result<Unit> {
         return try {
             val productos = SupabaseClientProvider.client.postgrest
