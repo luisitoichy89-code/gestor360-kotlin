@@ -44,7 +44,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             return Result.success(cacheado.toModel())
         }
         if (!NetworkMonitor.hayInternet(context)) {
-            return Result.failure(IllegalStateException("Sin conexión y sin datos guardados para este día todavía"))
+            return Result.success(InventarioDia())
         }
         return refrescarDesdeServidor(androidId, fecha)
     }
