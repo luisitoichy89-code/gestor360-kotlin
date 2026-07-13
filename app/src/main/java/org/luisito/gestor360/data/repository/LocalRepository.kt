@@ -46,7 +46,7 @@ class LocalRepository(
             val locales = SupabaseClientProvider.client.postgrest
                 .rpc("get_locales", buildJsonObject { put("p_android_id", androidId) })
                 .decodeList<Local>()
-            // db.localDao().limpiar()
+            db.localDao().limpiar()
             db.localDao().insertarTodos(locales.map { it.toEntity() })
             Result.success(locales)
         } catch (e: Exception) {
