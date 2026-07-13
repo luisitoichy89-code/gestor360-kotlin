@@ -44,7 +44,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             return Result.success(cacheado.toModel())
         }
         if (!NetworkMonitor.hayInternet(context)) {
-            return Result.success(InventarioDia())
+            return Result.success(InventarioDia(fecha = java.time.LocalDate.now().toString()))
         }
         return refrescarDesdeServidor(androidId, fecha)
     }

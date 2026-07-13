@@ -48,7 +48,7 @@ class ProductRepository(
             val productos = SupabaseClientProvider.client.postgrest
                 .rpc("get_productos", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
                 .decodeList<Product>()
-            db.productoDao().limpiarDeLocal(localId)
+            // // db.productoDao().limpiarDeLocal(localId)
             db.productoDao().insertarTodos(productos.map { it.toEntity(localId) })
             Result.success(productos)
         } catch (e: Exception) {
@@ -136,7 +136,7 @@ class ProductRepository(
             val productos = SupabaseClientProvider.client.postgrest
                 .rpc("get_productos", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
                 .decodeList<Product>()
-            db.productoDao().limpiarDeLocal(localId)
+            // // db.productoDao().limpiarDeLocal(localId)
             db.productoDao().insertarTodos(productos.map { it.toEntity(localId) })
             Result.success(Unit)
         } catch (e: Exception) {
