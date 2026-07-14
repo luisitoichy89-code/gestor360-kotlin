@@ -58,7 +58,6 @@ class TarjetaRepository(
 
     suspend fun limpiarCache() { }
 
-    /** Precarga las tarjetas de UN local específico, sin depender del local activo en sesión. */
     suspend fun precargarLocal(androidId: String, localId: Long): Result<Unit> {
         return try {
             val tarjetas = SupabaseClientProvider.client.postgrest
@@ -84,9 +83,6 @@ class TarjetaRepository(
         return Result.success(Unit)
     }
 
-    /** Offline-first, igual que crearTarjeta/updateProduct: aplica ya en caché y encola.
-     * Antes bloqueaba con "Necesitas conexión" mientras crear sí funcionaba offline —
-     * inconsistente, dado que el admin no depende de aprobación para nada acá. */
     suspend fun editarTarjeta(androidId: String, id: Long, banco: String, numero: String, titular: String): Result<Unit> {
         val localId = localIdActivo()
         val activoActual = db.tarjetaDao().obtenerTodas(localId).find { it.id == id }?.activo ?: true
@@ -111,6 +107,14 @@ class TarjetaRepository(
 
     suspend fun eliminarTarjeta(androidId: String, id: Long): Result<Unit> {
         val localId = localIdActivo()
+        
+        // Si es id temporal, cancelar crear pendiente y solo borrar local
+        if (id < 0) {
+            db.tarjetaDao().eliminar(id, localId)
+            db.accionPendienteDao().cancelarPorIdTemporal(id)
+            return Result.success(Unit)
+        }
+        
         db.tarjetaDao().eliminar(id, localId)
         val payload = buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id) }
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "eliminar_tarjeta", payloadJson = payload.toString()))
