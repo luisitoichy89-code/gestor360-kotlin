@@ -99,7 +99,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
 
         val eliminadosInfo = eliminadosHoy.map { accion ->
             val json = kotlinx.serialization.json.Json.parseToJsonElement(accion.payloadJson)
-            val id = json["p_id"]?.toString()?.trim('"')?.toLongOrNull() ?: 0L
+            val id = json.jsonObject["p_id"]?.toString()?.trim('"')?.toLongOrNull() ?: 0L
             val nombre = db.productoDao().obtenerPorId(id, localId)?.nombre ?: "Producto #$id"
             ProductoEliminadoInfo(
                 id = id, nombre = nombre, stock = 0.0, resuelto_por_nombre = null, fecha = fechaStr
