@@ -24,6 +24,9 @@ interface ProductoDao {
     @Query("DELETE FROM productos_cache WHERE localId = :localId")
     suspend fun limpiarDeLocal(localId: Long)
 
+    @Query("DELETE FROM productos_cache WHERE id > 0 AND localId = :localId")
+    suspend fun limpiarSincronizadosDeLocal(localId: Long)
+
     @Query("DELETE FROM productos_cache WHERE id = :id AND localId = :localId")
     suspend fun eliminar(id: Long, localId: Long)
 
