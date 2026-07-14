@@ -83,7 +83,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         val localesComoInfo = productosModificadosHoy.map { p ->
             ProductoInfo(
                 id = p.id, nombre = p.nombre, precio = p.precio, stock = p.stock,
-                ubicacion = p.ubicacion, categoria = p.categoria, fecha = p.updatedAt,
+                ubicacion = p.ubicacion, fecha = p.updatedAt,
                 solicitado_por_nombre = null, resuelto_por_nombre = null
             )
         }
@@ -98,7 +98,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         if (eliminadosHoy.isEmpty()) return dia
 
         val eliminadosInfo = eliminadosHoy.map { accion ->
-            val json = kotlinx.serialization.json.Json.parseToJsonElement(accion.payloadJson).jsonObject
+            val json = kotlinx.serialization.json.Json.parseToJsonElement(accion.payloadJson)
             val id = json["p_id"]?.toString()?.trim('"')?.toLongOrNull() ?: 0L
             val nombre = db.productoDao().obtenerPorId(id, localId)?.nombre ?: "Producto #$id"
             ProductoEliminadoInfo(
