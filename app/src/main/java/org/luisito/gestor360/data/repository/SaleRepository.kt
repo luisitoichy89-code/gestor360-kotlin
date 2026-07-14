@@ -72,7 +72,7 @@ class SaleRepository(
 
                 // 1. Aplicar YA en local: baja el stock cacheado y agrega la venta a la vista.
                 productRepository.descontarStockLocal(item.productId, item.cantidad)
-                val ventaLocal = Sale(
+                val ventaLocal = Sale(producto_nombre = item.nombre, 
                     id = null, producto_id = item.productId, cantidad = item.cantidad, total = item.subtotal,
                     metodo = metodo, efectivo = efectivoItem, transferencia = transferenciaItem, local_id = localId,
                     cliente_ci = cliente?.ci, cliente_tel = cliente?.telefono, cliente_nombre = cliente?.nombre,

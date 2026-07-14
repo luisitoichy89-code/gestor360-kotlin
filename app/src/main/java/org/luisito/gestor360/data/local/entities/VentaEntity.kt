@@ -9,6 +9,7 @@ import java.util.UUID
 data class VentaEntity(
     @PrimaryKey val id: String,
     val productoId: Long,
+    val productoNombre: String? = null,
     val cantidad: Double,
     val total: Double,
     val metodo: String,
@@ -25,15 +26,16 @@ data class VentaEntity(
 )
 
 fun VentaEntity.toModel() = Sale(
-    id = id, producto_id = productoId, cantidad = cantidad, total = total, metodo = metodo,
+    id = id, producto_id = productoId, producto_nombre = productoNombre,
+    cantidad = cantidad, total = total, metodo = metodo,
     efectivo = efectivo, transferencia = transferencia, usuario_id = usuarioId, local_id = localId,
     cliente_ci = clienteCi, cliente_tel = clienteTel, cliente_nombre = clienteNombre,
     tarjeta_id = tarjetaId, created_at = createdAt
 )
 
 fun Sale.toEntity(localId: Long, sincronizada: Boolean = true) = VentaEntity(
-    id = id ?: "local_${UUID.randomUUID()}", productoId = producto_id, cantidad = cantidad, total = total,
-    metodo = metodo, efectivo = efectivo, transferencia = transferencia, usuarioId = usuario_id,
-    localId = localId, clienteCi = cliente_ci, clienteTel = cliente_tel, clienteNombre = cliente_nombre,
+    id = id ?: "local_${UUID.randomUUID()}", productoId = producto_id, productoNombre = producto_nombre,
+    cantidad = cantidad, total = total, metodo = metodo, efectivo = efectivo, transferencia = transferencia,
+    usuarioId = usuario_id, localId = localId, clienteCi = cliente_ci, clienteTel = cliente_tel, clienteNombre = cliente_nombre,
     tarjetaId = tarjeta_id, createdAt = created_at, sincronizada = sincronizada
 )
