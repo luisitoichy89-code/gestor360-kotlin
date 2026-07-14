@@ -20,4 +20,7 @@ interface AccionPendienteDao {
 
     @Query("DELETE FROM acciones_pendientes WHERE estado = 'sincronizado'")
     suspend fun limpiarSincronizadas()
+
+    @Query("DELETE FROM acciones_pendientes WHERE idLocalTemporal = :idTemporal AND estado = 'pendiente'")
+    suspend fun cancelarPorIdTemporal(idTemporal: Long)
 }

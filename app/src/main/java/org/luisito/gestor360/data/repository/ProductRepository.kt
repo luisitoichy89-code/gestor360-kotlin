@@ -48,7 +48,6 @@ class ProductRepository(
             val productos = SupabaseClientProvider.client.postgrest
                 .rpc("get_productos", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
                 .decodeList<Product>()
-            // // db.productoDao().limpiarSincronizadosDeLocal(localId)
             db.productoDao().insertarTodos(productos.map { it.toEntity(localId) })
             Result.success(productos)
         } catch (e: Exception) {
@@ -112,8 +111,22 @@ class ProductRepository(
 
     suspend fun deleteProduct(androidId: String, id: Long): Result<Unit> {
         val localId = localIdActivo()
+        
+        // Si el id es temporal (negativo), el producto nunca llegó al servidor.
+        // Cancelamos la acción crear_producto pendiente y solo borramos local.
+        if (id < 0) {
+            db.productoDao().eliminar(id, localId)
+            db.accionPendienteDao().cancelarPorIdTemporal(id)
+            return Result.success(Unit)
+        }
+        
+        // id real (positivo): eliminar local y encolar para backend
         db.productoDao().eliminar(id, localId)
-        val payload = buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id) }
+        val payload = buildJsonObject {
+            put("p_android_id", androidId)
+            put("p_local_id", localId)
+            put("p_id", id)
+        }
         encolarYSincronizar(androidId, "eliminar_producto", payload)
         return Result.success(Unit)
     }
@@ -136,7 +149,6 @@ class ProductRepository(
             val productos = SupabaseClientProvider.client.postgrest
                 .rpc("get_productos", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
                 .decodeList<Product>()
-            // // db.productoDao().limpiarSincronizadosDeLocal(localId)
             db.productoDao().insertarTodos(productos.map { it.toEntity(localId) })
             Result.success(Unit)
         } catch (e: Exception) {
