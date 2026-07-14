@@ -215,7 +215,7 @@ private fun TurnoCard(turno: TurnoInfo?, puedeCerrar: Boolean, isSaving: Boolean
                 Spacer(Modifier.height(4.dp))
                 val dif = turno.diferencia ?: 0.0
                 Text(
-                    when { dif > 0 -> "Sobran $dif CUP"; dif < 0 -> "Faltan ${-dif} CUP"; else -> "Cuadra exacto ✅" },
+                    when { dif > 0 -> "Sobran ${formatearMonto(dif)} CUP"; dif < 0 -> "Faltan ${formatearMonto(-dif)} CUP"; else -> "Cuadra exacto ✅" },
                     fontWeight = FontWeight.Bold,
                     color = when { dif > 0 -> MaterialTheme.colorScheme.tertiary; dif < 0 -> MaterialTheme.colorScheme.error; else -> MaterialTheme.colorScheme.primary }
                 )
@@ -326,7 +326,7 @@ private fun VentaInfoRow(v: VentaInfo) {
         Column(Modifier.padding(12.dp)) {
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                 Text(v.producto_nombre, fontWeight = FontWeight.Bold)
-                Text("${v.total} CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text("${formatearMonto(v.total)} CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
             Text("Cantidad: ${v.cantidad}  ·  Método: ${v.metodo}", style = MaterialTheme.typography.bodySmall)
             FilaConRol("Vendido por", v.usuario_nombre, v.usuario_rol, v.fecha)
@@ -351,7 +351,7 @@ private fun TotalesGeneralesCard(totales: TotalesVentas) {
 private fun FilaResumenDinero(etiqueta: String, valor: Double, destacado: Boolean = false) {
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(etiqueta, style = if (destacado) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium)
-        Text("$valor CUP", style = if (destacado) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium, fontWeight = if (destacado) FontWeight.Bold else FontWeight.Normal, color = if (destacado) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+        Text("${formatearMonto(valor)} CUP", style = if (destacado) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium, fontWeight = if (destacado) FontWeight.Bold else FontWeight.Normal, color = if (destacado) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
     }
 }
 
@@ -364,7 +364,7 @@ private fun TarjetaResumenRow(t: TarjetaResumen) {
                 Text(t.etiqueta, fontWeight = FontWeight.Bold)
                 if (!t.titular.isNullOrBlank()) Text(t.titular, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text("${t.total} CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Text("${formatearMonto(t.total)} CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         }
     }
 }
@@ -392,7 +392,7 @@ private fun PagoTarjetaRow(v: VentaInfo) {
         Column(Modifier.padding(12.dp)) {
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                 Text("${v.tarjeta_banco ?: ""} · ${v.tarjeta_numero}", fontWeight = FontWeight.Bold)
-                Text("${v.transferencia} CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text("${formatearMonto(v.transferencia)} CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
             if (!v.tarjeta_titular.isNullOrBlank()) Text("Titular de la cuenta: ${v.tarjeta_titular}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(4.dp))
@@ -407,7 +407,7 @@ private fun PagoTarjetaRow(v: VentaInfo) {
 private fun CerrarTurnoDialog(efectivoEsperado: Double, isSaving: Boolean, onDismiss: () -> Unit, onCerrar: (Double) -> Unit) {
     var monto by remember { mutableStateOf("") }
     AlertDialog(onDismissRequest = onDismiss, shape = RoundedCornerShape(18.dp), title = { Text("Cerrar turno", fontWeight = FontWeight.Bold) }, text = { Column {
-        Card(shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) { Text("Esperado: $efectivoEsperado CUP", Modifier.padding(12.dp), fontWeight = FontWeight.Bold) }
+        Card(shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) { Text("Esperado: ${formatearMonto(efectivoEsperado)} CUP", Modifier.padding(12.dp), fontWeight = FontWeight.Bold) }
         Spacer(Modifier.height(12.dp))
         OutlinedTextField(monto, { monto = it }, label = { Text("Efectivo contado") }, singleLine = true, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
     } }, confirmButton = { TextButton(enabled = (monto.toDoubleOrNull() ?: -1.0) >= 0 && !isSaving, onClick = { onCerrar(monto.toDoubleOrNull() ?: 0.0) }) { Text(if (isSaving) "Cerrando..." else "Cerrar") } }, dismissButton = { TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } })

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Por qué existe esto (contexto: inspección de red por terceros, ej. un
+    proxy MITM configurado a nivel de operador/gobierno con una CA propia
+    instalada en el dispositivo, o un vendedor que instala un certificado
+    "de confianza" para espiar el tráfico de la app con Charles/mitmproxy):
+
+    1. cleartext-traffic="false" a nivel global: ya estaba en el manifest
+       (usesCleartextTraffic="false"), esto lo refuerza de forma explícita
+       y granular por dominio.
+    2. trust-anchors solo "system": en Android, por defecto (API 24+) las
+       apps YA ignoran las CAs que el usuario instala manualmente — pero
+       solo si no se especifica nada. Al declarar explícitamente
+       <certificates src="system"/> y NO incluir <certificates src="user"/>,
+       queda documentado y a prueba de que alguien cambie el targetSdk o
+       agregue sin querer confianza en CAs de usuario en el futuro. Esto
+       hace mucho más difícil (aunque no imposible sin root) que un proxy
+       de inspección de tráfico intercepte las llamadas HTTPS a Supabase.
+
+    OJO — si necesitas depurar el tráfico de red vos mismo con Charles/
+    mitmproxy/Proxyman en un build de DEBUG, esto también lo va a bloquear.
+    Para eso, crea un archivo aparte en
+    app/src/main/res/xml/network_security_config_debug.xml con
+    <certificates src="user"/> agregado, y en build.gradle.kts, dentro de
+    buildTypes { debug { ... } }, agrega:
+        manifestPlaceholders["networkSecurityConfig"] = "@xml/network_security_config_debug"
+    (y referencia ese placeholder en el manifest en vez del nombre fijo).
+    Se deja así, fijo a este archivo, porque por defecto NO quieres que
+    ningún build —ni debug que alguien podría dejar corriendo en un
+    dispositivo real— confíe en CAs de usuario.
+
+    Certificate pinning: ACTIVO desde 2026-07-12 contra
+    duspeazziwxptcrignju.supabase.co (pin del certificado hoja + pin de
+    respaldo de la CA intermedia). Ver el <pin-set> dentro del
+    <domain-config> de abajo — ahí mismo está el comentario con el
+    procedimiento para regenerar los pines cuando Supabase rote el
+    certificado o se acerque la fecha de "expiration".
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">duspeazziwxptcrignju.supabase.co</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+        <!--
+        Pinning ACTIVO desde 2026-07-12.
+          Pin 1 = certificado HOJA actual de duspeazziwxptcrignju.supabase.co
+          Pin 2 = CA INTERMEDIA de respaldo (si Supabase rota solo el hoja,
+                   la app sigue conectando gracias a este segundo pin)
+
+        Antes de publicar el release con esto activado (si todavía no lo
+        hiciste): instalá el APK en un dispositivo real y confirmá que
+        loguea y sincroniza con Supabase sin errores de conexión. Si el pin
+        estuviera mal tipeado, el efecto es que la app deja de poder
+        conectarse a Supabase hasta que subas una versión nueva con el pin
+        corregido — por eso vale la pena ese chequeo una vez.
+
+        Cómo regenerar los pines más adelante (rotación de certificado, o
+        antes de que se cumpla la fecha de "expiration" de abajo):
+
+        1. Pin del hoja:
+           openssl s_client -connect duspeazziwxptcrignju.supabase.co:443 -servername duspeazziwxptcrignju.supabase.co < /dev/null 2>/dev/null | \
+             openssl x509 -pubkey -noout | \
+             openssl pkey -pubin -outform der | \
+             openssl dgst -sha256 -binary | base64
+
+        2. Pin de respaldo: repetí el comando de arriba agregando
+           "-showcerts" y tomando el certificado INTERMEDIO de la cadena
+           (no el hoja).
+
+        3. Reemplazá los dos valores de abajo y subí una nueva versión
+           ANTES de que llegue la fecha de expiration (si se cumple sin
+           actualizar, Android simplemente deja de exigir el pinning en vez
+           de romper la app — pero quedás sin esta protección extra hasta
+           que subas pines nuevos).
+        -->
+        <pin-set expiration="2027-01-01">
+            <pin digest="SHA-256">ZcJbApTb7wyllleAjHw2vYAskqdT+DhMY9aPDFwAtf4=</pin>
+            <pin digest="SHA-256">kIdp6NNEd8wsugYyyIYFsi1ylMCED3hZbSR8ZFsa/A4=</pin>
+        </pin-set>
+    </domain-config>
+</network-security-config>

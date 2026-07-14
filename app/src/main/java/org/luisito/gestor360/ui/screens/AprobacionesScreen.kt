@@ -156,9 +156,9 @@ private fun AprobacionStockCard(sol: AprobacionStock, isSaving: Boolean, onAprob
             }
             Spacer(Modifier.height(10.dp))
             when (sol.tipo) {
-                "producto" -> { Text("Precio: ${sol.precio ?: 0.0} CUP  ·  Cantidad: ${sol.cantidad}", fontWeight = FontWeight.Medium) }
+                "producto" -> { Text("Precio: ${formatearMonto(sol.precio ?: 0.0)} CUP  ·  Cantidad: ${sol.cantidad}", fontWeight = FontWeight.Medium) }
                 "aumento" -> { Text("Cantidad a agregar: ${sol.cantidad}", fontWeight = FontWeight.Medium) }
-                "anular_venta" -> { Text("Total de la venta: ${sol.venta_total ?: 0.0} CUP", fontWeight = FontWeight.Medium) }
+                "anular_venta" -> { Text("Total de la venta: ${formatearMonto(sol.venta_total ?: 0.0)} CUP", fontWeight = FontWeight.Medium) }
             }
             Spacer(Modifier.height(6.dp))
             Text("Solicitado por: ${sol.solicitado_por_nombre ?: "—"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

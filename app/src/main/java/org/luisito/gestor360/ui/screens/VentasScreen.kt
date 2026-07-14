@@ -19,6 +19,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.luisito.gestor360.data.models.Product
+import org.luisito.gestor360.ui.components.formatearMonto
 import org.luisito.gestor360.ui.viewmodels.SaleViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -56,7 +57,7 @@ fun VentasScreen(
         },
         floatingActionButton = {
             if (uiState.carrito.isNotEmpty()) {
-                ExtendedFloatingActionButton(onClick = onIrACarrito, icon = { Icon(Icons.Default.ShoppingCart, null) }, text = { Text("Carrito (${uiState.carrito.size}) · ${uiState.totalCarrito} CUP") })
+                ExtendedFloatingActionButton(onClick = onIrACarrito, icon = { Icon(Icons.Default.ShoppingCart, null) }, text = { Text("Carrito (${uiState.carrito.size}) · ${formatearMonto(uiState.totalCarrito)} CUP") })
             }
         }
     ) { padding ->
@@ -84,7 +85,7 @@ fun VentasScreen(
                                 Text("Stock: ${p.stock.toInt()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), shape = RoundedCornerShape(12.dp)) {
-                                Text("${p.precio} CUP", modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                Text("${formatearMonto(p.precio)} CUP", modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }

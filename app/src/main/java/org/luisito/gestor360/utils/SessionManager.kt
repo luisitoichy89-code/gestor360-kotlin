@@ -2,6 +2,7 @@ package org.luisito.gestor360.utils
 
 import android.content.Context
 import android.content.SharedPreferences
+import org.luisito.gestor360.security.EncryptedPrefs
 
 /**
  * Fuente de verdad LOCAL (en el dispositivo) de la sesión activa, incluyendo
@@ -13,9 +14,16 @@ import android.content.SharedPreferences
  * a varios locales y cambiar de local activo, ver LocalSeleccionViewModel).
  * Todo lo que dependa de localId debe leerlo en el momento de la llamada,
  * nunca cachearlo en un campo de clase.
+ *
+ * SEGURIDAD: esto se guarda en SharedPreferences CIFRADAS (ver
+ * EncryptedPrefs), no planas. "rol" es el campo más sensible acá: si
+ * viviera en un .xml plano, un vendedor con acceso root podría editarlo a
+ * mano y cambiarse de "seller" a "admin" para saltarse el flujo de
+ * aprobaciones. Cifrado, esa edición manual ya no es posible sin la llave
+ * del Keystore.
  */
 class SessionManager(context: Context) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("gestor360_session", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = EncryptedPrefs.abrir(context, "gestor360_session")
 
     fun saveSession(
         userId: Long,

@@ -160,6 +160,20 @@ dependencies {
     implementation("androidx.room:room-ktx:2.7.1")
     ksp("androidx.room:room-compiler:2.7.1")
 
+    // Seguridad: EncryptedSharedPreferences respaldadas por Android Keystore
+    // (sesión, rate-limiting de PIN, passphrase de la base de datos).
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // Seguridad: cifra el archivo completo de la base Room (SQLCipher). Se
+    // usa junto con androidx.room vía SupportOpenHelperFactory (ver AppDatabase.kt).
+    // OJO: es net.zetetic:sqlcipher-android (la librería nueva, activamente
+    // mantenida, paquete net.zetetic.database.sqlcipher.*) — NO
+    // net.zetetic:android-database-sqlcipher (la vieja, oficialmente
+    // deprecada, paquete net.sqlcipher.database.*, sin más updates y sin
+    // soporte de 16KB page size que Google ya exige en Play Store).
+    implementation("net.zetetic:sqlcipher-android:4.17.0")
+    implementation("androidx.sqlite:sqlite:2.6.2")
+
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("com.russhwolf:multiplatform-settings:1.2.0")
     implementation("com.russhwolf:multiplatform-settings-coroutines:1.2.0")

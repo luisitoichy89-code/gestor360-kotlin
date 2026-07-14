@@ -114,7 +114,7 @@ private fun ProductoCard(producto: Product, esAdmin: Boolean, onEditar: () -> Un
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(producto.nombre, style = MaterialTheme.typography.titleMedium)
-                Text("${producto.precio} CUP", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                Text("${formatearMonto(producto.precio)} CUP", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
                 if (!producto.ubicacion.isNullOrBlank() || !producto.categoria.isNullOrBlank()) Text(listOfNotNull(producto.ubicacion?.takeIf { it.isNotBlank() }?.let { "📍 $it" }, producto.categoria?.takeIf { it.isNotBlank() }).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(4.dp))
                 EstadoChip(activo = !sinStock, textoActivo = if (stockBajo) "Stock bajo: ${producto.stock.toInt()}" else "Stock: ${producto.stock.toInt()}", textoInactivo = "Sin stock")

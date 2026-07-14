@@ -44,7 +44,7 @@ fun PaymentDialog(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Total: ${String.format("%.2f", total)} CUP",
+                    text = "Total: ${formatearMonto(total)} CUP",
                     style = androidx.compose.material3.MaterialTheme.typography.titleLarge
                 )
 
@@ -88,12 +88,12 @@ fun PaymentDialog(
                             modifier = Modifier.fillMaxWidth()
                         )
                         Text(
-                            text = "Cambio: ${String.format("%.2f", (efectivo.toDoubleOrNull() ?: 0.0) - total)} CUP",
+                            text = "Cambio: ${formatearMonto((efectivo.toDoubleOrNull() ?: 0.0) - total)} CUP",
                             color = androidx.compose.material3.MaterialTheme.colorScheme.primary
                         )
                     }
                     "transferencia" -> {
-                        Text("Total a transferir: ${String.format("%.2f", total)} CUP")
+                        Text("Total a transferir: ${formatearMonto(total)} CUP")
                     }
                     "mixto" -> {
                         OutlinedTextField(
@@ -112,7 +112,7 @@ fun PaymentDialog(
                         val tr = transferencia.toDoubleOrNull() ?: 0.0
                         if (ef + tr > 0) {
                             Text(
-                                text = "Restante: ${String.format("%.2f", total - ef - tr)} CUP",
+                                text = "Restante: ${formatearMonto(total - ef - tr)} CUP",
                                 color = if (ef + tr >= total) androidx.compose.material3.MaterialTheme.colorScheme.primary
                                        else androidx.compose.material3.MaterialTheme.colorScheme.error
                             )

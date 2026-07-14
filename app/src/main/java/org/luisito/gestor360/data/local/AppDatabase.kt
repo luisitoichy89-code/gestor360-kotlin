@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
+import org.luisito.gestor360.security.DbKeyProvider
 import org.luisito.gestor360.data.local.dao.AccionPendienteDao
 import org.luisito.gestor360.data.local.dao.AprobacionStockCacheDao
 import org.luisito.gestor360.data.local.dao.ConflictoDao
@@ -55,7 +57,15 @@ import org.luisito.gestor360.data.local.entities.VentaEntity
     // fallbackToDestructiveMigration: se recrea la tabla de caché, cero
     // pérdida real (las ventas ya sincronizadas se vuelven a traer del
     // servidor; las pendientes de sincronizar viven en AccionPendienteEntity).
-    version = 8,
+    //
+    // v9: SEGURIDAD — UserEntity ya no guarda "pin" en texto plano; ahora
+    // guarda pinHash + pinSalt (ver PinSecurity/DeviceVerificationRepository).
+    // Además, a partir de esta versión la base completa se abre cifrada con
+    // SQLCipher (ver DbKeyProvider más abajo). fallbackToDestructiveMigration
+    // recrea la tabla `users`; se re-hashea el PIN en el próximo login online
+    // de cada usuario (mismo criterio que siempre: todo esto es caché,
+    // se resincroniza del servidor).
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -77,11 +87,27 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun obtener(context: Context): AppDatabase =
             INSTANCE ?: synchronized(this) {
-                INSTANCE ?: Room.databaseBuilder(
-                    context.applicationContext,
-                    AppDatabase::class.java,
-                    "gestor360.db"
-                ).fallbackToDestructiveMigration().build().also { INSTANCE = it }
+                INSTANCE ?: run {
+                    System.loadLibrary("sqlcipher")
+                    val passphrase = DbKeyProvider.obtenerOCrearPassphrase(context)
+                    val factory = SupportOpenHelperFactory(charArrayAUtf8Bytes(passphrase))
+                    Room.databaseBuilder(
+                        context.applicationContext,
+                        AppDatabase::class.java,
+                        "gestor360.db"
+                    )
+                        .openHelperFactory(factory)
+                        .fallbackToDestructiveMigration()
+                        .build()
+                }.also { INSTANCE = it }
             }
+
+        private fun charArrayAUtf8Bytes(chars: CharArray): ByteArray {
+            val byteBuffer = Charsets.UTF_8.encode(java.nio.CharBuffer.wrap(chars))
+            val bytes = ByteArray(byteBuffer.remaining())
+            byteBuffer.get(bytes)
+            java.util.Arrays.fill(byteBuffer.array(), 0)
+            return bytes
+        }
     }
 }

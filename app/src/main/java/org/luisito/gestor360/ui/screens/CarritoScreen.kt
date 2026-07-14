@@ -21,6 +21,7 @@ import org.luisito.gestor360.data.models.Tarjeta
 import org.luisito.gestor360.data.repository.SaleRepository
 import org.luisito.gestor360.data.sms.SmsPagoReceiver
 import org.luisito.gestor360.ui.components.EsperandoPagoOverlay
+import org.luisito.gestor360.ui.components.formatearMonto
 import org.luisito.gestor360.ui.viewmodels.SaleViewModel
 import org.luisito.gestor360.ui.viewmodels.TarjetaViewModel
 
@@ -149,7 +150,7 @@ fun CarritoScreen(
                                 Column(Modifier.weight(1f)) {
                                     Text(item.nombre, fontWeight = FontWeight.SemiBold)
                                     Spacer(Modifier.height(2.dp))
-                                    Text("${item.cantidad.toInt()} × ${item.subtotal} CUP", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("${item.cantidad.toInt()} × ${formatearMonto(item.subtotal)} CUP", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 FilledIconButton(
                                     onClick = { viewModel.quitarDelCarrito(i) },
@@ -163,7 +164,7 @@ fun CarritoScreen(
                 Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                     Row(Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("TOTAL", fontWeight = FontWeight.Bold)
-                        Text("${uiState.totalCarrito} CUP", fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                        Text("${formatearMonto(uiState.totalCarrito)} CUP", fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
                     }
                 }
                 Spacer(Modifier.height(16.dp))
@@ -197,7 +198,7 @@ fun CarritoScreen(
                     Column(Modifier.padding(16.dp)) {
                         Text("Total a cobrar", style = MaterialTheme.typography.bodyMedium)
                         Spacer(Modifier.height(6.dp))
-                        Text("${uiState.totalCarrito} CUP", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.ExtraBold)
+                        Text("${formatearMonto(uiState.totalCarrito)} CUP", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.ExtraBold)
                     }
                 }
             },
@@ -233,7 +234,7 @@ fun CarritoScreen(
                 title = { Text("Pago mixto", fontWeight = FontWeight.Bold) },
                 text = {
                     Column {
-                        Text("Total: ${uiState.totalCarrito} CUP")
+                        Text("Total: ${formatearMonto(uiState.totalCarrito)} CUP")
                         Spacer(Modifier.height(12.dp))
                         OutlinedTextField(
                             efTexto, { efTexto = it.filter { c -> c.isDigit() } },
@@ -244,7 +245,7 @@ fun CarritoScreen(
                         val ef = efTexto.toDoubleOrNull() ?: 0.0
                         if (ef > 0) {
                             Spacer(Modifier.height(8.dp))
-                            Text("Restante: ${uiState.totalCarrito - ef} CUP", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                            Text("Restante: ${formatearMonto(uiState.totalCarrito - ef)} CUP", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                         }
                     }
                 },
@@ -289,11 +290,11 @@ fun CarritoScreen(
                     Column {
                         Card(shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                             Column(Modifier.padding(14.dp)) {
-                                Text("💵 Efectivo: ${datosMixto.efectivo} CUP", fontWeight = FontWeight.Bold)
+                                Text("💵 Efectivo: ${formatearMonto(datosMixto.efectivo)} CUP", fontWeight = FontWeight.Bold)
                                 Spacer(Modifier.height(6.dp))
-                                Text("📲 Transferencia: $restante CUP", fontWeight = FontWeight.Bold)
+                                Text("📲 Transferencia: ${formatearMonto(restante)} CUP", fontWeight = FontWeight.Bold)
                                 Spacer(Modifier.height(6.dp))
-                                Text("💰 Total: ${uiState.totalCarrito} CUP", fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                                Text("💰 Total: ${formatearMonto(uiState.totalCarrito)} CUP", fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
                             }
                         }
                         Spacer(Modifier.height(12.dp))
@@ -372,7 +373,7 @@ private fun DatosClienteDialog(titulo: String, monto: Double, tarjetas: List<Tar
                     Column(Modifier.padding(14.dp)) {
                         Text("Monto", style = MaterialTheme.typography.bodyMedium)
                         Spacer(Modifier.height(6.dp))
-                        Text("$monto CUP", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                        Text("${formatearMonto(monto)} CUP", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
                     }
                 }
                 Spacer(Modifier.height(12.dp))

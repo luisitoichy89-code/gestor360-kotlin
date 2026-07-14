@@ -25,6 +25,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToLong
+
+/**
+ * Acá NO se usan montos con decimales ("0.00") — el CUP se maneja en enteros
+ * ("000"). Antes cada pantalla interpolaba el Double directo (`"$valor CUP"`,
+ * que en Kotlin imprime "150.0") o usaba `String.format("%.2f", ...)` a mano
+ * ("150.00"), ninguno de los dos formatos correcto acá. Este es el único
+ * punto de formateo de dinero: redondea al entero más cercano (por si algún
+ * cálculo intermedio — reparto de efectivo/transferencia en pagos mixtos,
+ * por ejemplo — deja un resto de centavos) y listo, sin punto decimal.
+ */
+fun formatearMonto(valor: Double): String = valor.roundToLong().toString()
+
 
 @Composable
 fun EstadoChip(activo: Boolean, textoActivo: String = "Activo", textoInactivo: String = "Inactivo") {

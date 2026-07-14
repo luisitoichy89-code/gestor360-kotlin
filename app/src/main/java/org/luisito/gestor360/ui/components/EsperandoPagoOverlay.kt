@@ -63,7 +63,7 @@ fun EsperandoPagoOverlay(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Monto: $montoEsperado CUP",
+                    text = "Monto: ${formatearMonto(montoEsperado)} CUP",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

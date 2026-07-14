@@ -28,21 +28,28 @@ import org.luisito.gestor360.ui.viewmodels.AccesoViewModel
  * Pantalla de acceso: mismo look & feel de tarjeta clara, centrada y
  * redondeada usado como referencia de diseño — fondo claro, texto negro,
  * campo de PIN con visibilidad alternable y botón de acción en naranja.
+ *
+ * El bloqueo por intentos fallidos vive en el ViewModel (persistido en
+ * disco, cifrado, ver PinRateLimiter): sobrevive a cerrar la app o rotar la
+ * pantalla, a diferencia de un simple `remember` local.
  */
 @Composable
 fun PinLoginScreen(usuario: User, onLoginExitoso: (User) -> Unit, onCambiarDispositivo: () -> Unit, viewModel: AccesoViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     var pin by remember { mutableStateOf("") }
     var pinVisible by remember { mutableStateOf(false) }
-    var intentos by remember { mutableStateOf(0) }
-    var bloqueado by remember { mutableStateOf(false) }
+    var validando by remember { mutableStateOf(false) }
+    var segundosRestantes by remember { mutableStateOf(uiState.pinBloqueadoSegundos) }
     val error = uiState.pinError
     val verificando = uiState.verificando
-    val maxIntentos = 3
+    val bloqueado = uiState.pinBloqueado && segundosRestantes > 0
     val shake = animateFloatAsState(targetValue = if (error != null) 1f else 0f, label = "shake")
-    val canSubmit = pin.length in 4..6 && !verificando && !bloqueado
+    val canSubmit = pin.length in 4..6 && !verificando && !bloqueado && !validando
 
-    LaunchedEffect(intentos) { if (intentos >= maxIntentos) { bloqueado = true; delay(2500); intentos = 0; bloqueado = false } }
+    LaunchedEffect(uiState.pinBloqueadoSegundos) { segundosRestantes = uiState.pinBloqueadoSegundos }
+    LaunchedEffect(bloqueado) {
+        while (segundosRestantes > 0) { delay(1000); segundosRestantes-- }
+    }
 
     Box(
         modifier = Modifier
@@ -93,7 +100,7 @@ fun PinLoginScreen(usuario: User, onLoginExitoso: (User) -> Unit, onCambiarDispo
                 AnimatedVisibility(bloqueado) {
                     Column {
                         Text(
-                            "Demasiados intentos. Intenta nuevamente en unos segundos.",
+                            "Demasiados intentos. Intenta nuevamente en ${segundosRestantes}s.",
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -125,7 +132,13 @@ fun PinLoginScreen(usuario: User, onLoginExitoso: (User) -> Unit, onCambiarDispo
                 Spacer(Modifier.height(20.dp))
 
                 Button(
-                    onClick = { val ok = viewModel.validarPin(pin); if (ok) { intentos = 0; onLoginExitoso(usuario) } else { intentos++ } },
+                    onClick = {
+                        validando = true
+                        viewModel.validarPin(pin) { ok ->
+                            validando = false
+                            if (ok) onLoginExitoso(usuario) else pin = ""
+                        }
+                    },
                     enabled = canSubmit,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(14.dp),
@@ -134,7 +147,7 @@ fun PinLoginScreen(usuario: User, onLoginExitoso: (User) -> Unit, onCambiarDispo
                         contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
-                    if (verificando) {
+                    if (verificando || validando) {
                         CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
                         Spacer(Modifier.width(10.dp))
                         Text("Verificando acceso...")
@@ -152,15 +165,6 @@ fun PinLoginScreen(usuario: User, onLoginExitoso: (User) -> Unit, onCambiarDispo
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
                 ) {
                     Text("No soy este usuario / cambiar dispositivo")
-                }
-
-                if (intentos > 0 && !bloqueado) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Intentos fallidos: $intentos / $maxIntentos",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
                 }
             }
         }

@@ -9,22 +9,30 @@ import kotlinx.coroutines.launch
 import org.luisito.gestor360.data.models.User
 import org.luisito.gestor360.data.repository.DeviceVerificationRepository
 import org.luisito.gestor360.data.repository.VerificacionResultado
+import org.luisito.gestor360.security.PinRateLimiter
+import org.luisito.gestor360.utils.AppContextHolder
 
 data class AccesoUiState(
     val verificando: Boolean = false,
     val usuarioVerificado: User? = null,
     val mensajeError: String? = null,
-    val pinError: String? = null
+    val pinError: String? = null,
+    val pinBloqueado: Boolean = false,
+    val pinBloqueadoSegundos: Long = 0L
 )
 
 class AccesoViewModel(
-    private val repository: DeviceVerificationRepository = DeviceVerificationRepository()
+    private val repository: DeviceVerificationRepository = DeviceVerificationRepository(),
+    private val rateLimiter: PinRateLimiter = PinRateLimiter(AppContextHolder.context)
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AccesoUiState())
     val uiState: StateFlow<AccesoUiState> = _uiState.asStateFlow()
 
+    private var androidIdActual: String = ""
+
     fun verificarDispositivo(androidId: String) {
+        androidIdActual = androidId
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(verificando = true, mensajeError = null)
             when (val resultado = repository.verificar(androidId)) {
@@ -39,7 +47,7 @@ class AccesoViewModel(
                 is VerificacionResultado.LicenciaVencida ->
                     _uiState.value = _uiState.value.copy(verificando = false, mensajeError = "La licencia del negocio venció hace ${resultado.diasVencida} días. Debe renovarse para continuar.")
                 is VerificacionResultado.SinConexionPrimerInicio ->
-                    _uiState.value = _uiState.value.copy(verificando = false, mensajeError = "Primer inicio requiere conexión a internet.")
+                    _uiState.value = _uiState.value.copy(verificando = false, mensajeError = "No hay conexión y este dispositivo nunca se verificó antes. Conéctate a internet al menos una vez para activar el acceso offline.")
                 is VerificacionResultado.Error ->
                     _uiState.value = _uiState.value.copy(
                         verificando = false,
@@ -50,11 +58,41 @@ class AccesoViewModel(
         }
     }
 
-    fun validarPin(pin: String): Boolean {
-        val usuario = _uiState.value.usuarioVerificado ?: return false
-        val correcto = repository.validarPin(usuario, pin)
-        if (!correcto) _uiState.value = _uiState.value.copy(pinError = "El PIN no es correcto. Intenta de nuevo.")
-        return correcto
+    /**
+     * Valida el PIN contra el hash cacheado (nunca contra texto plano) y
+     * aplica rate limiting persistente por usuario: si ya está bloqueado por
+     * demasiados intentos fallidos, ni siquiera se llega a comparar el PIN.
+     */
+    fun validarPin(pin: String, onResultado: (Boolean) -> Unit) {
+        val usuario = _uiState.value.usuarioVerificado
+        val key = usuario?.android_id ?: androidIdActual
+        if (usuario == null || key.isBlank()) { onResultado(false); return }
+
+        val estadoPrevio = rateLimiter.estadoActual(key)
+        if (estadoPrevio.bloqueado) {
+            _uiState.value = _uiState.value.copy(
+                pinBloqueado = true, pinBloqueadoSegundos = estadoPrevio.segundosRestantes,
+                pinError = "Demasiados intentos. Espera ${estadoPrevio.segundosRestantes}s."
+            )
+            onResultado(false)
+            return
+        }
+
+        viewModelScope.launch {
+            val correcto = repository.validarPinLocal(key, pin)
+            if (correcto) {
+                rateLimiter.registrarExito(key)
+                _uiState.value = _uiState.value.copy(pinError = null, pinBloqueado = false, pinBloqueadoSegundos = 0L)
+            } else {
+                val estado = rateLimiter.registrarFallo(key)
+                _uiState.value = _uiState.value.copy(
+                    pinError = if (estado.bloqueado) "Demasiados intentos. Espera ${estado.segundosRestantes}s." else "El PIN no es correcto. Intenta de nuevo.",
+                    pinBloqueado = estado.bloqueado,
+                    pinBloqueadoSegundos = estado.segundosRestantes
+                )
+            }
+            onResultado(correcto)
+        }
     }
 
     fun limpiarPinError() {
