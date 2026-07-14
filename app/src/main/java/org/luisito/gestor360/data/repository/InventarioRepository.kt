@@ -17,6 +17,8 @@ import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 import java.time.LocalDate
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 class InventarioRepository(private val context: Context = AppContextHolder.context) {
     private val db = AppDatabase.obtener(context)
@@ -40,12 +42,11 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         return refrescarDesdeServidor(androidId, fecha).map { completarDesdeRoom(it, localId, fecha) }
     }
 
-    /** Completa las secciones offline que el RPC no devuelve: ventas locales, tarjetas, modificados, eliminados, devueltos. */
     private suspend fun completarDesdeRoom(dia: InventarioDia, localId: Long, fecha: LocalDate): InventarioDia {
         var resultado = fusionarVentasLocales(dia, localId, fecha)
         resultado = fusionarModificados(resultado, localId, fecha)
-        resultado = fusionarEliminados(resultado, localId, fecha)
         resultado = fusionarDevueltos(resultado, localId, fecha)
+        resultado = fusionarEliminados(resultado, localId, fecha)
         return resultado
     }
 
@@ -88,24 +89,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             )
         }
         return dia.copy(productos_modificados = dia.productos_modificados + localesComoInfo)
-    }
-
-    private suspend fun fusionarEliminados(dia: InventarioDia, localId: Long, fecha: LocalDate): InventarioDia {
-        val fechaStr = fecha.toString()
-        val eliminadosHoy = db.accionPendienteDao().obtenerPendientes().filter {
-            it.tipo == "eliminar_producto" && it.estado == "sincronizado" && it.payloadJson.contains(fechaStr)
-        }
-        if (eliminadosHoy.isEmpty()) return dia
-
-        val eliminadosInfo = eliminadosHoy.map { accion ->
-            val json = kotlinx.serialization.json.Json.parseToJsonElement(accion.payloadJson)
-            val id = json.jsonObject["p_id"]?.toString()?.trim('"')?.toLongOrNull() ?: 0L
-            val nombre = db.productoDao().obtenerPorId(id, localId)?.nombre ?: "Producto #$id"
-            ProductoEliminadoInfo(
-                id = id, nombre = nombre, stock = 0.0, resuelto_por_nombre = null, fecha = fechaStr
-            )
-        }
-        return dia.copy(productos_eliminados = dia.productos_eliminados + eliminadosInfo)
     }
 
     private suspend fun fusionarDevueltos(dia: InventarioDia, localId: Long, fecha: LocalDate): InventarioDia {
@@ -163,6 +146,24 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         return porNombre.values.toList()
     }
 
+
+    private suspend fun fusionarEliminados(dia: InventarioDia, localId: Long, fecha: LocalDate): InventarioDia {
+        val fechaStr = fecha.toString()
+        val eliminadosHoy = db.accionPendienteDao().obtenerPendientes().filter {
+            it.tipo == "eliminar_producto" && it.payloadJson.contains(fechaStr)
+        }
+        if (eliminadosHoy.isEmpty()) return dia
+
+        val eliminadosInfo = eliminadosHoy.map { accion ->
+            val element = kotlinx.serialization.json.Json.parseToJsonElement(accion.payloadJson)
+            val id = element.jsonObject["p_id"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L
+            val nombre = db.productoDao().obtenerPorId(id, localId)?.nombre ?: "Producto #$id"
+            ProductoEliminadoInfo(
+                id = id, nombre = nombre, stock = 0.0, resuelto_por_nombre = null, fecha = fechaStr
+            )
+        }
+        return dia.copy(productos_eliminados = dia.productos_eliminados + eliminadosInfo)
+    }
     suspend fun refrescarDesdeServidor(androidId: String, fecha: LocalDate): Result<InventarioDia> {
         return try {
             val localId = localIdActivo()
