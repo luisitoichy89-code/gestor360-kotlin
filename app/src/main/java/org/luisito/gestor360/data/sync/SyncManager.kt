@@ -16,18 +16,6 @@ import org.luisito.gestor360.utils.SessionManager
 
 data class SyncResultado(val exitosas: Int, val fallidas: Int, val error: String? = null)
 
-/**
- * Motor central de sincronización. Recorre "acciones_pendientes" en orden y
- * reproduce cada llamada RPC exactamente como se habría hecho online (cada
- * payload ya trae su propio p_local_id, congelado en el momento en que se
- * encoló la acción — así una acción encolada en el Local A siempre se
- * reproduce contra el Local A aunque el usuario haya cambiado de local activo
- * mientras estaba offline). Para las acciones que crean algo (crear_producto,
- * abrir_turno, crear_tarjeta, crear_merma) usa el id real que devuelve el
- * servidor para reemplazar el id temporal negativo que se usó mientras estaba
- * offline. Al terminar, refresca todos los cachés (del local ACTIVO ahora) y
- * detecta conflictos (ej. stock negativo).
- */
 class SyncManager(private val context: Context) {
     private val db = AppDatabase.obtener(context)
     private val session = SessionManager(context)
@@ -44,6 +32,7 @@ class SyncManager(private val context: Context) {
         val pendientes = db.accionPendienteDao().obtenerPendientes()
         var exitosas = 0
         var fallidas = 0
+        val eliminadosProcesados = mutableListOf<Pair<Long, Long>>() // (productoId, localId)
 
         for (accion in pendientes) {
             try {
@@ -51,12 +40,19 @@ class SyncManager(private val context: Context) {
                 val respuesta = SupabaseClientProvider.client.postgrest.rpc(accion.tipo, payload)
 
                 if (accion.idLocalTemporal != null) {
-                    // p_local_id ya viaja dentro del payload guardado: se usa el mismo
-                    // local con el que se encoló la acción, no el local activo ahora.
                     val localIdDeLaAccion = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull()
                         ?: session.getLocalId()
                     if (localIdDeLaAccion != null) {
                         reemplazarIdTemporal(accion.tipo, accion.idLocalTemporal, respuesta, localIdDeLaAccion)
+                    }
+                }
+
+                // Si es eliminación de producto, guardar referencia para borrado local post-sync
+                if (accion.tipo == "eliminar_producto") {
+                    val pid = payload["p_id"]?.toString()?.trim('"')?.toLongOrNull()
+                    val lid = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull()
+                    if (pid != null && lid != null) {
+                        eliminadosProcesados.add(pid to lid)
                     }
                 }
 
@@ -68,6 +64,11 @@ class SyncManager(private val context: Context) {
                 )
                 fallidas++
             }
+        }
+
+        // Eliminar localmente los productos ya procesados por el backend ANTES de refrescar
+        for ((pid, lid) in eliminadosProcesados) {
+            db.productoDao().eliminar(pid, lid)
         }
 
         if (session.getLocalId() != null) {
