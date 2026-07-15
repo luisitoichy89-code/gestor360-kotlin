@@ -21,3 +21,9 @@ val AzulClaro = Color(0xFFCFE0F0)
 val Rojo = Color(0xFFD32F2F)
 val RojoOscuro = Color(0xFFB71C1C)
 val RojoClaro = Color(0xFFFFCDD2)
+
+// Sombras del efecto neomórfico (soft UI): misma base BackgroundLight,
+// una sombra clara (arriba-izquierda) y una oscura (abajo-derecha) para dar
+// sensación de relieve o hundimiento sin cambiar la paleta ni el tema.
+val NeuLuz = Color(0xFFFFFFFF)
+val NeuSombra = Color(0xFFC9CDD3)

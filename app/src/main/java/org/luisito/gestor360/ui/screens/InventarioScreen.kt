@@ -21,6 +21,10 @@ import org.luisito.gestor360.utils.CsvExporter
 import org.luisito.gestor360.utils.ReporteExporter
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import org.luisito.gestor360.ui.theme.NeuCard
+import org.luisito.gestor360.ui.theme.NeuButton
+import org.luisito.gestor360.ui.theme.NeuOutlinedButton
+import org.luisito.gestor360.ui.theme.neuShadow
 
 private const val VENTAS_POR_PAGINA = 20
 
@@ -206,7 +210,7 @@ private fun EncabezadoDia(fecha: LocalDate, formatter: DateTimeFormatter, soloLe
 
 @Composable
 private fun TurnoCard(turno: TurnoInfo?, puedeCerrar: Boolean, isSaving: Boolean, onCerrar: () -> Unit) {
-    ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+    NeuCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             if (turno == null) {
                 Text("Sin actividad registrada todavía", fontWeight = FontWeight.Bold)
@@ -230,7 +234,7 @@ private fun TurnoCard(turno: TurnoInfo?, puedeCerrar: Boolean, isSaving: Boolean
                 )
             } else if (puedeCerrar) {
                 Spacer(Modifier.height(10.dp))
-                Button(onClick = onCerrar, enabled = !isSaving, shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
+                NeuButton(onClick = onCerrar, enabled = !isSaving, shape = RoundedCornerShape(14.dp), containerColor = MaterialTheme.colorScheme.error) {
                     Icon(Icons.Default.Lock, null); Spacer(Modifier.width(8.dp)); Text("Cerrar turno")
                 }
             }
@@ -266,7 +270,7 @@ private fun FilaConRol(etiqueta: String, nombre: String?, rol: String?, fecha: S
 
 @Composable
 private fun ProductoInfoRow(p: ProductoInfo) {
-    Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
+    NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Text(p.nombre, fontWeight = FontWeight.Bold)
             Text("Stock actual: ${p.stock.toInt()}", style = MaterialTheme.typography.bodySmall)
@@ -278,7 +282,7 @@ private fun ProductoInfoRow(p: ProductoInfo) {
 /** PRODUCTOS NUEVOS INGRESADOS: nombre, cantidad, ubicación. Solo llegan aquí los ya aprobados. */
 @Composable
 private fun ProductoEliminadoRow(p: ProductoEliminadoInfo) {
-    Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
+    NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Text(p.nombre, fontWeight = FontWeight.Bold)
             Text("Stock al borrarse: ${p.stock.toInt()}", style = MaterialTheme.typography.bodySmall)
@@ -290,7 +294,7 @@ private fun ProductoEliminadoRow(p: ProductoEliminadoInfo) {
 
 @Composable
 private fun ProductoNuevoRow(p: ProductoInfo) {
-    Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
+    NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Text(p.nombre, fontWeight = FontWeight.Bold)
             Text("Cantidad: ${p.stock.toInt()}", style = MaterialTheme.typography.bodySmall)
@@ -306,7 +310,7 @@ private fun ProductoNuevoRow(p: ProductoInfo) {
 
 @Composable
 private fun DevueltoInfoRow(d: DevueltoInfo) {
-    Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
+    NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                 Text(d.producto_nombre, fontWeight = FontWeight.Bold)
@@ -331,7 +335,7 @@ private fun EstadoDevolucionChip(estado: String) {
 
 @Composable
 private fun VentaInfoRow(v: VentaInfo) {
-    Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
+    NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                 Text(v.producto_nombre, fontWeight = FontWeight.Bold)
@@ -346,7 +350,7 @@ private fun VentaInfoRow(v: VentaInfo) {
 /** TOTAL EFECTIVO / TOTAL TRANSFERENCIA / TOTAL GENERADO. */
 @Composable
 private fun TotalesGeneralesCard(totales: TotalesVentas) {
-    ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+    NeuCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             FilaResumenDinero("Total efectivo", totales.efectivo)
             FilaResumenDinero("Total transferencia", totales.transferencia)
@@ -367,7 +371,7 @@ private fun FilaResumenDinero(etiqueta: String, valor: Double, destacado: Boolea
 /** Fila de la sección "Tarjeta": cuenta + cuánto entró por ella. */
 @Composable
 private fun TarjetaResumenRow(t: TarjetaResumen) {
-    Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
+    NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column {
                 Text(t.etiqueta, fontWeight = FontWeight.Bold)
@@ -381,7 +385,7 @@ private fun TarjetaResumenRow(t: TarjetaResumen) {
 /** Fila de "PRODUCTOS VENDIDOS": nombre + los 5 totales pedidos. */
 @Composable
 private fun ProductoVendidoRow(p: ProductoVendidoInfo) {
-    Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
+    NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Text(p.nombre, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
@@ -397,7 +401,7 @@ private fun ProductoVendidoRow(p: ProductoVendidoInfo) {
 /** Fila de "PAGOS POR TARJETAS": cuenta + monto + datos del cliente si se cargaron. */
 @Composable
 private fun PagoTarjetaRow(v: VentaInfo) {
-    Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
+    NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                 Text("${v.tarjeta_banco ?: ""} · ${v.tarjeta_numero}", fontWeight = FontWeight.Bold)
@@ -416,7 +420,7 @@ private fun PagoTarjetaRow(v: VentaInfo) {
 private fun CerrarTurnoDialog(efectivoEsperado: Double, isSaving: Boolean, onDismiss: () -> Unit, onCerrar: (Double) -> Unit) {
     var monto by remember { mutableStateOf("") }
     AlertDialog(onDismissRequest = onDismiss, shape = RoundedCornerShape(18.dp), title = { Text("Cerrar turno", fontWeight = FontWeight.Bold) }, text = { Column {
-        Card(shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) { Text("Esperado: ${formatearMonto(efectivoEsperado)} CUP", Modifier.padding(12.dp), fontWeight = FontWeight.Bold) }
+        NeuCard(shape = RoundedCornerShape(14.dp), containerColor = MaterialTheme.colorScheme.primaryContainer) { Text("Esperado: ${formatearMonto(efectivoEsperado)} CUP", Modifier.padding(12.dp), fontWeight = FontWeight.Bold) }
         Spacer(Modifier.height(12.dp))
         OutlinedTextField(monto, { monto = it }, label = { Text("Efectivo contado") }, singleLine = true, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
     } }, confirmButton = { TextButton(enabled = (monto.toDoubleOrNull() ?: -1.0) >= 0 && !isSaving, onClick = { onCerrar(monto.toDoubleOrNull() ?: 0.0) }) { Text(if (isSaving) "Cerrando..." else "Cerrar") } }, dismissButton = { TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } })

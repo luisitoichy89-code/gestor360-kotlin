@@ -21,6 +21,10 @@ import org.luisito.gestor360.ui.viewmodels.AprobacionStockViewModel
 import org.luisito.gestor360.ui.viewmodels.MermaViewModel
 import org.luisito.gestor360.utils.ConfigManager
 import org.luisito.gestor360.utils.SessionManager
+import org.luisito.gestor360.ui.theme.NeuCard
+import org.luisito.gestor360.ui.theme.NeuButton
+import org.luisito.gestor360.ui.theme.NeuOutlinedButton
+import org.luisito.gestor360.ui.theme.neuShadow
 
 /**
  * Todas las solicitudes que necesitan aprobación del admin en un solo lugar:
@@ -82,7 +86,7 @@ fun AprobacionesScreen(
 
 @Composable
 private fun ConfirmacionSmsCard(activo: Boolean, habilitado: Boolean, onCambiar: (Boolean) -> Unit) {
-    ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+    NeuCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -110,7 +114,7 @@ private fun ConfirmacionSmsCard(activo: Boolean, habilitado: Boolean, onCambiar:
 
 @Composable
 private fun MermaCard(merma: MermaPendiente, isSaving: Boolean, onAprobar: () -> Unit, onRechazar: () -> Unit) {
-    ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+    NeuCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.RemoveCircleOutline, null, tint = MaterialTheme.colorScheme.error)
@@ -127,8 +131,8 @@ private fun MermaCard(merma: MermaPendiente, isSaving: Boolean, onAprobar: () ->
             if (!merma.created_at.isNullOrBlank()) Text(merma.created_at.take(16).replace("T", " "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onAprobar, enabled = !isSaving, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) { Icon(Icons.Default.Check, null); Spacer(Modifier.width(6.dp)); Text("Aprobar") }
-                OutlinedButton(onClick = onRechazar, enabled = !isSaving, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Icon(Icons.Default.Close, null); Spacer(Modifier.width(6.dp)); Text("Rechazar") }
+                NeuButton(onClick = onAprobar, enabled = !isSaving, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) { Icon(Icons.Default.Check, null); Spacer(Modifier.width(6.dp)); Text("Aprobar") }
+                NeuOutlinedButton(onClick = onRechazar, enabled = !isSaving, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), contentColor = MaterialTheme.colorScheme.error) { Icon(Icons.Default.Close, null); Spacer(Modifier.width(6.dp)); Text("Rechazar") }
             }
         }
     }
@@ -142,7 +146,7 @@ private fun AprobacionStockCard(sol: AprobacionStock, isSaving: Boolean, onAprob
         "anular_venta" -> Icons.Default.Cancel to "Anular venta"
         else -> Icons.Default.FactCheck to sol.tipo
     }
-    ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+    NeuCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(icono, null, tint = MaterialTheme.colorScheme.primary)
@@ -165,8 +169,8 @@ private fun AprobacionStockCard(sol: AprobacionStock, isSaving: Boolean, onAprob
             if (!sol.created_at.isNullOrBlank()) Text(sol.created_at.take(16).replace("T", " "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onAprobar, enabled = !isSaving, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) { Icon(Icons.Default.Check, null); Spacer(Modifier.width(6.dp)); Text("Aprobar") }
-                OutlinedButton(onClick = onRechazar, enabled = !isSaving, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Icon(Icons.Default.Close, null); Spacer(Modifier.width(6.dp)); Text("Rechazar") }
+                NeuButton(onClick = onAprobar, enabled = !isSaving, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) { Icon(Icons.Default.Check, null); Spacer(Modifier.width(6.dp)); Text("Aprobar") }
+                NeuOutlinedButton(onClick = onRechazar, enabled = !isSaving, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), contentColor = MaterialTheme.colorScheme.error) { Icon(Icons.Default.Close, null); Spacer(Modifier.width(6.dp)); Text("Rechazar") }
             }
         }
     }

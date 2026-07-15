@@ -23,6 +23,10 @@ import org.luisito.gestor360.ui.viewmodels.AprobacionStockViewModel
 import org.luisito.gestor360.ui.viewmodels.DevolucionViewModel
 import org.luisito.gestor360.ui.viewmodels.MermaViewModel
 import org.luisito.gestor360.ui.viewmodels.ProductViewModel
+import org.luisito.gestor360.ui.theme.NeuCard
+import org.luisito.gestor360.ui.theme.NeuButton
+import org.luisito.gestor360.ui.theme.NeuOutlinedButton
+import org.luisito.gestor360.ui.theme.neuShadow
 
 private const val PRODUCTOS_POR_PAGINA = 25
 
@@ -116,7 +120,7 @@ fun ProductosScreen(
 private fun ProductoCard(producto: Product, esAdmin: Boolean, onEditar: () -> Unit, onMerma: () -> Unit, onAumentarStock: () -> Unit, onDevolucion: () -> Unit, onEliminar: () -> Unit) {
     var menuAbierto by remember { mutableStateOf(false) }
     val stockBajo = producto.stock <= 5; val sinStock = producto.stock <= 0
-    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+    NeuCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
         Row(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Inventory2, null, tint = when { sinStock -> MaterialTheme.colorScheme.error; stockBajo -> MaterialTheme.colorScheme.tertiary; else -> MaterialTheme.colorScheme.primary })
             Spacer(Modifier.width(12.dp))
@@ -153,7 +157,7 @@ private fun MermaDialog(producto: Product, esAdmin: Boolean, isSaving: Boolean, 
     var cantidadTexto by remember { mutableStateOf("") }; var motivo by remember { mutableStateOf("") }
     val cantidad = cantidadTexto.toDoubleOrNull(); val valido = cantidad != null && cantidad > 0 && cantidad <= producto.stock
     AlertDialog(onDismissRequest = onDismiss, shape = RoundedCornerShape(18.dp), title = { Text(if (esAdmin) "Registrar merma" else "Proponer merma", fontWeight = FontWeight.Bold) }, text = { Column {
-        Card(shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) { Column(Modifier.padding(12.dp)) { Text(producto.nombre, fontWeight = FontWeight.Bold); Text("Stock disponible: ${producto.stock.toInt()}", style = MaterialTheme.typography.bodySmall) } }
+        NeuCard(shape = RoundedCornerShape(14.dp), containerColor = MaterialTheme.colorScheme.errorContainer) { Column(Modifier.padding(12.dp)) { Text(producto.nombre, fontWeight = FontWeight.Bold); Text("Stock disponible: ${producto.stock.toInt()}", style = MaterialTheme.typography.bodySmall) } }
         Spacer(Modifier.height(12.dp))
         if (!esAdmin) { Text("Esta solicitud quedará pendiente de aprobación.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.height(8.dp)) }
         OutlinedTextField(cantidadTexto, { cantidadTexto = it }, label = { Text("Cantidad") }, singleLine = true, isError = cantidad != null && cantidad > producto.stock, supportingText = { if (cantidad != null && cantidad > producto.stock) Text("No puede superar el stock") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
@@ -170,7 +174,7 @@ private fun DevolucionDialog(producto: Product, isSaving: Boolean, onDismiss: ()
     val valido = cantidad != null && cantidad > 0
 
     AlertDialog(onDismissRequest = onDismiss, shape = RoundedCornerShape(18.dp), title = { Text("Solicitar devolución", fontWeight = FontWeight.Bold) }, text = { Column {
-        Card(shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) { Column(Modifier.padding(12.dp)) { Text(producto.nombre, fontWeight = FontWeight.Bold) } }
+        NeuCard(shape = RoundedCornerShape(14.dp), containerColor = MaterialTheme.colorScheme.primaryContainer) { Column(Modifier.padding(12.dp)) { Text(producto.nombre, fontWeight = FontWeight.Bold) } }
         Spacer(Modifier.height(12.dp))
         Text("Esta solicitud quedará pendiente de aprobación del admin.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(8.dp))

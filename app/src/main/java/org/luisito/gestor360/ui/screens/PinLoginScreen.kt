@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -23,6 +24,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import org.luisito.gestor360.data.models.User
 import org.luisito.gestor360.ui.viewmodels.AccesoViewModel
+import org.luisito.gestor360.ui.theme.NeuButton
+import org.luisito.gestor360.ui.theme.neuShadow
 
 /**
  * Pantalla de acceso: mismo look & feel de tarjeta clara, centrada y
@@ -60,11 +63,12 @@ fun PinLoginScreen(usuario: User, onLoginExitoso: (User) -> Unit, onCambiarDispo
     ) {
         Surface(
             shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 2.dp,
+            color = MaterialTheme.colorScheme.background,
+            tonalElevation = 0.dp,
             modifier = Modifier
                 .fillMaxWidth()
                 .scale(1f - (shake.value * 0.02f))
+                .neuShadow(shape = RoundedCornerShape(28.dp), elevation = 8.dp, blur = 18.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -74,7 +78,8 @@ fun PinLoginScreen(usuario: User, onLoginExitoso: (User) -> Unit, onCambiarDispo
             ) {
                 Surface(
                     shape = RoundedCornerShape(20.dp),
-                    color = if (bloqueado) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer
+                    color = if (bloqueado) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.neuShadow(shape = RoundedCornerShape(20.dp), elevation = 4.dp, blur = 8.dp)
                 ) {
                     Icon(
                         Icons.Default.Lock,
@@ -126,12 +131,20 @@ fun PinLoginScreen(usuario: User, onLoginExitoso: (User) -> Unit, onCambiarDispo
                             )
                         }
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedBorderColor = if (error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedContainerColor = Color.Transparent
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .neuShadow(shape = RoundedCornerShape(14.dp), elevation = 4.dp, blur = 8.dp, pressed = true),
                     shape = RoundedCornerShape(14.dp)
                 )
                 Spacer(Modifier.height(20.dp))
 
-                Button(
+                NeuButton(
                     onClick = {
                         validando = true
                         viewModel.validarPin(pin) { ok ->
@@ -142,10 +155,8 @@ fun PinLoginScreen(usuario: User, onLoginExitoso: (User) -> Unit, onCambiarDispo
                     enabled = canSubmit,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 ) {
                     if (verificando || validando) {
                         CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)

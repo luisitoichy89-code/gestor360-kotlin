@@ -23,6 +23,10 @@ import org.luisito.gestor360.ui.components.EstadoVacio
 import org.luisito.gestor360.ui.components.SkeletonLista
 import org.luisito.gestor360.ui.components.formatearMonto
 import org.luisito.gestor360.ui.viewmodels.SaleViewModel
+import org.luisito.gestor360.ui.theme.NeuCard
+import org.luisito.gestor360.ui.theme.NeuButton
+import org.luisito.gestor360.ui.theme.NeuOutlinedButton
+import org.luisito.gestor360.ui.theme.neuShadow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,10 +87,10 @@ fun VentasScreen(
                     "vacio" -> EstadoVacio("Sin productos")
                     else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
                         items(productosFiltrados) { p ->
-                            ElevatedCard(
+                            NeuCard(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                                 shape = RoundedCornerShape(16.dp),
-                                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 5.dp),
+                                elevation = 5.dp,
                                 onClick = { selectedProduct = p; cantidad = "" }
                             ) {
                                 Row(modifier = Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -95,7 +99,7 @@ fun VentasScreen(
                                         Spacer(Modifier.height(4.dp))
                                         Text("Stock: ${p.stock.toInt()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
-                                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), shape = RoundedCornerShape(12.dp)) {
+                                    NeuCard(containerColor = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(12.dp)) {
                                         Text("${formatearMonto(p.precio)} CUP", modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                                     }
                                 }
@@ -124,13 +128,13 @@ fun VentasScreen(
                     )
                     Spacer(Modifier.height(20.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OutlinedButton(
+                        NeuOutlinedButton(
                             onClick = { selectedProduct = null },
                             modifier = Modifier.weight(1f).height(52.dp),
                             shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                            contentColor = MaterialTheme.colorScheme.error
                         ) { Text("Cancelar", fontWeight = FontWeight.Bold) }
-                        Button(
+                        NeuButton(
                             onClick = {
                                 val c = cantidad.toDoubleOrNull() ?: 0.0
                                 val err = viewModel.agregarAlCarrito(selectedProduct!!, c)
@@ -154,12 +158,12 @@ fun VentasScreen(
             text = { Text("¿Estás seguro de cancelar la venta? Se vaciará el carrito.") },
             confirmButton = {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedButton(
+                    NeuOutlinedButton(
                         onClick = { mostrarCancelarVenta = false },
                         modifier = Modifier.weight(1f).height(52.dp),
                         shape = RoundedCornerShape(14.dp)
                     ) { Text("Volver", fontWeight = FontWeight.Bold) }
-                    Button(
+                    NeuButton(
                         onClick = {
                             viewModel.limpiarCarrito()
                             mostrarCancelarVenta = false
@@ -167,7 +171,7 @@ fun VentasScreen(
                         },
                         modifier = Modifier.weight(1f).height(52.dp),
                         shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                        containerColor = MaterialTheme.colorScheme.error
                     ) { Text("Cancelar venta", fontWeight = FontWeight.Bold) }
                 }
             }

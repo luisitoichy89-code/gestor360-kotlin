@@ -28,6 +28,10 @@ import org.luisito.gestor360.R
 import org.luisito.gestor360.data.models.User
 import org.luisito.gestor360.ui.viewmodels.AccesoViewModel
 import org.luisito.gestor360.utils.DeviceIdManager
+import org.luisito.gestor360.ui.theme.NeuButton
+import org.luisito.gestor360.ui.theme.NeuCard
+import org.luisito.gestor360.ui.theme.NeuOutlinedButton
+import org.luisito.gestor360.ui.theme.neuShadow
 
 @Composable
 fun VerificarDispositivoScreen(onDispositivoAutorizado: (User) -> Unit, viewModel: AccesoViewModel = viewModel()) {
@@ -88,19 +92,19 @@ fun VerificarDispositivoScreen(onDispositivoAutorizado: (User) -> Unit, viewMode
             Text("Gestor360", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Text("Verificación de dispositivo requerida", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(24.dp))
-            ElevatedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+            NeuCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
                 Column(Modifier.padding(16.dp)) {
                     Text("Identificador del dispositivo", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(6.dp))
                     SelectionContainer { Text(androidId, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) }
                     Spacer(Modifier.height(12.dp))
-                    OutlinedButton(onClick = { val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager; clipboard.setPrimaryClip(ClipData.newPlainText("Device ID", androidId)); Toast.makeText(context, "ID copiado al portapapeles", Toast.LENGTH_SHORT).show() }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) { Icon(Icons.Default.ContentCopy, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Copiar identificador") }
+                    NeuOutlinedButton(onClick = { val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager; clipboard.setPrimaryClip(ClipData.newPlainText("Device ID", androidId)); Toast.makeText(context, "ID copiado al portapapeles", Toast.LENGTH_SHORT).show() }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) { Icon(Icons.Default.ContentCopy, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Copiar identificador") }
                 }
             }
             Spacer(Modifier.height(24.dp))
             if (uiState.verificando) { CircularProgressIndicator(); Spacer(Modifier.height(12.dp)); Text("Verificando dispositivo...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            else { Button(onClick = { viewModel.verificarDispositivo(androidId) }, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp)) { Text("Verificar dispositivo") } }
-            uiState.mensajeError?.let { error -> Spacer(Modifier.height(16.dp)); Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) { Text(error, Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodySmall) } }
+            else { NeuButton(onClick = { viewModel.verificarDispositivo(androidId) }, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp)) { Text("Verificar dispositivo") } }
+            uiState.mensajeError?.let { error -> Spacer(Modifier.height(16.dp)); Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().neuShadow(shape = RoundedCornerShape(12.dp), elevation = 3.dp, blur = 6.dp)) { Text(error, Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodySmall) } }
             // Si el usuario niega el permiso de SMS (o lo hace "no volver a preguntar"),
             // no lo dejamos bloqueado sin poder entrar: el checkout ya tiene el botón
             // "Confirmé visual" en el overlay de pago como respaldo manual para ese caso.

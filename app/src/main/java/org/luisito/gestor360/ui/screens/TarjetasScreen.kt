@@ -18,6 +18,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import org.luisito.gestor360.data.models.Tarjeta
 import org.luisito.gestor360.ui.components.*
 import org.luisito.gestor360.ui.viewmodels.TarjetaViewModel
+import org.luisito.gestor360.ui.theme.NeuCard
+import org.luisito.gestor360.ui.theme.NeuButton
+import org.luisito.gestor360.ui.theme.NeuOutlinedButton
+import org.luisito.gestor360.ui.theme.neuShadow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,7 +64,7 @@ fun TarjetasScreen(androidId: String, onBack: (() -> Unit)? = null, viewModel: T
 @Composable
 private fun TarjetaCard(tarjeta: Tarjeta, onEditar: () -> Unit, onToggleActivo: () -> Unit, onEliminar: () -> Unit) {
     var menuAbierto by remember { mutableStateOf(false) }
-    ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+    NeuCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.CreditCard, null, tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(12.dp))
