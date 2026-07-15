@@ -67,6 +67,7 @@ data class MermaInfo(
     val fecha: String? = null
 )
 
+@Serializable
 data class DevueltoInfo(
     val id: Long,
     val producto_nombre: String,
