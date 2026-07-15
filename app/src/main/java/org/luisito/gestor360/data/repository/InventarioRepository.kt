@@ -70,7 +70,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         val productosVendidos = fusionarProductosVendidos(emptyList(), ventasHoy)
         
         // Totales
-        val totales = TotalesVentasInfo(
+        val totales = TotalesVentas(
             efectivo = ventasHoy.sumOf { it.efectivo },
             transferencia = ventasHoy.sumOf { it.transferencia },
             cantidad_ventas = ventasHoy.size
@@ -125,10 +125,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             productos_eliminados = eliminados,
             devueltos = devueltos,
             totales_ventas = totales,
-            totales_mermas = null,
-            totales_modificados = null,
-            totales_eliminados = null,
-            totales_devueltos = null
         )
     }
 
@@ -140,7 +136,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             productos_modificados = (dia.productos_modificados + local.productos_modificados).distinctBy { it.id },
             productos_eliminados = (dia.productos_eliminados + local.productos_eliminados).distinctBy { it.id },
             devueltos = (dia.devueltos + local.devueltos).distinctBy { it.id },
-            totales_ventas = TotalesVentasInfo(
+            totales_ventas = TotalesVentas(
                 efectivo = (dia.totales_ventas?.efectivo ?: 0.0) + (local.totales_ventas?.efectivo ?: 0.0),
                 transferencia = (dia.totales_ventas?.transferencia ?: 0.0) + (local.totales_ventas?.transferencia ?: 0.0),
                 cantidad_ventas = (dia.totales_ventas?.cantidad_ventas ?: 0) + (local.totales_ventas?.cantidad_ventas ?: 0)
