@@ -21,7 +21,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.asFrameworkPaint
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -52,7 +53,7 @@ fun Modifier.neuShadow(
     val elevationPx = elevation.toPx() * if (pressed) -1f else 1f
     val blurPx = blur.toPx()
     val outline = shape.createOutline(size, layoutDirection, this)
-    val path = androidx.compose.ui.graphics.Path().apply { addOutline(outline) }
+    val path = Path().apply { addOutline(outline) }
 
     drawIntoCanvas { canvas ->
         val darkPaint = Paint().apply {
