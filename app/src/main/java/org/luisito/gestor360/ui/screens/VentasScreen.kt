@@ -19,6 +19,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.luisito.gestor360.data.models.Product
+import org.luisito.gestor360.ui.components.EstadoVacio
+import org.luisito.gestor360.ui.components.SkeletonLista
 import org.luisito.gestor360.ui.components.formatearMonto
 import org.luisito.gestor360.ui.viewmodels.SaleViewModel
 
@@ -70,22 +72,33 @@ fun VentasScreen(
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(18.dp))
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                items(productosFiltrados) { p ->
-                    ElevatedCard(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 5.dp),
-                        onClick = { selectedProduct = p; cantidad = "" }
-                    ) {
-                        Row(modifier = Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(p.nombre, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                                Spacer(Modifier.height(4.dp))
-                                Text("Stock: ${p.stock.toInt()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), shape = RoundedCornerShape(12.dp)) {
-                                Text("${formatearMonto(p.precio)} CUP", modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            val estadoLista = when {
+                uiState.isLoading -> "cargando"
+                productosFiltrados.isEmpty() -> "vacio"
+                else -> "listo"
+            }
+            androidx.compose.animation.Crossfade(targetState = estadoLista, modifier = Modifier.weight(1f), label = "ventas_transicion") { estado ->
+                when (estado) {
+                    "cargando" -> SkeletonLista()
+                    "vacio" -> EstadoVacio("Sin productos")
+                    else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        items(productosFiltrados) { p ->
+                            ElevatedCard(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 5.dp),
+                                onClick = { selectedProduct = p; cantidad = "" }
+                            ) {
+                                Row(modifier = Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(p.nombre, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                        Spacer(Modifier.height(4.dp))
+                                        Text("Stock: ${p.stock.toInt()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), shape = RoundedCornerShape(12.dp)) {
+                                        Text("${formatearMonto(p.precio)} CUP", modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
                             }
                         }
                     }

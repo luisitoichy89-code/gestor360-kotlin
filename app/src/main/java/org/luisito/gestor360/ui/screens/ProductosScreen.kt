@@ -79,12 +79,20 @@ fun ProductosScreen(
                 BuscadorField(query = query, onQueryChange = { query = it }, placeholder = "Buscar producto...")
                 if (categorias.isNotEmpty()) { Spacer(modifier = Modifier.height(10.dp)); LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) { item { FilterChip(selected = categoriaSeleccionada == null, onClick = { categoriaSeleccionada = null }, label = { Text("Todas") }) }; items(categorias) { cat -> FilterChip(selected = categoriaSeleccionada == cat, onClick = { categoriaSeleccionada = if (categoriaSeleccionada == cat) null else cat }, label = { Text(cat) }) } } }
             }
-            when {
-                uiState.isLoading -> EstadoCargando()
-                uiState.error != null -> EstadoError(uiState.error ?: "Error") { viewModel.refrescar() }
-                filtrados.isEmpty() -> EstadoVacio("Sin productos")
-                else -> LazyColumn(modifier = Modifier.weight(1f).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(pagina0, key = { it.id }) { p -> ProductoCard(producto = p, esAdmin = esAdmin, onEditar = { productoEnEdicion = p; mostrarFormulario = true }, onMerma = { productoParaMerma = p }, onAumentarStock = { mostrarAumentoStock = p }, onDevolucion = { productoParaDevolucion = p }, onEliminar = { productoAEliminar = p }) }
+            val estadoPantalla = when {
+                uiState.isLoading -> "cargando"
+                uiState.error != null -> "error"
+                filtrados.isEmpty() -> "vacio"
+                else -> "listo"
+            }
+            androidx.compose.animation.Crossfade(targetState = estadoPantalla, modifier = Modifier.weight(1f), label = "productos_transicion") { estado ->
+                when (estado) {
+                    "cargando" -> SkeletonLista()
+                    "error" -> EstadoError(uiState.error ?: "Error") { viewModel.refrescar() }
+                    "vacio" -> EstadoVacio("Sin productos")
+                    else -> LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(pagina0, key = { it.id }) { p -> ProductoCard(producto = p, esAdmin = esAdmin, onEditar = { productoEnEdicion = p; mostrarFormulario = true }, onMerma = { productoParaMerma = p }, onAumentarStock = { mostrarAumentoStock = p }, onDevolucion = { productoParaDevolucion = p }, onEliminar = { productoAEliminar = p }) }
+                    }
                 }
             }
         }

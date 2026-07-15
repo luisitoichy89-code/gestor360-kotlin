@@ -73,6 +73,14 @@ fun Gestor360App() {
     var usuarioParaPin by remember { mutableStateOf<User?>(null) }
     var pantalla by remember { mutableStateOf<PantallaInterna>(PantallaInterna.Home) }
     var mostrarConfirmarSalir by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    var localRecienCambiado by remember { mutableStateOf<Local?>(null) }
+
+    LaunchedEffect(localRecienCambiado) {
+        localRecienCambiado?.let { local ->
+            snackbarHostState.showSnackbar("Cambiado a: ${local.nombre}")
+        }
+    }
 
     LaunchedEffect(Unit) {
         isLoggedIn = sessionManager.isLoggedIn()
@@ -112,6 +120,7 @@ fun Gestor360App() {
         )
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     when {
         isLoading -> {}
         !isLoggedIn && usuarioParaPin == null -> VerificarDispositivoScreen(
@@ -140,7 +149,7 @@ fun Gestor360App() {
                 when (pantallaActual) {
                     is PantallaInterna.Home -> Column(modifier = Modifier.statusBarsPadding()) {
                         SyncStatusBar(androidId = androidId, onVerConflictos = { pantalla = PantallaInterna.Conflictos })
-                        if (esAdmin) SelectorDeLocalBar(androidId = androidId, viewModel = localSeleccionViewModel)
+                        if (esAdmin) SelectorDeLocalBar(androidId = androidId, viewModel = localSeleccionViewModel, onLocalCambiado = { local -> localRecienCambiado = local })
                         DashboardScreen(
                             userRol = rol,
                             username = sessionManager.getNombre().ifEmpty { sessionManager.getUsername() },
@@ -179,10 +188,12 @@ fun Gestor360App() {
             }
         }
     }
+    SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
+    }
 }
 
 @Composable
-private fun SelectorDeLocalBar(androidId: String, viewModel: LocalSeleccionViewModel) {
+private fun SelectorDeLocalBar(androidId: String, viewModel: LocalSeleccionViewModel, onLocalCambiado: (Local) -> Unit) {
     val uiState by viewModel.uiState.collectAsState()
     var menuAbierto by remember { mutableStateOf(false) }
     var localAConfirmar by remember { mutableStateOf<Local?>(null) }
@@ -219,7 +230,9 @@ private fun SelectorDeLocalBar(androidId: String, viewModel: LocalSeleccionViewM
             text = { Text("¿Cambiar a ${localAConfirmar!!.nombre}?") },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.seleccionar(localAConfirmar!!)
+                    val local = localAConfirmar!!
+                    viewModel.seleccionar(local)
+                    onLocalCambiado(local)
                     localAConfirmar = null
                 }) { Text("Aceptar") }
             },

@@ -89,11 +89,19 @@ fun InventarioScreen(androidId: String, rol: String, onBack: (() -> Unit)? = nul
             )
         }
     ) { padding ->
-        when {
-            uiState.isLoading -> EstadoCargando()
-            uiState.error != null -> EstadoError(uiState.error ?: "Error") { viewModel.refrescar() }
-            dia == null -> EstadoVacio("Sin datos")
-            else -> LazyColumn(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        val estadoPantalla = when {
+            uiState.isLoading -> "cargando"
+            uiState.error != null -> "error"
+            dia == null -> "vacio"
+            else -> "listo"
+        }
+        androidx.compose.animation.Crossfade(targetState = estadoPantalla, modifier = Modifier.fillMaxSize().padding(padding), label = "inventario_transicion") { estado -> when (estado) {
+            "cargando" -> SkeletonLista()
+            "error" -> EstadoError(uiState.error ?: "Error") { viewModel.refrescar() }
+            "vacio" -> EstadoVacio("Sin datos")
+            else -> {
+                val dia = dia!!
+                LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 item { EncabezadoDia(uiState.fecha, formatter, dia.solo_lectura) }
                 item { TurnoCard(dia.turno, uiState.esHoy && !dia.solo_lectura, uiState.isSaving, onCerrar = { mostrarCerrarTurno = true }) }
 
@@ -141,7 +149,8 @@ fun InventarioScreen(androidId: String, rol: String, onBack: (() -> Unit)? = nul
                 }
                 item { Spacer(Modifier.height(56.dp)) }
             }
-        }
+            }
+        } }
     }
 
     if (mostrarCerrarTurno && dia != null) {

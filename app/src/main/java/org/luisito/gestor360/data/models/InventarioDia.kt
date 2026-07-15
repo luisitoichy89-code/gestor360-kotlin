@@ -56,8 +56,6 @@ data class ProductoEliminadoInfo(
 )
 
 @Serializable
-@Serializable
-@Serializable
 data class MermaInfo(
     val id: Long,
     val producto_nombre: String,
