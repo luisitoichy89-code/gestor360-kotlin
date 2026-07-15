@@ -32,7 +32,8 @@ class SyncManager(private val context: Context) {
         val pendientes = db.accionPendienteDao().obtenerPendientes()
         var exitosas = 0
         var fallidas = 0
-        val eliminadosProcesados = mutableListOf<Pair<Long, Long>>() // (productoId, localId)
+        val eliminadosProductos = mutableListOf<Pair<Long, Long>>()
+        val eliminadosTarjetas = mutableListOf<Pair<Long, Long>>()
 
         for (accion in pendientes) {
             try {
@@ -47,12 +48,16 @@ class SyncManager(private val context: Context) {
                     }
                 }
 
-                // Si es eliminación de producto, guardar referencia para borrado local post-sync
-                if (accion.tipo == "eliminar_producto") {
-                    val pid = payload["p_id"]?.toString()?.trim('"')?.toLongOrNull()
-                    val lid = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull()
-                    if (pid != null && lid != null) {
-                        eliminadosProcesados.add(pid to lid)
+                when (accion.tipo) {
+                    "eliminar_producto" -> {
+                        val pid = payload["p_id"]?.toString()?.trim('"')?.toLongOrNull()
+                        val lid = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull()
+                        if (pid != null && lid != null) eliminadosProductos.add(pid to lid)
+                    }
+                    "eliminar_tarjeta" -> {
+                        val tid = payload["p_id"]?.toString()?.trim('"')?.toLongOrNull()
+                        val lid = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull()
+                        if (tid != null && lid != null) eliminadosTarjetas.add(tid to lid)
                     }
                 }
 
@@ -66,9 +71,11 @@ class SyncManager(private val context: Context) {
             }
         }
 
-        // Eliminar localmente los productos ya procesados por el backend ANTES de refrescar
-        for ((pid, lid) in eliminadosProcesados) {
+        for ((pid, lid) in eliminadosProductos) {
             db.productoDao().eliminar(pid, lid)
+        }
+        for ((tid, lid) in eliminadosTarjetas) {
+            db.tarjetaDao().eliminar(tid, lid)
         }
 
         if (session.getLocalId() != null) {
