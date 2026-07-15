@@ -73,7 +73,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         val totales = TotalesVentas(
             efectivo = ventasHoy.sumOf { it.efectivo },
             transferencia = ventasHoy.sumOf { it.transferencia },
-            cantidad_ventas = ventasHoy.size
+            cantidad_ventas = ventasHoy.size.toLong()
         )
         
         // Productos modificados hoy
