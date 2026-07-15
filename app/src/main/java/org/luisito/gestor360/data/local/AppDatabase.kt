@@ -4,8 +4,6 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
-import org.luisito.gestor360.security.DbKeyProvider
 import org.luisito.gestor360.data.local.dao.AccionPendienteDao
 import org.luisito.gestor360.data.local.dao.AprobacionStockCacheDao
 import org.luisito.gestor360.data.local.dao.ConflictoDao
@@ -14,6 +12,7 @@ import org.luisito.gestor360.data.local.dao.InventarioCacheDao
 import org.luisito.gestor360.data.local.dao.LocalDao
 import org.luisito.gestor360.data.local.dao.MermaDao
 import org.luisito.gestor360.data.local.dao.ProductoDao
+import org.luisito.gestor360.data.local.dao.ProductoEliminadoCacheDao
 import org.luisito.gestor360.data.local.dao.TarjetaDao
 import org.luisito.gestor360.data.local.dao.TurnoDao
 import org.luisito.gestor360.data.local.dao.VentaDao
@@ -25,6 +24,7 @@ import org.luisito.gestor360.data.local.entities.InventarioCacheEntity
 import org.luisito.gestor360.data.local.entities.LocalEntity
 import org.luisito.gestor360.data.local.entities.MermaEntity
 import org.luisito.gestor360.data.local.entities.ProductoEntity
+import org.luisito.gestor360.data.local.entities.ProductoEliminadoCacheEntity
 import org.luisito.gestor360.data.local.entities.TarjetaEntity
 import org.luisito.gestor360.data.local.entities.TurnoEntity
 import org.luisito.gestor360.data.local.entities.VentaEntity
@@ -32,6 +32,7 @@ import org.luisito.gestor360.data.local.entities.VentaEntity
 @Database(
     entities = [
         ProductoEntity::class, AccionPendienteEntity::class, VentaEntity::class, ConflictoEntity::class,
+        ProductoEliminadoCacheEntity::class,
         TurnoEntity::class, TarjetaEntity::class, MermaEntity::class,
         UserEntity::class, LocalEntity::class, InventarioCacheEntity::class, DevolucionCacheEntity::class,
         AprobacionStockCacheEntity::class
@@ -57,19 +58,12 @@ import org.luisito.gestor360.data.local.entities.VentaEntity
     // fallbackToDestructiveMigration: se recrea la tabla de caché, cero
     // pérdida real (las ventas ya sincronizadas se vuelven a traer del
     // servidor; las pendientes de sincronizar viven en AccionPendienteEntity).
-    //
-    // v9: SEGURIDAD — UserEntity ya no guarda "pin" en texto plano; ahora
-    // guarda pinHash + pinSalt (ver PinSecurity/DeviceVerificationRepository).
-    // Además, a partir de esta versión la base completa se abre cifrada con
-    // SQLCipher (ver DbKeyProvider más abajo). fallbackToDestructiveMigration
-    // recrea la tabla `users`; se re-hashea el PIN en el próximo login online
-    // de cada usuario (mismo criterio que siempre: todo esto es caché,
-    // se resincroniza del servidor).
-    version = 9,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun productoDao(): ProductoDao
+    abstract fun productoEliminadoCacheDao(): ProductoEliminadoCacheDao
     abstract fun accionPendienteDao(): AccionPendienteDao
     abstract fun ventaDao(): VentaDao
     abstract fun conflictoDao(): ConflictoDao
@@ -87,27 +81,11 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun obtener(context: Context): AppDatabase =
             INSTANCE ?: synchronized(this) {
-                INSTANCE ?: run {
-                    System.loadLibrary("sqlcipher")
-                    val passphrase = DbKeyProvider.obtenerOCrearPassphrase(context)
-                    val factory = SupportOpenHelperFactory(charArrayAUtf8Bytes(passphrase))
-                    Room.databaseBuilder(
-                        context.applicationContext,
-                        AppDatabase::class.java,
-                        "gestor360.db"
-                    )
-                        .openHelperFactory(factory)
-                        .fallbackToDestructiveMigration()
-                        .build()
-                }.also { INSTANCE = it }
+                INSTANCE ?: Room.databaseBuilder(
+                    context.applicationContext,
+                    AppDatabase::class.java,
+                    "gestor360.db"
+                ).fallbackToDestructiveMigration().build().also { INSTANCE = it }
             }
-
-        private fun charArrayAUtf8Bytes(chars: CharArray): ByteArray {
-            val byteBuffer = Charsets.UTF_8.encode(java.nio.CharBuffer.wrap(chars))
-            val bytes = ByteArray(byteBuffer.remaining())
-            byteBuffer.get(bytes)
-            java.util.Arrays.fill(byteBuffer.array(), 0)
-            return bytes
-        }
     }
 }

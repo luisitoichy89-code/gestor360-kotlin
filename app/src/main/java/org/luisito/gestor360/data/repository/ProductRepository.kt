@@ -10,6 +10,7 @@ import kotlinx.serialization.json.put
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.local.AppDatabase
 import org.luisito.gestor360.data.local.entities.AccionPendienteEntity
+import org.luisito.gestor360.data.local.entities.ProductoEliminadoCacheEntity
 import org.luisito.gestor360.data.local.entities.toEntity
 import org.luisito.gestor360.data.local.entities.toModel
 import org.luisito.gestor360.data.models.Product
@@ -17,6 +18,7 @@ import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.data.sync.SyncWorker
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
+import java.time.LocalDate
 
 class ProductRepository(
     private val context: Context = AppContextHolder.context
@@ -111,16 +113,28 @@ class ProductRepository(
 
     suspend fun deleteProduct(androidId: String, id: Long): Result<Unit> {
         val localId = localIdActivo()
-        
-        // Si el id es temporal (negativo), el producto nunca llegó al servidor.
-        // Cancelamos la acción crear_producto pendiente y solo borramos local.
+        val fechaHoy = LocalDate.now().toString()
+
+        // Guardar en caché de eliminados ANTES de borrar
+        val producto = db.productoDao().obtenerPorId(id, localId)
+        if (producto != null) {
+            db.productoEliminadoCacheDao().insertar(
+                ProductoEliminadoCacheEntity(
+                    id = producto.id,
+                    localId = localId,
+                    nombre = producto.nombre,
+                    stock = producto.stock,
+                    fecha = fechaHoy
+                )
+            )
+        }
+
         if (id < 0) {
             db.productoDao().eliminar(id, localId)
             db.accionPendienteDao().cancelarPorIdTemporal(id)
             return Result.success(Unit)
         }
-        
-        // id real (positivo): eliminar local y encolar para backend
+
         db.productoDao().eliminar(id, localId)
         val payload = buildJsonObject {
             put("p_android_id", androidId)
