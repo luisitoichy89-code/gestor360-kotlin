@@ -30,6 +30,9 @@ data class AprobacionStock(
     val venta_id: String? = null,
     val venta_total: Double? = null,
     val solicitado_por_nombre: String? = null,
+    val solicitado_por: Long? = null,
+    val resuelto_por: Long? = null,
+    val resuelto_por_nombre: String? = null,
     val local_id: Long? = null,
     val created_at: String? = null
 )
