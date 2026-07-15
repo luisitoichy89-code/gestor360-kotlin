@@ -7,9 +7,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.Json
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.local.AppDatabase
 import org.luisito.gestor360.data.local.entities.VentaEntity
@@ -31,54 +28,44 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
     suspend fun getInventarioDia(androidId: String, fecha: LocalDate): Result<InventarioDia> {
         val localId = localIdActivo()
         val fechaStr = fecha.toString()
-        
-        // 1. Intentar caché del servidor
+
         val cacheado = db.inventarioCacheDao().obtener(localId, fechaStr)
-        
-        // 2. Construir desde Room SIEMPRE (offline-first real)
         val desdeRoom = construirDesdeRoom(localId, fecha)
-        
-        // 3. Si hay caché del servidor, fusionar con datos locales
+
         val base = if (cacheado != null) {
-            val servidor = cacheado.toModel()
-            completarDesdeRoom(servidor, localId, fecha)
+            completarDesdeRoom(cacheado.toModel(), localId, fecha)
         } else {
             desdeRoom
         }
-        
-        // 4. Refrescar en segundo plano si hay internet
+
         if (NetworkMonitor.hayInternet(context)) {
             CoroutineScope(Dispatchers.IO).launch {
                 refrescarDesdeServidor(androidId, fecha)
             }
         }
-        
+
         return Result.success(base)
     }
 
     private suspend fun construirDesdeRoom(localId: Long, fecha: LocalDate): InventarioDia {
         val fechaStr = fecha.toString()
-        
-        // Ventas locales del día (sincronizadas y no sincronizadas)
+
         val ventasHoy = db.ventaDao().obtenerTodas(localId)
             .filter { it.createdAt?.startsWith(fechaStr) == true }
-        
+
         val nombreUsuarioLocal = session.getNombre().takeIf { it.isNotBlank() }
         val ventasInfo = ventasHoy.map { it.toVentaInfo(localId, nombreUsuarioLocal) }
-        
-        // Productos vendidos
+
         val productosVendidos = fusionarProductosVendidos(emptyList(), ventasHoy)
-        
-        // Totales
+
         val totales = TotalesVentas(
             efectivo = ventasHoy.sumOf { it.efectivo },
             transferencia = ventasHoy.sumOf { it.transferencia },
             cantidad_ventas = ventasHoy.size.toLong()
         )
-        
-        // Productos modificados hoy
+
         val modificados = db.productoDao().obtenerTodos(localId).filter { p ->
-            p.updatedAt?.startsWith(fechaStr) == true
+            p.updatedAt?.startsWith(fechaStr) == true && p.createdAt != p.updatedAt
         }.map { p ->
             ProductoInfo(
                 id = p.id, nombre = p.nombre, precio = p.precio, stock = p.stock,
@@ -86,8 +73,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 solicitado_por_nombre = null, resuelto_por_nombre = null
             )
         }
-        
-        // Devoluciones del día
+
         val devolucionesCache = db.devolucionCacheDao().obtener(localId)
         val devueltos = if (devolucionesCache != null) {
             devolucionesCache.toModel().filter { d ->
@@ -102,29 +88,22 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 )
             }
         } else emptyList()
-        
-        // Productos eliminados hoy (desde acciones pendientes y sincronizadas recientes)
-        val eliminados = db.accionPendienteDao().obtenerPendientes()
-            .filter { it.tipo == "eliminar_producto" }
-            .mapNotNull { accion ->
-                try {
-                    val json = Json.parseToJsonElement(accion.payloadJson).jsonObject
-                    val pid = json["p_id"]?.jsonPrimitive?.content?.toLongOrNull() ?: return@mapNotNull null
-                    val nombre = db.productoDao().obtenerPorId(pid, localId)?.nombre ?: "Producto #$pid"
-                    ProductoEliminadoInfo(id = pid, nombre = nombre, stock = 0.0, resuelto_por_nombre = null, fecha = fechaStr)
-                } catch (e: Exception) {
-                    null
-                }
+
+        val mermasLocales = db.mermaDao().obtenerPendientes(localId).map { m -> MermaInfo(id = m.id, producto_nombre = m.productoNombre, cantidad = m.cantidad, motivo = m.motivo ?: "", estado = m.estado, solicitado_por_nombre = m.solicitadoPorNombre, resuelto_por_nombre = null, fecha = null) }
+        val eliminados = db.productoEliminadoCacheDao().obtenerPorFecha(localId, fechaStr)
+            .map { e ->
+                ProductoEliminadoInfo(id = e.id, nombre = e.nombre, stock = e.stock, fecha = e.fecha, resuelto_por_nombre = null)
             }
-        
+
         return InventarioDia(
             fecha = fechaStr,
             ventas = ventasInfo,
             productos_vendidos = productosVendidos,
             productos_modificados = modificados,
             productos_eliminados = eliminados,
+            mermas = mermasLocales,
             devueltos = devueltos,
-            totales_ventas = totales,
+            totales_ventas = totales
         )
     }
 
@@ -136,6 +115,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             productos_modificados = (dia.productos_modificados + local.productos_modificados).distinctBy { it.id },
             productos_eliminados = (dia.productos_eliminados + local.productos_eliminados).distinctBy { it.id },
             devueltos = (dia.devueltos + local.devueltos).distinctBy { it.id },
+            mermas = (dia.mermas + local.mermas).distinctBy { it.id },
             totales_ventas = TotalesVentas(
                 efectivo = (dia.totales_ventas?.efectivo ?: 0.0) + (local.totales_ventas?.efectivo ?: 0.0),
                 transferencia = (dia.totales_ventas?.transferencia ?: 0.0) + (local.totales_ventas?.transferencia ?: 0.0),

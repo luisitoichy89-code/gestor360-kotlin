@@ -7,6 +7,8 @@ import org.luisito.gestor360.data.local.entities.MermaEntity
 interface MermaDao {
     @Query("SELECT * FROM mermas_cache WHERE estado = 'pendiente' AND localId = :localId ORDER BY id DESC")
     suspend fun obtenerPendientes(localId: Long): List<MermaEntity>
+    @Query("SELECT * FROM mermas_cache WHERE localId = :localId")
+    suspend fun obtenerTodas(localId: Long): List<MermaEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertarTodas(mermas: List<MermaEntity>)

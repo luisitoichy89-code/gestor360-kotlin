@@ -1,4 +1,6 @@
 package org.luisito.gestor360.ui.screens
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -90,7 +92,7 @@ private fun TarjetaFormDialog(tarjeta: Tarjeta?, isSaving: Boolean, onDismiss: (
         text = { Column {
             OutlinedTextField(banco, { banco = it }, label = { Text("Banco") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
             Spacer(Modifier.height(10.dp))
-            OutlinedTextField(numero, { numero = it.filter { c -> c.isDigit() }.take(16) }, label = { Text("Número de cuenta") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
+            OutlinedTextField(numero, { numero = it.filter { c -> c.isDigit() }.take(16) }, label = { Text("Número de cuenta") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
             Spacer(Modifier.height(10.dp))
             OutlinedTextField(titular, { titular = it }, label = { Text("Titular (opcional)") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
         }},
