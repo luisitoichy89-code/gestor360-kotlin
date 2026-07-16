@@ -18,8 +18,20 @@ object SyncReporter {
                     put("p_payload", payload.toString())
                 }
             )
-        } catch (_: Exception) {
-            // No bloquear si falla el reporte
-        }
+        } catch (_: Exception) { }
+    }
+
+    suspend fun reportarError(androidId: String, localId: Long, tipo: String, mensaje: String) {
+        try {
+            SupabaseClientProvider.client.postgrest.rpc(
+                "reportar_sync_error",
+                buildJsonObject {
+                    put("p_android_id", androidId)
+                    put("p_local_id", localId)
+                    put("p_tipo", tipo)
+                    put("p_error", mensaje)
+                }
+            )
+        } catch (_: Exception) { }
     }
 }

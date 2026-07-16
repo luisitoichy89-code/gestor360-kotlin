@@ -62,21 +62,31 @@ class SyncManager(private val context: Context) {
                 }
 
                 db.accionPendienteDao().actualizar(accion.copy(estado = "sincronizado"))
+                // Reportar éxito a sync_queue
+                try {
+                    val localIdAccion = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull() ?: session.getLocalId()
+                    if (localIdAccion != null) {
+                        SyncReporter.reportar(androidId, localIdAccion, accion.tipo, payload)
+                    }
+                } catch (_: Exception) {}
                 exitosas++
             } catch (e: Exception) {
                 db.accionPendienteDao().actualizar(
                     accion.copy(intentos = accion.intentos + 1, ultimoError = e.message?.take(300))
                 )
+                // Reportar error a sync_queue
+                try {
+                    val localIdAccion = session.getLocalId()
+                    if (localIdAccion != null) {
+                        SyncReporter.reportarError(androidId, localIdAccion, accion.tipo, e.message ?: "Error desconocido")
+                    }
+                } catch (_: Exception) {}
                 fallidas++
             }
         }
 
-        for ((pid, lid) in eliminadosProductos) {
-            db.productoDao().eliminar(pid, lid)
-        }
-        for ((tid, lid) in eliminadosTarjetas) {
-            db.tarjetaDao().eliminar(tid, lid)
-        }
+        for ((pid, lid) in eliminadosProductos) db.productoDao().eliminar(pid, lid)
+        for ((tid, lid) in eliminadosTarjetas) db.tarjetaDao().eliminar(tid, lid)
 
         if (session.getLocalId() != null) {
             refrescarProductosYDetectarConflictos(androidId)
@@ -94,10 +104,8 @@ class SyncManager(private val context: Context) {
     }
 
     private suspend fun reemplazarIdTemporal(
-        tipo: String,
-        idTemporal: Long,
-        respuesta: io.github.jan.supabase.postgrest.result.PostgrestResult,
-        localId: Long
+        tipo: String, idTemporal: Long,
+        respuesta: io.github.jan.supabase.postgrest.result.PostgrestResult, localId: Long
     ) {
         when (tipo) {
             "crear_producto" -> runCatching { respuesta.decodeAs<Long>() }.getOrNull()
