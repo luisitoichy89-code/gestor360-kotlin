@@ -12,7 +12,6 @@ import org.luisito.gestor360.data.local.entities.toModel
 import org.luisito.gestor360.data.models.MermaPendiente
 import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.data.sync.SyncWorker
-import org.luisito.gestor360.data.sync.SyncReporter
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 
@@ -68,7 +67,7 @@ class MermaRepository(
             put("p_cantidad", cantidad); put("p_motivo", motivo)
         }
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "crear_merma", payloadJson = payload.toString(), idLocalTemporal = idTemporal))
-        try { SyncReporter.reportar(androidId, localIdActivo(), "crear_merma", payload) } catch (_: Exception) {}
+        if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
         return Result.success(Unit)
     }
 

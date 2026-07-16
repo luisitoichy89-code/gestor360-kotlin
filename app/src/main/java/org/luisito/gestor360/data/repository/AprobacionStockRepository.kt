@@ -15,7 +15,6 @@ import org.luisito.gestor360.data.local.entities.toEntity
 import org.luisito.gestor360.data.local.entities.toModel
 import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.data.sync.SyncWorker
-import org.luisito.gestor360.data.sync.SyncReporter
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 
@@ -31,9 +30,6 @@ data class AprobacionStock(
     val venta_id: String? = null,
     val venta_total: Double? = null,
     val solicitado_por_nombre: String? = null,
-    val solicitado_por: Long? = null,
-    val resuelto_por: Long? = null,
-    val resuelto_por_nombre: String? = null,
     val local_id: Long? = null,
     val created_at: String? = null
 )
@@ -115,7 +111,6 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
             put("p_nombre", nombre); put("p_precio", precio); put("p_cantidad", cantidad)
         }
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "solicitar_producto", payloadJson = payload.toString(), idLocalTemporal = idTemporal))
-        try { SyncReporter.reportar(androidId, localIdActivo(), "solicitar_producto", payload) } catch (_: Exception) {}
         if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
         return Result.success(Unit)
     }
@@ -136,7 +131,6 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
             put("p_producto_id", productoId); put("p_cantidad", cantidad)
         }
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "solicitar_aumento_stock", payloadJson = payload.toString(), idLocalTemporal = idTemporal))
-        try { SyncReporter.reportar(androidId, localIdActivo(), "solicitar_aumento_stock", payload) } catch (_: Exception) {}
         if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
         return Result.success(Unit)
     }

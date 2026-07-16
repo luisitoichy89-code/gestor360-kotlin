@@ -14,7 +14,6 @@ import org.luisito.gestor360.data.models.CartItem
 import org.luisito.gestor360.data.models.Sale
 import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.data.sync.SyncWorker
-import org.luisito.gestor360.data.sync.SyncReporter
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 import kotlin.math.round
@@ -91,7 +90,7 @@ class SaleRepository(
                     cliente?.tarjetaId?.let { put("p_tarjeta_id", it) }
                 }
                 db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "registrar_venta", payloadJson = payload.toString()))
-                try { SyncReporter.reportar(androidId, localId, "registrar_venta", payload) } catch (_: Exception) {}
+            } catch (e: Exception) {
                 android.util.Log.e("SaleRepository", "guardarVenta: falló el ítem ${item.nombre} (id=${item.productId})", e)
                 fallos += item to e
             }

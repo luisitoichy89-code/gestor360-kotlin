@@ -15,7 +15,6 @@ import org.luisito.gestor360.data.local.entities.toModel
 import org.luisito.gestor360.data.models.Devolucion
 import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.data.sync.SyncWorker
-import org.luisito.gestor360.data.sync.SyncReporter
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 
@@ -81,7 +80,7 @@ class DevolucionRepository(private val context: Context = AppContextHolder.conte
             put("p_producto_id", productoId); put("p_cantidad", cantidad); put("p_metodo", metodo); put("p_motivo", motivo)
         }
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "solicitar_devolucion", payloadJson = payload.toString(), idLocalTemporal = idTemporal))
-        try { SyncReporter.reportar(androidId, localIdActivo(), "solicitar_devolucion", payload) } catch (_: Exception) {}
+        if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
         return Result.success(Unit)
     }
 
