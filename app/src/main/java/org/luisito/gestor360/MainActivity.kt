@@ -118,7 +118,7 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
     // Carga la foto guardada del usuario que está por meter su PIN, para
     // mostrarla en el cuadrado donde va el candado en PinLoginScreen.
     LaunchedEffect(usuarioParaPin) {
-        fotoUsuarioPin = usuarioParaPin?.let { fotoRepository.obtenerFoto(it.id) }
+        fotoUsuarioPin = usuarioParaPin?.let { fotoRepository.obtenerFoto(it.id.toString()) }
     }
 
     // Carga la foto del usuario ya logueado para el avatar del dashboard.
