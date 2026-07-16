@@ -33,7 +33,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
          * ver NetworkMonitor + sincronizarAhora() disparado desde la app.
          */
         fun programarPeriodico(context: Context) {
-            val solicitud = PeriodicWorkRequestBuilder<SyncWorker>(15, TimeUnit.MINUTES)
+            val solicitud = PeriodicWorkRequestBuilder<SyncWorker>(1, TimeUnit.MINUTES)
                 .setConstraints(restricciones())
                 .setBackoffCriteria(BackoffPolicy.LINEAR, 1, TimeUnit.MINUTES)
                 .build()
