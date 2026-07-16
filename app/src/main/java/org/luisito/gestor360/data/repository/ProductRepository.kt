@@ -15,8 +15,8 @@ import org.luisito.gestor360.data.local.entities.toEntity
 import org.luisito.gestor360.data.local.entities.toModel
 import org.luisito.gestor360.data.models.Product
 import org.luisito.gestor360.data.sync.NetworkMonitor
-import org.luisito.gestor360.data.sync.SyncReporter
 import org.luisito.gestor360.data.sync.SyncWorker
+import org.luisito.gestor360.data.sync.SyncReporter
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 import java.time.LocalDate
@@ -116,12 +116,16 @@ class ProductRepository(
         val localId = localIdActivo()
         val fechaHoy = LocalDate.now().toString()
 
+        // Guardar en caché de eliminados ANTES de borrar
         val producto = db.productoDao().obtenerPorId(id, localId)
         if (producto != null) {
             db.productoEliminadoCacheDao().insertar(
                 ProductoEliminadoCacheEntity(
-                    id = producto.id, localId = localId, nombre = producto.nombre,
-                    stock = producto.stock, fecha = fechaHoy
+                    id = producto.id,
+                    localId = localId,
+                    nombre = producto.nombre,
+                    stock = producto.stock,
+                    fecha = fechaHoy
                 )
             )
         }
@@ -148,9 +152,9 @@ class ProductRepository(
 
     private suspend fun encolarYSincronizar(androidId: String, tipo: String, payload: kotlinx.serialization.json.JsonObject, idTemporal: Long? = null) {
         db.accionPendienteDao().encolar(
+        SyncReporter.reportar(androidId, localIdActivo(), tipo, payload)
             AccionPendienteEntity(tipo = tipo, payloadJson = payload.toString(), idLocalTemporal = idTemporal)
         )
-        try { SyncReporter.reportar(androidId, localIdActivo(), tipo, payload) } catch (_: Exception) {}
         if (NetworkMonitor.hayInternet(context)) {
             SyncWorker.sincronizarAhora(context)
         }

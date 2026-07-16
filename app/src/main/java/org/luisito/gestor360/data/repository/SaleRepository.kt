@@ -14,6 +14,7 @@ import org.luisito.gestor360.data.models.CartItem
 import org.luisito.gestor360.data.models.Sale
 import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.data.sync.SyncWorker
+import org.luisito.gestor360.data.sync.SyncReporter
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 import kotlin.math.round
@@ -72,7 +73,7 @@ class SaleRepository(
 
                 // 1. Aplicar YA en local: baja el stock cacheado y agrega la venta a la vista.
                 productRepository.descontarStockLocal(item.productId, item.cantidad)
-                val ventaLocal = Sale(
+                val ventaLocal = Sale(producto_nombre = item.nombre, 
                     id = null, producto_id = item.productId, cantidad = item.cantidad, total = item.subtotal,
                     metodo = metodo, efectivo = efectivoItem, transferencia = transferenciaItem, local_id = localId,
                     cliente_ci = cliente?.ci, cliente_tel = cliente?.telefono, cliente_nombre = cliente?.nombre,
@@ -90,6 +91,7 @@ class SaleRepository(
                     cliente?.tarjetaId?.let { put("p_tarjeta_id", it) }
                 }
                 db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "registrar_venta", payloadJson = payload.toString()))
+                SyncReporter.reportar(androidId, localId, "registrar_venta", payload)
             } catch (e: Exception) {
                 android.util.Log.e("SaleRepository", "guardarVenta: falló el ítem ${item.nombre} (id=${item.productId})", e)
                 fallos += item to e
