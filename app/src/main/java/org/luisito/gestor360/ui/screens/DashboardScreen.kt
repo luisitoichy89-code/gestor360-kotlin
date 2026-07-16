@@ -1,10 +1,10 @@
 package org.luisito.gestor360.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -12,14 +12,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import org.luisito.gestor360.ui.theme.NeuCard
+import org.luisito.gestor360.ui.theme.Azul
+import org.luisito.gestor360.ui.theme.Morado
 import org.luisito.gestor360.ui.theme.TarjetaCarpeta
 
-private data class SeccionDashboard(val titulo: String, val icono: ImageVector, val ruta: String)
+private data class SeccionDashboard(val titulo: String, val icono: ImageVector, val ruta: String, val color: Color)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,13 +36,13 @@ fun DashboardScreen(
     val esAdmin = userRol == "admin"
 
     val secciones = buildList {
-        add(SeccionDashboard("Ventas", Icons.Default.PointOfSale, "ventas"))
-        add(SeccionDashboard("Productos", Icons.Default.Inventory2, "productos"))
-        add(SeccionDashboard("Inventario", Icons.Default.ReceiptLong, "inventario"))
+        add(SeccionDashboard("Ventas", Icons.Default.PointOfSale, "ventas", Azul))
+        add(SeccionDashboard("Productos", Icons.Default.Inventory2, "productos", Morado))
+        add(SeccionDashboard("Inventario", Icons.Default.ReceiptLong, "inventario", Azul))
         if (esAdmin) {
-            add(SeccionDashboard("Tarjetas", Icons.Default.CreditCard, "tarjetas"))
-            add(SeccionDashboard("Aprobaciones", Icons.Default.FactCheck, "aprobaciones"))
-            add(SeccionDashboard("Devolución", Icons.Default.AssignmentReturn, "devolucion"))
+            add(SeccionDashboard("Tarjetas", Icons.Default.CreditCard, "tarjetas", Morado))
+            add(SeccionDashboard("Aprobaciones", Icons.Default.FactCheck, "aprobaciones", Azul))
+            add(SeccionDashboard("Devolución", Icons.Default.AssignmentReturn, "devolucion", Morado))
         }
     }
 
@@ -61,27 +64,30 @@ fun DashboardScreen(
                 items(secciones) { seccion ->
                     TarjetaCarpeta(
                         modifier = Modifier.fillMaxWidth().aspectRatio(1f),
-                        shape = RoundedCornerShape(20.dp),
+                        shape = RoundedCornerShape(22.dp),
                         elevation = 3.dp,
-                        accentThickness = 7.dp,
+                        accentColor = seccion.color,
+                        accentThickness = 9.dp,
                         onClick = { onNavigate(seccion.ruta) }
                     ) {
                         Column(
-                            modifier = Modifier.fillMaxSize().padding(start = 20.dp, top = 16.dp, end = 16.dp, bottom = 20.dp),
+                            modifier = Modifier.fillMaxSize().padding(18.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                            NeuCard(
-                                modifier = Modifier.size(56.dp),
-                                shape = CircleShape,
-                                pressed = true,
-                                elevation = 2.dp
+                            // Insignia con tinte de color plano (sin neumórfico):
+                            // look moderno tipo "stat card" en vez del círculo
+                            // hundido de antes.
+                            Box(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(seccion.color.copy(alpha = 0.14f)),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Icon(seccion.icono, null, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
-                                }
+                                Icon(seccion.icono, null, modifier = Modifier.size(26.dp), tint = seccion.color)
                             }
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
                             Text(
                                 seccion.titulo,
                                 style = MaterialTheme.typography.titleSmall,

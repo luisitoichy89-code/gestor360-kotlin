@@ -222,6 +222,9 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
                             onLogout = { cerrarSesion() },
                             fotoUsuario = fotoUsuarioLogueado,
                             onFotoSeleccionada = { bytes -> onFotoDashboardSeleccionada(bytes) },
+                            onFotoError = {
+                                scope.launch { snackbarHostState.showSnackbar("No se pudo cargar esa foto. Probá con otra imagen.") }
+                            },
                             temaOscuro = temaOscuro,
                             onCambiarTema = onCambiarTema
                         )
@@ -296,6 +299,7 @@ private fun InicioTopBar(
     onLogout: () -> Unit,
     fotoUsuario: ByteArray?,
     onFotoSeleccionada: (ByteArray) -> Unit,
+    onFotoError: () -> Unit,
     temaOscuro: Boolean,
     onCambiarTema: () -> Unit
 ) {
@@ -321,9 +325,10 @@ private fun InicioTopBar(
                 }
                 AvatarUsuario(
                     fotoBytes = fotoUsuario,
-                    size = 26.dp,
+                    size = 40.dp,
                     editable = true,
-                    onFotoSeleccionada = onFotoSeleccionada
+                    onFotoSeleccionada = onFotoSeleccionada,
+                    onError = onFotoError
                 )
             }
             Spacer(modifier = Modifier.width(8.dp))

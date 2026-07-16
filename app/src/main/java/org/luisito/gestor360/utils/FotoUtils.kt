@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Log
 import java.io.ByteArrayOutputStream
 
 /**
@@ -14,12 +15,21 @@ import java.io.ByteArrayOutputStream
  * de la base de datos local cifrada.
  */
 object FotoUtils {
+    private const val TAG = "FotoUtils"
     private const val LADO = 128
     private const val CALIDAD_JPEG = 70
 
     fun procesarUriAFoto(context: Context, uri: Uri): ByteArray? {
         return try {
-            val original = decodificarBitmapMuestreado(context, uri) ?: return null
+            val original = decodificarBitmapMuestreado(context, uri)
+            if (original == null) {
+                // Antes esto fallaba en silencio (return null sin rastro).
+                // Con este log se puede ver en Logcat (filtro "FotoUtils")
+                // si el bounds-decode falló (formato no soportado, uri sin
+                // permiso, stream vacío, etc.) para saber la causa real.
+                Log.e(TAG, "decodificarBitmapMuestreado devolvió null para uri=$uri")
+                return null
+            }
             val cuadrada = recortarAlCentro(original)
             val redimensionada = Bitmap.createScaledBitmap(cuadrada, LADO, LADO, true)
 
@@ -32,6 +42,7 @@ object FotoUtils {
 
             salida.toByteArray()
         } catch (e: Exception) {
+            Log.e(TAG, "Error procesando foto de uri=$uri", e)
             null
         }
     }
@@ -44,14 +55,24 @@ object FotoUtils {
     private fun decodificarBitmapMuestreado(context: Context, uri: Uri): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-            ?: return null
+            ?: run {
+                Log.e(TAG, "openInputStream devolvió null (sin permiso o uri inválida) para $uri")
+                return null
+            }
+
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            Log.e(TAG, "BitmapFactory no pudo leer las dimensiones (formato no soportado?) de $uri")
+            return null
+        }
 
         var sampleSize = 1
         val menorLado = minOf(bounds.outWidth, bounds.outHeight)
         while (menorLado / (sampleSize * 2) >= LADO) sampleSize *= 2
 
         val opciones = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-        return context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opciones) }
+        val bitmap = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opciones) }
+        if (bitmap == null) Log.e(TAG, "El decode final devolvió null para $uri (sampleSize=$sampleSize)")
+        return bitmap
     }
 
     private fun recortarAlCentro(bitmap: Bitmap): Bitmap {

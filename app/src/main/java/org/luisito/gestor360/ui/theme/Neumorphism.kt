@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -22,8 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
@@ -159,10 +159,11 @@ fun NeuButton(
 }
 
 /**
- * Tarjeta estilo "carpeta": mismo fondo/relieve suave que NeuCard, más un
- * acento morado en forma de L (franja lateral izquierda + franja en la
- * base) que le da un aire de pestaña/carpeta. El acento es puramente
- * decorativo — no reemplaza azul/rojo como color funcional.
+ * Tarjeta moderna de dashboard: fondo suave con sombra neomórfica ligera y
+ * un pequeño indicador de color (chip redondeado) en la esquina superior
+ * derecha — reemplaza al borde grueso en L de la versión anterior, que se
+ * veía recargado. El color de acento sigue siendo configurable (Morado por
+ * defecto) y es puramente decorativo.
  */
 @Composable
 fun TarjetaCarpeta(
@@ -176,26 +177,11 @@ fun TarjetaCarpeta(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val accentPx = with(LocalDensity.current) { accentThickness.toPx() }
     Box(
         modifier = modifier
             .neuShadow(shape = shape, elevation = elevation)
             .clip(shape)
             .background(containerColor)
-            .drawBehind {
-                // Franja izquierda
-                drawRect(
-                    color = accentColor,
-                    topLeft = Offset(0f, 0f),
-                    size = androidx.compose.ui.geometry.Size(accentPx, size.height)
-                )
-                // Franja inferior (junto con la izquierda forman la "L")
-                drawRect(
-                    color = accentColor,
-                    topLeft = Offset(0f, size.height - accentPx),
-                    size = androidx.compose.ui.geometry.Size(size.width, accentPx)
-                )
-            }
             .then(
                 if (onClick != null) Modifier.clickable(
                     interactionSource = interactionSource,
@@ -205,6 +191,15 @@ fun TarjetaCarpeta(
                 ) else Modifier
             )
     ) {
+        // Chip de color en la esquina, sutil, en vez del borde en L.
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 12.dp, end = 12.dp)
+                .size(accentThickness)
+                .clip(CircleShape)
+                .background(accentColor)
+        )
         Column(content = content)
     }
 }

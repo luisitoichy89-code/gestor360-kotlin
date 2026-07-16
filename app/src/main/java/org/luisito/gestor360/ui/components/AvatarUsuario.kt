@@ -45,12 +45,14 @@ fun AvatarUsuario(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(size / 4),
     editable: Boolean = false,
-    onFotoSeleccionada: (ByteArray) -> Unit = {}
+    onFotoSeleccionada: (ByteArray) -> Unit = {},
+    onError: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
-            FotoUtils.procesarUriAFoto(context, uri)?.let(onFotoSeleccionada)
+            val bytes = FotoUtils.procesarUriAFoto(context, uri)
+            if (bytes != null) onFotoSeleccionada(bytes) else onError()
         }
     }
 
