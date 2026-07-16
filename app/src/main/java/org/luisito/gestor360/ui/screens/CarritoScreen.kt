@@ -25,6 +25,20 @@ import org.luisito.gestor360.ui.components.formatearMonto
 import org.luisito.gestor360.ui.viewmodels.SaleViewModel
 import org.luisito.gestor360.ui.viewmodels.TarjetaViewModel
 
+private fun ciValida(ci: String): Boolean {
+    if (ci.length != 11 || !ci.all { it.isDigit() }) return false
+    val mes = ci.substring(2, 4).toIntOrNull() ?: return false
+    val dia = ci.substring(4, 6).toIntOrNull() ?: return false
+    if (mes !in 1..12) return false
+    val diasEnMes = when (mes) {
+        1, 3, 5, 7, 8, 10, 12 -> 31
+        4, 6, 9, 11 -> 30
+        2 -> 29
+        else -> 0
+    }
+    return dia in 1..diasEnMes
+}
+
 private sealed class PasoCheckout {
     object Ninguno : PasoCheckout()
     object ConfirmarEfectivo : PasoCheckout()
@@ -357,6 +371,7 @@ private fun BotonesDialogoGrandes(
 @Composable
 private fun DatosClienteDialog(titulo: String, monto: Double, tarjetas: List<Tarjeta>, onDismiss: () -> Unit, onConfirmar: (String, String, String, Tarjeta?) -> Unit) {
     var ci by remember { mutableStateOf("") }
+    val ciError = remember(ci) { ci.isNotBlank() && !ciValida(ci) }
     var tel by remember { mutableStateOf("") }
     var nombre by remember { mutableStateOf("") }
     // Ya no se preselecciona ninguna tarjeta: el vendedor/admin ve "Seleccionar"
@@ -393,7 +408,7 @@ private fun DatosClienteDialog(titulo: String, monto: Double, tarjetas: List<Tar
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                OutlinedTextField(ci, { ci = it.filter { c -> c.isDigit() } }, label = { Text("CI (opcional)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
+                OutlinedTextField(ci, { ci = it.filter { c -> c.isDigit() }.take(11) }, label = { Text("CI (opcional)") }, placeholder = { Text("AAMMDD + 5 dígitos") }, isError = ciError, supportingText = { if (ciError) Text("El CI debe tener 11 dígitos y comenzar con la fecha de nacimiento (AAMMDD)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(tel, { tel = it.filter { c -> c.isDigit() } }, label = { Text("Teléfono (opcional)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
                 Spacer(Modifier.height(8.dp))
@@ -403,7 +418,7 @@ private fun DatosClienteDialog(titulo: String, monto: Double, tarjetas: List<Tar
         confirmButton = {
             BotonesDialogoGrandes(
                 textoConfirmar = "Confirmar",
-                confirmarHabilitado = true,
+                confirmarHabilitado = !ciError,
                 onCancelar = onDismiss,
                 onConfirmar = { onConfirmar(ci.trim(), tel.trim(), nombre.trim(), tarjetaSel) }
             )

@@ -102,7 +102,7 @@ fun ProductosScreen(
         }
     }
 
-    if (mostrarFormulario) ProductoFormDialog(productoEnEdicion, esAdmin, categorias, uiState.isSaving, { mostrarFormulario = false }) { nombre, precio, stock, ubicacion, categoria ->
+    if (mostrarFormulario) ProductoFormDialog(productoEnEdicion, esAdmin, categorias, uiState.productos, uiState.isSaving, { mostrarFormulario = false }) { nombre, precio, stock, ubicacion, categoria ->
         if (esAdmin) { if (productoEnEdicion == null) viewModel.crear(nombre, precio, stock, ubicacion, categoria) else viewModel.editar(productoEnEdicion!!.id, nombre, precio, stock, ubicacion, categoria) } else aprobacionVM.solicitarProducto(androidId, nombre, precio, stock)
         mostrarFormulario = false
     }
@@ -138,16 +138,23 @@ private fun ProductoCard(producto: Product, esAdmin: Boolean, onEditar: () -> Un
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ProductoFormDialog(producto: Product?, esAdmin: Boolean, categoriasExistentes: List<String>, isSaving: Boolean, onDismiss: () -> Unit, onGuardar: (nombre: String, precio: Double, stock: Double, ubicacion: String, categoria: String) -> Unit) {
+private fun ProductoFormDialog(producto: Product?, esAdmin: Boolean, categoriasExistentes: List<String>, productosExistentes: List<Product>, isSaving: Boolean, onDismiss: () -> Unit, onGuardar: (nombre: String, precio: Double, stock: Double, ubicacion: String, categoria: String) -> Unit) {
     var nombre by remember { mutableStateOf(producto?.nombre ?: "") }; var precioTexto by remember { mutableStateOf(producto?.precio?.toString() ?: "") }; var stockTexto by remember { mutableStateOf(producto?.stock?.toString() ?: "") }; var ubicacion by remember { mutableStateOf(producto?.ubicacion ?: "") }; var categoria by remember { mutableStateOf(producto?.categoria ?: "") }; var menuCategoriaAbierto by remember { mutableStateOf(false) }
     val precio = precioTexto.toDoubleOrNull(); val stock = stockTexto.toDoubleOrNull()
-    val valido = nombre.isNotBlank() && precio != null && precio > 0 && stock != null && stock >= 0
+    val nombreDuplicado = remember(nombre, productosExistentes, producto) {
+        val nombreNormalizado = nombre.trim()
+        nombreNormalizado.isNotBlank() && productosExistentes.any { it.id != producto?.id && it.nombre.trim().equals(nombreNormalizado, ignoreCase = true) }
+    }
+    val nombreVacio = nombre.isBlank()
+    val precioInvalido = precioTexto.isBlank() || precio == null || precio <= 0
+    val stockInvalido = stockTexto.isBlank() || stock == null || stock < 0
+    val valido = !nombreVacio && !nombreDuplicado && !precioInvalido && !stockInvalido
     val sugerencias = remember(categoria, categoriasExistentes) { if (categoria.isBlank()) categoriasExistentes else categoriasExistentes.filter { it.contains(categoria, true) && it != categoria } }
 
     AlertDialog(onDismissRequest = onDismiss, shape = RoundedCornerShape(18.dp), title = { Text(if (producto == null) if (esAdmin) "Nuevo producto" else "Solicitar producto" else "Editar producto", fontWeight = FontWeight.Bold) }, text = { Column {
-        OutlinedTextField(nombre, { nombre = it.uppercase() }, label = { Text("Nombre") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)); Spacer(Modifier.height(10.dp))
-        OutlinedTextField(precioTexto, { precioTexto = it }, label = { Text("Precio (CUP)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)); Spacer(Modifier.height(10.dp))
-        OutlinedTextField(stockTexto, { stockTexto = it }, label = { Text(if (producto == null) "Stock inicial" else "Stock total") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)); Spacer(Modifier.height(10.dp))
+        OutlinedTextField(nombre, { nombre = it.uppercase() }, label = { Text("Nombre") }, singleLine = true, isError = nombreVacio || nombreDuplicado, supportingText = { when { nombreVacio -> Text("El nombre es obligatorio"); nombreDuplicado -> Text("Ya existe un producto con ese nombre") } }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)); Spacer(Modifier.height(10.dp))
+        OutlinedTextField(precioTexto, { precioTexto = it }, label = { Text("Precio (CUP)") }, singleLine = true, isError = precioInvalido, supportingText = { if (precioInvalido) Text("Ingresá un precio mayor que 0") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)); Spacer(Modifier.height(10.dp))
+        OutlinedTextField(stockTexto, { stockTexto = it }, label = { Text(if (producto == null) "Stock inicial" else "Stock total") }, singleLine = true, isError = stockInvalido, supportingText = { if (stockInvalido) Text("Ingresá un stock válido (0 o más)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)); Spacer(Modifier.height(10.dp))
         OutlinedTextField(ubicacion, { ubicacion = it.uppercase() }, label = { Text("Ubicación (ej: A-03-12)") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)); Spacer(Modifier.height(10.dp))
         ExposedDropdownMenuBox(expanded = menuCategoriaAbierto && sugerencias.isNotEmpty(), onExpandedChange = { menuCategoriaAbierto = it }) { OutlinedTextField(categoria, { categoria = it; menuCategoriaAbierto = true }, label = { Text("Categoría") }, singleLine = true, modifier = Modifier.fillMaxWidth().menuAnchor(), shape = RoundedCornerShape(14.dp)); ExposedDropdownMenu(expanded = menuCategoriaAbierto && sugerencias.isNotEmpty(), onDismissRequest = { menuCategoriaAbierto = false }) { sugerencias.forEach { s -> DropdownMenuItem(text = { Text(s) }, onClick = { categoria = s; menuCategoriaAbierto = false }) } } }
     } }, confirmButton = { TextButton(enabled = valido && !isSaving, onClick = { onGuardar(nombre.trim(), precio ?: 0.0, stock ?: 0.0, ubicacion.trim(), categoria.trim()) }) { Text(if (isSaving) "Guardando..." else if (!esAdmin) "Enviar a aprobación" else "Guardar", fontWeight = FontWeight.Bold) } }, dismissButton = { TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }) }
@@ -155,7 +162,7 @@ private fun ProductoFormDialog(producto: Product?, esAdmin: Boolean, categoriasE
 @Composable
 private fun MermaDialog(producto: Product, esAdmin: Boolean, isSaving: Boolean, onDismiss: () -> Unit, onConfirmar: (cantidad: Double, motivo: String) -> Unit) {
     var cantidadTexto by remember { mutableStateOf("") }; var motivo by remember { mutableStateOf("") }
-    val cantidad = cantidadTexto.toDoubleOrNull(); val valido = cantidad != null && cantidad > 0 && cantidad <= producto.stock
+    val cantidad = cantidadTexto.toDoubleOrNull(); val valido = cantidadTexto.isNotBlank() && cantidad != null && cantidad > 0 && cantidad <= producto.stock
     AlertDialog(onDismissRequest = onDismiss, shape = RoundedCornerShape(18.dp), title = { Text(if (esAdmin) "Registrar merma" else "Proponer merma", fontWeight = FontWeight.Bold) }, text = { Column {
         NeuCard(shape = RoundedCornerShape(14.dp), containerColor = MaterialTheme.colorScheme.errorContainer) { Column(Modifier.padding(12.dp)) { Text(producto.nombre, fontWeight = FontWeight.Bold); Text("Stock disponible: ${producto.stock.toInt()}", style = MaterialTheme.typography.bodySmall) } }
         Spacer(Modifier.height(12.dp))

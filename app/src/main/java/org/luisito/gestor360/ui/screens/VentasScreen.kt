@@ -112,6 +112,8 @@ fun VentasScreen(
     }
 
     if (selectedProduct != null) {
+        var errorCantidad by remember { mutableStateOf<String?>(null) }
+        val cantidadNumero = cantidad.toDoubleOrNull()
         AlertDialog(
             onDismissRequest = { selectedProduct = null },
             title = { Text(selectedProduct!!.nombre, fontWeight = FontWeight.Bold) },
@@ -120,8 +122,10 @@ fun VentasScreen(
                     Text("Stock disponible: ${selectedProduct!!.stock.toInt()}")
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
-                        cantidad, { cantidad = it.filter { c -> c.isDigit() || c == '.' } },
+                        cantidad, { cantidad = it.filter { c -> c.isDigit() || c == '.' }; errorCantidad = null },
                         label = { Text("Cantidad") },
+                        isError = errorCantidad != null,
+                        supportingText = { errorCantidad?.let { Text(it) } },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true, shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.fillMaxWidth()
@@ -136,9 +140,12 @@ fun VentasScreen(
                         ) { Text("Cancelar", fontWeight = FontWeight.Bold) }
                         NeuButton(
                             onClick = {
-                                val c = cantidad.toDoubleOrNull() ?: 0.0
-                                val err = viewModel.agregarAlCarrito(selectedProduct!!, c)
-                                if (err == null) { selectedProduct = null; cantidad = "" }
+                                if (cantidad.isBlank() || cantidadNumero == null || cantidadNumero <= 0) {
+                                    errorCantidad = "Ingresá una cantidad válida"
+                                } else {
+                                    val err = viewModel.agregarAlCarrito(selectedProduct!!, cantidadNumero)
+                                    if (err == null) { selectedProduct = null; cantidad = "" } else errorCantidad = err
+                                }
                             },
                             modifier = Modifier.weight(1f).height(52.dp),
                             shape = RoundedCornerShape(14.dp)

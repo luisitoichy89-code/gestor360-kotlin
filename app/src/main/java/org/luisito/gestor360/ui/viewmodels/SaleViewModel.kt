@@ -67,6 +67,15 @@ class SaleViewModel(
     fun confirmarVenta(metodo: String, efectivo: Double, transferencia: Double, usuarioId: Long, cliente: SaleRepository.DatosCliente?) {
         if (_uiState.value.isSaving) return
         if (_uiState.value.carrito.isEmpty()) return
+        val productosActuales = _uiState.value.productos
+        val itemSinStock = _uiState.value.carrito.firstOrNull { item ->
+            val stockActual = productosActuales.firstOrNull { it.id == item.productId }?.stock
+            stockActual == null || item.cantidad > stockActual
+        }
+        if (itemSinStock != null) {
+            _uiState.value = _uiState.value.copy(error = "\"${itemSinStock.nombre}\" ya no tiene stock suficiente. Actualizá el carrito e intentá de nuevo.")
+            return
+        }
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             saleRepository.guardarVenta(androidIdActual, _uiState.value.carrito, metodo, efectivo, transferencia, cliente)
