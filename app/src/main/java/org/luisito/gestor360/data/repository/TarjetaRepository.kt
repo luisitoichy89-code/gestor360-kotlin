@@ -81,7 +81,6 @@ class TarjetaRepository(
         }
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "crear_tarjeta", payloadJson = payload.toString(), idLocalTemporal = idTemporal))
         SyncReporter.reportar(androidId, localId, "crear_tarjeta", payload)
-        if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
         return Result.success(Unit)
     }
 
@@ -95,7 +94,6 @@ class TarjetaRepository(
         }
         SyncReporter.reportar(androidId, localId, "editar_tarjeta", payload)
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "editar_tarjeta", payloadJson = payload.toString()))
-        if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
         return Result.success(Unit)
     }
 
@@ -105,7 +103,6 @@ class TarjetaRepository(
         val payload = buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id); put("p_activo", activo) }
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "activar_tarjeta", payloadJson = payload.toString()))
         SyncReporter.reportar(androidId, localId, "activar_tarjeta", payload)
-        if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
         return Result.success(Unit)
     }
 
@@ -123,7 +120,6 @@ class TarjetaRepository(
         val payload = buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id) }
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "eliminar_tarjeta", payloadJson = payload.toString()))
         SyncReporter.reportar(androidId, localId, "eliminar_tarjeta", payload)
-        if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
         return Result.success(Unit)
     }
 }

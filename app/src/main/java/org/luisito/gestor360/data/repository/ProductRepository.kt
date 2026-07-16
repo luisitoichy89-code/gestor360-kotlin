@@ -142,7 +142,8 @@ class ProductRepository(
             put("p_local_id", localId)
             put("p_id", id)
         }
-        encolarYSincronizar(androidId, "eliminar_producto", payload)
+        db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "eliminar_producto", payloadJson = payload.toString()))
+        // No refrescar - SyncManager lo hará cuando procese la cola
         return Result.success(Unit)
     }
 
