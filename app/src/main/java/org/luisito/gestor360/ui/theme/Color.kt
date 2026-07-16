@@ -27,3 +27,21 @@ val RojoClaro = Color(0xFFFFCDD2)
 // sensación de relieve o hundimiento sin cambiar la paleta ni el tema.
 val NeuLuz = Color(0xFFFFFFFF)
 val NeuSombra = Color(0xFFC9CDD3)
+
+// ============================================================
+// Variante oscura — mismos roles de color (azul = acciones, rojo =
+// cancelar/eliminar), invertidos para fondo oscuro y texto claro.
+// ============================================================
+val BackgroundDark = Color(0xFF121214)
+val SurfaceDark = Color(0xFF1C1C1E)
+val SurfaceVariantDark = Color(0xFF2A2A2D)
+
+val TextWhite = Color(0xFFF2F2F2)
+val TextGrayDark = Color(0xFFAEAEB2)
+val OutlineDark = Color(0xFF6E6E73)
+
+val AzulClaroDark = Color(0xFF25384A)
+val RojoClaroDark = Color(0xFF4A2323)
+
+val NeuLuzDark = Color(0xFF2E2E31)
+val NeuSombraDark = Color(0xFF000000)

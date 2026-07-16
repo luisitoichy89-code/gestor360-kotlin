@@ -2,6 +2,7 @@ package org.luisito.gestor360.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -23,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import org.luisito.gestor360.data.models.User
+import org.luisito.gestor360.ui.components.rememberFotoBitmap
 import org.luisito.gestor360.ui.viewmodels.AccesoViewModel
 import org.luisito.gestor360.ui.theme.NeuButton
 import org.luisito.gestor360.ui.theme.neuShadow
@@ -37,7 +40,13 @@ import org.luisito.gestor360.ui.theme.neuShadow
  * pantalla, a diferencia de un simple `remember` local.
  */
 @Composable
-fun PinLoginScreen(usuario: User, onLoginExitoso: (User) -> Unit, onCambiarDispositivo: () -> Unit, viewModel: AccesoViewModel = viewModel()) {
+fun PinLoginScreen(
+    usuario: User,
+    onLoginExitoso: (User) -> Unit,
+    onCambiarDispositivo: () -> Unit,
+    viewModel: AccesoViewModel = viewModel(),
+    fotoBytes: ByteArray? = null
+) {
     val uiState by viewModel.uiState.collectAsState()
     var pin by remember { mutableStateOf("") }
     var pinVisible by remember { mutableStateOf(false) }
@@ -76,17 +85,32 @@ fun PinLoginScreen(usuario: User, onLoginExitoso: (User) -> Unit, onCambiarDispo
                     .padding(28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                val fotoUsuario = rememberFotoBitmap(fotoBytes)
                 Surface(
                     shape = RoundedCornerShape(20.dp),
                     color = if (bloqueado) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.neuShadow(shape = RoundedCornerShape(20.dp), elevation = 4.dp, blur = 8.dp)
+                    modifier = Modifier
+                        .size(64.dp)
+                        .neuShadow(shape = RoundedCornerShape(20.dp), elevation = 4.dp, blur = 8.dp)
                 ) {
-                    Icon(
-                        Icons.Default.Lock,
-                        null,
-                        modifier = Modifier.padding(18.dp),
-                        tint = if (bloqueado) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        if (fotoUsuario != null) {
+                            // Misma foto que se elige/guarda desde el dashboard: solo local,
+                            // nunca se sube a Supabase Storage.
+                            Image(
+                                bitmap = fotoUsuario,
+                                contentDescription = "Foto de perfil",
+                                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(20.dp))
+                            )
+                        } else {
+                            Icon(
+                                Icons.Default.Lock,
+                                null,
+                                modifier = Modifier.padding(18.dp),
+                                tint = if (bloqueado) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
                 }
                 Spacer(Modifier.height(16.dp))
                 Text(
