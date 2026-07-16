@@ -16,7 +16,6 @@ import org.luisito.gestor360.data.local.entities.toModel
 import org.luisito.gestor360.data.models.Product
 import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.data.sync.SyncWorker
-import org.luisito.gestor360.data.sync.SyncReporter
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 import java.time.LocalDate
@@ -114,18 +113,21 @@ class ProductRepository(
 
     suspend fun deleteProduct(androidId: String, id: Long): Result<Unit> {
         val localId = localIdActivo()
+        
+        // Verificar si ya hay una acción eliminar_producto pendiente para este id
+        val yaPendiente = db.accionPendienteDao().obtenerPendientes()
+            .filter { it.tipo == "eliminar_producto" }
+            .any { it.payloadJson.contains("\"p_id\":$id") || it.payloadJson.contains("\"p_id\": $id") }
+        if (yaPendiente) return Result.success(Unit)
+        
         val fechaHoy = LocalDate.now().toString()
 
-        // Guardar en caché de eliminados ANTES de borrar
         val producto = db.productoDao().obtenerPorId(id, localId)
         if (producto != null) {
             db.productoEliminadoCacheDao().insertar(
                 ProductoEliminadoCacheEntity(
-                    id = producto.id,
-                    localId = localId,
-                    nombre = producto.nombre,
-                    stock = producto.stock,
-                    fecha = fechaHoy
+                    id = producto.id, localId = localId, nombre = producto.nombre,
+                    stock = producto.stock, fecha = fechaHoy
                 )
             )
         }
@@ -137,13 +139,11 @@ class ProductRepository(
         }
 
         db.productoDao().eliminar(id, localId)
-        val payload = buildJsonObject {
+        db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "eliminar_producto", payloadJson = buildJsonObject {
             put("p_android_id", androidId)
             put("p_local_id", localId)
             put("p_id", id)
-        }
-        db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "eliminar_producto", payloadJson = payload.toString()))
-        // No refrescar - SyncManager lo hará cuando procese la cola
+        }.toString()))
         return Result.success(Unit)
     }
 
@@ -155,7 +155,6 @@ class ProductRepository(
         db.accionPendienteDao().encolar(
             AccionPendienteEntity(tipo = tipo, payloadJson = payload.toString(), idLocalTemporal = idTemporal)
         )
-        SyncReporter.reportar(androidId, localIdActivo(), tipo, payload)
         if (NetworkMonitor.hayInternet(context)) {
             SyncWorker.sincronizarAhora(context)
         }
