@@ -30,7 +30,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 import org.luisito.gestor360.data.local.FotoRepository
 // AJUSTAR: reemplaza este import y el accessor usado más abajo
-// (AppDatabase.getInstance(context).userDao()) por los reales de tu
+// (AppDatabase.obtener(context).userDao()) por los reales de tu
 // AppDatabase.kt — ese archivo no estaba entre los que compartiste, así
 // que no conozco el nombre exacto del singleton/accessor.
 import org.luisito.gestor360.data.local.AppDatabase
@@ -100,8 +100,8 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val sessionManager = remember { SessionManager(context) }
-    // AJUSTAR: ver nota en los imports sobre AppDatabase.getInstance(context).
-    val fotoRepository = remember { FotoRepository(AppDatabase.getInstance(context).userDao()) }
+    // AJUSTAR: ver nota en los imports sobre AppDatabase.obtener(context).
+    val fotoRepository = remember { FotoRepository(AppDatabase.obtener(context).userDao()) }
     val scope = rememberCoroutineScope()
     val accesoViewModel: AccesoViewModel = viewModel()
     val localSeleccionViewModel: LocalSeleccionViewModel = viewModel()
@@ -126,12 +126,12 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
     // patrón que getUsername()/getRol()/getAndroidId(); si el método se
     // llama distinto, ajustar aquí.
     LaunchedEffect(isLoggedIn) {
-        fotoUsuarioLogueado = if (isLoggedIn) fotoRepository.obtenerFoto(sessionManager.getUserId()) else null
+        fotoUsuarioLogueado = if (isLoggedIn) fotoRepository.obtenerFoto(sessionManager.getUserId().toString()) else null
     }
 
     fun onFotoDashboardSeleccionada(bytes: ByteArray) {
         fotoUsuarioLogueado = bytes
-        scope.launch { fotoRepository.guardarFoto(sessionManager.getUserId(), bytes) }
+        scope.launch { fotoRepository.guardarFoto(sessionManager.getUserId().toString(), bytes) }
     }
 
     LaunchedEffect(localRecienCambiado) {
