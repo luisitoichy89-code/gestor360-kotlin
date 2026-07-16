@@ -52,10 +52,6 @@ class DeviceVerificationRepository(
                 return VerificacionResultado.LicenciaVencida(diasVencida)
             }
 
-            // El PIN nunca se guarda tal cual: se hashea acá mismo, antes de
-            // tocar disco. Si usuario.pin viene null (no debería, pero por las
-            // dudas) se conserva el hash anterior en vez de dejar al usuario
-            // sin forma de validar PIN localmente.
             val entidadPrevia = db.userDao().getUserById(usuario.android_id ?: androidId)
             val (pinHash, pinSalt) = if (usuario.pin != null) {
                 val h = PinSecurity.hashearPinNuevo(usuario.pin)
@@ -73,15 +69,14 @@ class DeviceVerificationRepository(
                 localId = usuario.local_id,
                 activo = usuario.activo,
                 pinHash = pinHash,
-                pinSalt = pinSalt
+                pinSalt = pinSalt,
+                foto = entidadPrevia?.foto
             ))
 
             VerificacionResultado.Autorizado(usuario)
         } catch (e: Exception) {
             val userLocal = db.userDao().getUserById(androidId)
             if (userLocal != null) {
-                // pin = null a propósito: nunca tenemos el PIN en texto plano acá,
-                // solo su hash (ver validarPinLocal más abajo).
                 val usuario = User(
                     id = 0L, auth_id = userLocal.authId, cliente_id = "",
                     username = userLocal.username, nombre = userLocal.nombre,
@@ -95,11 +90,6 @@ class DeviceVerificationRepository(
         }
     }
 
-    /**
-     * Valida el PIN contra el hash cacheado localmente (nunca contra texto
-     * plano: ni lo tenemos guardado ni lo tendremos). Funciona igual online
-     * u offline porque siempre compara contra lo último cacheado en Room.
-     */
     suspend fun validarPinLocal(androidId: String, pin: String): Boolean {
         val userLocal = db.userDao().getUserById(androidId) ?: return false
         val hash = userLocal.pinHash ?: return false
