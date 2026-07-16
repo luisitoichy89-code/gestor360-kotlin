@@ -77,7 +77,10 @@ fun PinLoginScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .scale(1f - (shake.value * 0.02f))
-                .neuShadow(shape = RoundedCornerShape(28.dp), elevation = 8.dp, blur = 18.dp)
+                // Antes: elevation 8dp + blur 18dp -> sombra muy marcada en
+                // claro. Ahora bien suave, casi imperceptible, como en la
+                // referencia (apenas se nota que la tarjeta "flota").
+                .neuShadow(shape = RoundedCornerShape(28.dp), elevation = 3.dp, blur = 22.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -87,11 +90,11 @@ fun PinLoginScreen(
             ) {
                 val fotoUsuario = rememberFotoBitmap(fotoBytes)
                 Surface(
-                    shape = RoundedCornerShape(20.dp),
+                    shape = CircleShape,
                     color = if (bloqueado) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
                     modifier = Modifier
-                        .size(64.dp)
-                        .neuShadow(shape = RoundedCornerShape(20.dp), elevation = 4.dp, blur = 8.dp)
+                        .size(72.dp)
+                        .neuShadow(shape = CircleShape, elevation = 2.dp, blur = 10.dp)
                 ) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         if (fotoUsuario != null) {
@@ -100,13 +103,13 @@ fun PinLoginScreen(
                             Image(
                                 bitmap = fotoUsuario,
                                 contentDescription = "Foto de perfil",
-                                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(20.dp))
+                                modifier = Modifier.fillMaxSize().clip(CircleShape)
                             )
                         } else {
                             Icon(
                                 Icons.Default.Lock,
                                 null,
-                                modifier = Modifier.padding(18.dp),
+                                modifier = Modifier.padding(20.dp),
                                 tint = if (bloqueado) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer
                             )
                         }
@@ -137,6 +140,9 @@ fun PinLoginScreen(
                     }
                 }
 
+                // Campo plano tipo "pill", relleno gris suave y sin borde —
+                // como en la referencia — en vez del neuShadow "hundido" tan
+                // marcado que tenía antes.
                 OutlinedTextField(
                     value = pin,
                     onValueChange = { if (!bloqueado && it.length <= 6) { pin = it.filter { c -> c.isDigit() }; viewModel.limpiarPinError() } },
@@ -157,14 +163,17 @@ fun PinLoginScreen(
                     },
                     colors = OutlinedTextFieldDefaults.colors(
                         unfocusedBorderColor = Color.Transparent,
-                        focusedBorderColor = if (error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedContainerColor = Color.Transparent
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        errorContainerColor = MaterialTheme.colorScheme.surfaceVariant
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .neuShadow(shape = RoundedCornerShape(14.dp), elevation = 4.dp, blur = 8.dp, pressed = true),
-                    shape = RoundedCornerShape(14.dp)
+                        // Sombra casi plana, solo para separarla levemente
+                        // del fondo (nada de efecto "hundido").
+                        .neuShadow(shape = RoundedCornerShape(28.dp), elevation = 1.dp, blur = 10.dp),
+                    shape = RoundedCornerShape(28.dp)
                 )
                 Spacer(Modifier.height(20.dp))
 
@@ -177,8 +186,9 @@ fun PinLoginScreen(
                         }
                     },
                     enabled = canSubmit,
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                    shape = RoundedCornerShape(28.dp),
+                    elevation = 1.dp,
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 ) {

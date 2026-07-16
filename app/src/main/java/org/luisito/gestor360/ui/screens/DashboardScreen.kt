@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.luisito.gestor360.ui.theme.NeuCard
+import org.luisito.gestor360.ui.theme.TarjetaCarpeta
 
 private data class SeccionDashboard(val titulo: String, val icono: ImageVector, val ruta: String)
 
@@ -58,14 +59,15 @@ fun DashboardScreen(
                 modifier = Modifier.fillMaxSize().padding(padding)
             ) {
                 items(secciones) { seccion ->
-                    NeuCard(
+                    TarjetaCarpeta(
                         modifier = Modifier.fillMaxWidth().aspectRatio(1f),
                         shape = RoundedCornerShape(20.dp),
-                        elevation = 6.dp,
+                        elevation = 3.dp,
+                        accentThickness = 7.dp,
                         onClick = { onNavigate(seccion.ruta) }
                     ) {
                         Column(
-                            modifier = Modifier.fillMaxSize().padding(16.dp),
+                            modifier = Modifier.fillMaxSize().padding(start = 20.dp, top = 16.dp, end = 16.dp, bottom = 20.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
@@ -73,7 +75,7 @@ fun DashboardScreen(
                                 modifier = Modifier.size(56.dp),
                                 shape = CircleShape,
                                 pressed = true,
-                                elevation = 4.dp
+                                elevation = 2.dp
                             ) {
                                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                     Icon(seccion.icono, null, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)

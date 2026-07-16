@@ -22,11 +22,19 @@ val Rojo = Color(0xFFD32F2F)
 val RojoOscuro = Color(0xFFB71C1C)
 val RojoClaro = Color(0xFFFFCDD2)
 
+// Acento morado: SOLO decorativo (línea/borde en L de las tarjetas del
+// dashboard). No reemplaza a Azul/Rojo como color funcional.
+val Morado = Color(0xFF7C5CD6)
+val MoradoOscuro = Color(0xFF5B3FB0)
+val MoradoClaro = Color(0xFFEDE7FB)
+
 // Sombras del efecto neomórfico (soft UI): misma base BackgroundLight,
 // una sombra clara (arriba-izquierda) y una oscura (abajo-derecha) para dar
 // sensación de relieve o hundimiento sin cambiar la paleta ni el tema.
+// En modo CLARO el contraste fondo/sombra es alto (fondo casi blanco), así
+// que la sombra debe ser gris neutro y muy transparente o se ve "tallada".
 val NeuLuz = Color(0xFFFFFFFF)
-val NeuSombra = Color(0xFFC9CDD3)
+val NeuSombra = Color(0xFFB9BEC7)
 
 // ============================================================
 // Variante oscura — mismos roles de color (azul = acciones, rojo =

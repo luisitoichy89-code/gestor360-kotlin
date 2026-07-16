@@ -122,16 +122,21 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
     }
 
     // Carga la foto del usuario ya logueado para el avatar del dashboard.
-    // AJUSTAR: se asume que SessionManager expone getUserId() con el mismo
-    // patrón que getUsername()/getRol()/getAndroidId(); si el método se
-    // llama distinto, ajustar aquí.
+    // BUG CORREGIDO: antes se guardaba/leía con sessionManager.getAndroidId(),
+    // pero UserEntity.id (la clave primaria que usa actualizarFoto/getFoto en
+    // Room) es el id real del usuario (usuario.id, ver saveSession más abajo
+    // y PinLoginScreen que sí usa usuario.id.toString()), NO el android_id.
+    // El UPDATE/SELECT con el id equivocado no encontraba fila -> la foto se
+    // veía al seleccionarla (estaba en memoria) pero nunca quedaba guardada,
+    // y al recargar sesión volvía a salir null. Se usa getUserId() para que
+    // coincida con la misma clave que ya usa el login por PIN.
     LaunchedEffect(isLoggedIn) {
-        fotoUsuarioLogueado = if (isLoggedIn) fotoRepository.obtenerFoto(sessionManager.getAndroidId()) else null
+        fotoUsuarioLogueado = if (isLoggedIn) fotoRepository.obtenerFoto(sessionManager.getUserId().toString()) else null
     }
 
     fun onFotoDashboardSeleccionada(bytes: ByteArray) {
         fotoUsuarioLogueado = bytes
-        scope.launch { fotoRepository.guardarFoto(sessionManager.getAndroidId(), bytes) }
+        scope.launch { fotoRepository.guardarFoto(sessionManager.getUserId().toString(), bytes) }
     }
 
     LaunchedEffect(localRecienCambiado) {
