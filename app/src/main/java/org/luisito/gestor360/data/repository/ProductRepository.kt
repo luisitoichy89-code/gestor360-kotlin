@@ -152,9 +152,9 @@ class ProductRepository(
 
     private suspend fun encolarYSincronizar(androidId: String, tipo: String, payload: kotlinx.serialization.json.JsonObject, idTemporal: Long? = null) {
         db.accionPendienteDao().encolar(
-        SyncReporter.reportar(androidId, localIdActivo(), tipo, payload)
             AccionPendienteEntity(tipo = tipo, payloadJson = payload.toString(), idLocalTemporal = idTemporal)
         )
+        SyncReporter.reportar(androidId, localIdActivo(), tipo, payload)
         if (NetworkMonitor.hayInternet(context)) {
             SyncWorker.sincronizarAhora(context)
         }
