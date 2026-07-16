@@ -68,8 +68,7 @@ class MermaRepository(
             put("p_cantidad", cantidad); put("p_motivo", motivo)
         }
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "crear_merma", payloadJson = payload.toString(), idLocalTemporal = idTemporal))
-        SyncReporter.reportar(androidId, localIdActivo(), "crear_merma", payload)
-        if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
+        try { SyncReporter.reportar(androidId, localIdActivo(), "crear_merma", payload) } catch (_: Exception) {}
         return Result.success(Unit)
     }
 

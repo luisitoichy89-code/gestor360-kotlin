@@ -81,8 +81,7 @@ class DevolucionRepository(private val context: Context = AppContextHolder.conte
             put("p_producto_id", productoId); put("p_cantidad", cantidad); put("p_metodo", metodo); put("p_motivo", motivo)
         }
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "solicitar_devolucion", payloadJson = payload.toString(), idLocalTemporal = idTemporal))
-        SyncReporter.reportar(androidId, localIdActivo(), "solicitar_devolucion", payload)
-        if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
+        try { SyncReporter.reportar(androidId, localIdActivo(), "solicitar_devolucion", payload) } catch (_: Exception) {}
         return Result.success(Unit)
     }
 

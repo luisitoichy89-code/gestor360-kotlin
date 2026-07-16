@@ -91,8 +91,7 @@ class SaleRepository(
                     cliente?.tarjetaId?.let { put("p_tarjeta_id", it) }
                 }
                 db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "registrar_venta", payloadJson = payload.toString()))
-                SyncReporter.reportar(androidId, localId, "registrar_venta", payload)
-            } catch (e: Exception) {
+                try { SyncReporter.reportar(androidId, localId, "registrar_venta", payload) } catch (_: Exception) {}
                 android.util.Log.e("SaleRepository", "guardarVenta: falló el ítem ${item.nombre} (id=${item.productId})", e)
                 fallos += item to e
             }
