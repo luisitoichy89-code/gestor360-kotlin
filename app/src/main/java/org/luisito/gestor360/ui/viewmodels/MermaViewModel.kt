@@ -14,20 +14,18 @@ data class MermaUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val pendientes: List<MermaPendiente> = emptyList(),
-    val error: String? = null,
-    val mensaje: String? = null
+    val error: String? = null
 )
 
 class MermaViewModel(
     private val repository: MermaRepository = MermaRepository()
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(MermaUiState())
     val uiState: StateFlow<MermaUiState> = _uiState.asStateFlow()
 
     private var androidIdActual: String = ""
 
-    fun cargarPendientes(androidId: String) {
+    fun cargar(androidId: String) {
         androidIdActual = androidId
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
@@ -37,39 +35,27 @@ class MermaViewModel(
         }
     }
 
-    fun refrescar() {
-        if (androidIdActual.isNotBlank()) cargarPendientes(androidIdActual)
-    }
+    fun refrescar() { if (androidIdActual.isNotBlank()) cargar(androidIdActual) }
 
-    fun solicitar(androidId: String, productoId: Long, productoNombre: String, cantidad: Double, motivo: String, onListo: () -> Unit = {}) {
+    fun solicitar(productoId: Long, productoNombre: String, cantidad: Double, motivo: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
-            repository.solicitar(androidId, productoId, productoNombre, cantidad, motivo)
-                .onSuccess {
-                    _uiState.value = _uiState.value.copy(mensaje = "Merma enviada para aprobación del admin")
-                    onListo()
-                }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo registrar la merma")) }
-            _uiState.value = _uiState.value.copy(isSaving = false)
-        }
-    }
-
-    fun aprobar(merma: MermaPendiente) {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isSaving = true, error = null)
-            repository.aprobar(androidIdActual, merma.id)
+            repository.solicitar(androidIdActual, productoId, productoNombre, cantidad, motivo)
                 .onSuccess { refrescar() }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo aprobar la merma")) }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo enviar la solicitud de merma")) }
             _uiState.value = _uiState.value.copy(isSaving = false)
         }
     }
 
-    fun rechazar(merma: MermaPendiente) {
+    fun resolver(id: Long, estado: String, resueltoPor: Long) {
         viewModelScope.launch {
-            repository.rechazar(androidIdActual, merma.id).onSuccess { refrescar() }
+            _uiState.value = _uiState.value.copy(isSaving = true, error = null)
+            repository.resolver(androidIdActual, id, estado, resueltoPor)
+                .onSuccess { refrescar() }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo resolver la merma")) }
+            _uiState.value = _uiState.value.copy(isSaving = false)
         }
     }
 
     fun clearError() { _uiState.value = _uiState.value.copy(error = null) }
-    fun clearMensaje() { _uiState.value = _uiState.value.copy(mensaje = null) }
 }
