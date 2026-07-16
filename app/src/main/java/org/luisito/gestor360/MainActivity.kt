@@ -16,16 +16,30 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.CompositionLocalProvider
+import org.luisito.gestor360.ui.components.FeedbackBar
+import org.luisito.gestor360.ui.components.FeedbackViewModel
+import org.luisito.gestor360.ui.components.LocalFeedback
+import org.luisito.gestor360.ui.components.FeedbackTipo
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
+import org.luisito.gestor360.data.local.FotoRepository
+// AJUSTAR: reemplaza este import y el accessor usado más abajo
+// (AppDatabase.getInstance(context).userDao()) por los reales de tu
+// AppDatabase.kt — ese archivo no estaba entre los que compartiste, así
+// que no conozco el nombre exacto del singleton/accessor.
+import org.luisito.gestor360.data.local.AppDatabase
 import org.luisito.gestor360.data.models.User
 import org.luisito.gestor360.data.models.Local
 import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.data.sync.SyncWorker
+import org.luisito.gestor360.ui.components.AvatarUsuario
+import org.luisito.gestor360.ui.components.BotonTema
 import org.luisito.gestor360.ui.components.SyncStatusBar
 import org.luisito.gestor360.ui.components.VerificarActualizacion
 import org.luisito.gestor360.ui.screens.*
@@ -35,13 +49,14 @@ import org.luisito.gestor360.ui.viewmodels.AccesoViewModel
 import org.luisito.gestor360.ui.viewmodels.LocalSeleccionViewModel
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
+import org.luisito.gestor360.utils.ThemeManager
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppContextHolder.init(applicationContext)
         SyncWorker.programarPeriodico(applicationContext)
-        setContent { Gestor360Theme { Gestor360App() } }
+        setContent { Gestor360App() }
     }
 }
 
@@ -60,6 +75,21 @@ private sealed class PantallaInterna {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Gestor360App() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val temaOscuro by ThemeManager.observarTemaOscuro(context).collectAsState(initial = false)
+    val scope = rememberCoroutineScope()
+
+    Gestor360Theme(darkTheme = temaOscuro) {
+        Gestor360AppContenido(
+            temaOscuro = temaOscuro,
+            onCambiarTema = { scope.launch { ThemeManager.alternarTema(context) } }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit) {
     var mostrarSplash by remember { mutableStateOf(true) }
     if (mostrarSplash) {
         SplashScreen(onFinished = { mostrarSplash = false })
@@ -70,15 +100,39 @@ fun Gestor360App() {
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val sessionManager = remember { SessionManager(context) }
+    // AJUSTAR: ver nota en los imports sobre AppDatabase.getInstance(context).
+    val fotoRepository = remember { FotoRepository(AppDatabase.getInstance(context).userDao()) }
+    val scope = rememberCoroutineScope()
     val accesoViewModel: AccesoViewModel = viewModel()
     val localSeleccionViewModel: LocalSeleccionViewModel = viewModel()
     var isLoading by remember { mutableStateOf(true) }
     var isLoggedIn by remember { mutableStateOf(false) }
     var usuarioParaPin by remember { mutableStateOf<User?>(null) }
+    var fotoUsuarioPin by remember { mutableStateOf<ByteArray?>(null) }
+    var fotoUsuarioLogueado by remember { mutableStateOf<ByteArray?>(null) }
     var pantalla by remember { mutableStateOf<PantallaInterna>(PantallaInterna.Home) }
     var mostrarConfirmarSalir by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     var localRecienCambiado by remember { mutableStateOf<Local?>(null) }
+
+    // Carga la foto guardada del usuario que está por meter su PIN, para
+    // mostrarla en el cuadrado donde va el candado en PinLoginScreen.
+    LaunchedEffect(usuarioParaPin) {
+        fotoUsuarioPin = usuarioParaPin?.let { fotoRepository.obtenerFoto(it.id) }
+    }
+
+    // Carga la foto del usuario ya logueado para el avatar del dashboard.
+    // AJUSTAR: se asume que SessionManager expone getUserId() con el mismo
+    // patrón que getUsername()/getRol()/getAndroidId(); si el método se
+    // llama distinto, ajustar aquí.
+    LaunchedEffect(isLoggedIn) {
+        fotoUsuarioLogueado = if (isLoggedIn) fotoRepository.obtenerFoto(sessionManager.getUserId()) else null
+    }
+
+    fun onFotoDashboardSeleccionada(bytes: ByteArray) {
+        fotoUsuarioLogueado = bytes
+        scope.launch { fotoRepository.guardarFoto(sessionManager.getUserId(), bytes) }
+    }
 
     LaunchedEffect(localRecienCambiado) {
         localRecienCambiado?.let { local ->
@@ -138,7 +192,8 @@ fun Gestor360App() {
                 isLoggedIn = true
             },
             onCambiarDispositivo = { usuarioParaPin = null; accesoViewModel.reiniciar() },
-            viewModel = accesoViewModel
+            viewModel = accesoViewModel,
+            fotoBytes = fotoUsuarioPin
         )
         else -> {
             val rol = sessionManager.getRol()
@@ -148,7 +203,7 @@ fun Gestor360App() {
             AnimatedContent(
                 targetState = pantalla,
                 label = "navegacion_principal",
-                transitionSpec = { fadeIn(animationSpec = androidx.compose.animation.core.tween(220)) togetherWith fadeOut(animationSpec = androidx.compose.animation.core.tween(180)) }
+                transitionSpec = { fadeIn(animationSpec = androidx.compose.animation.core.tween(350)) togetherWith fadeOut(animationSpec = androidx.compose.animation.core.tween(300)) }
             ) { pantallaActual ->
                 when (pantallaActual) {
                     is PantallaInterna.Home -> Column(modifier = Modifier.statusBarsPadding()) {
@@ -159,7 +214,11 @@ fun Gestor360App() {
                             androidId = androidId,
                             localSeleccionViewModel = localSeleccionViewModel,
                             onLocalCambiado = { local -> localRecienCambiado = local },
-                            onLogout = { cerrarSesion() }
+                            onLogout = { cerrarSesion() },
+                            fotoUsuario = fotoUsuarioLogueado,
+                            onFotoSeleccionada = { bytes -> onFotoDashboardSeleccionada(bytes) },
+                            temaOscuro = temaOscuro,
+                            onCambiarTema = onCambiarTema
                         )
                         DashboardScreen(
                             userRol = rol,
@@ -200,14 +259,27 @@ fun Gestor360App() {
         }
     }
     SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
+            // Feedback global
+                    val feedbackVM = remember { FeedbackViewModel() }
+                    CompositionLocalProvider(LocalFeedback provides feedbackVM) {
+                        val feedbackState by feedbackVM.state.collectAsState()
+                        FeedbackBar(
+                            mensaje = feedbackState.mensaje,
+                            tipo = feedbackState.tipo,
+                            onDismiss = { feedbackVM.limpiar() }
+                        )
+                    }
     }
 }
 
 /**
  * Barra superior única de la pantalla de inicio: neomórfica, con esquinas
  * redondeadas igual que el contenido del dashboard. Orden fijo:
- * 1) icono + nombre de usuario, 2) icono + nombre del local (al presionar
- * despliega el selector, sin botón "Cambiar"), 3) icono de cerrar sesión.
+ * 1) avatar (foto de perfil, editable) + nombre de usuario,
+ * 2) botón redondo ☀️/🌙 de tema,
+ * 3) icono + nombre del local (al presionar despliega el selector, sin
+ *    botón "Cambiar"),
+ * 4) icono de cerrar sesión.
  */
 @Composable
 private fun InicioTopBar(
@@ -216,7 +288,11 @@ private fun InicioTopBar(
     androidId: String,
     localSeleccionViewModel: LocalSeleccionViewModel,
     onLocalCambiado: (Local) -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    fotoUsuario: ByteArray?,
+    onFotoSeleccionada: (ByteArray) -> Unit,
+    temaOscuro: Boolean,
+    onCambiarTema: () -> Unit
 ) {
     NeuCard(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
@@ -226,7 +302,25 @@ private fun InicioTopBar(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Default.AccountCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
+            // Mismo tamaño que tenía el icono de cuenta (26dp) que reemplaza.
+            // Mientras no haya foto guardada, "Añadir foto" aparece arriba
+            // como pista de que el avatar es tocable.
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                if (fotoUsuario == null) {
+                    Text(
+                        "Añadir foto",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                }
+                AvatarUsuario(
+                    fotoBytes = fotoUsuario,
+                    size = 26.dp,
+                    editable = true,
+                    onFotoSeleccionada = onFotoSeleccionada
+                )
+            }
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 username,
@@ -234,6 +328,9 @@ private fun InicioTopBar(
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1
             )
+
+            Spacer(modifier = Modifier.width(10.dp))
+            BotonTema(temaOscuro = temaOscuro, onClick = onCambiarTema)
 
             if (esAdmin) {
                 Spacer(modifier = Modifier.width(12.dp))
