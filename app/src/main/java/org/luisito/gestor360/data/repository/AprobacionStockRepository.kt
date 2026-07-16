@@ -101,6 +101,11 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
 
     /** El vendedor propone offline: queda visible como pendiente de inmediato, igual que solicitarAumento/Merma/Devolucion. */
     suspend fun solicitarProducto(androidId: String, nombre: String, precio: Double, cantidad: Double): Result<Unit> {
+        // Verificar si ya hay una solicitud pendiente para este nombre
+        val yaPendiente = db.accionPendienteDao().obtenerPendientes()
+            .filter { it.tipo == "solicitar_producto" }
+            .any { it.payloadJson.contains("\"p_nombre\":\"$nombre\"") }
+        if (yaPendiente) return Result.success(Unit)
         val localId = localIdActivo()
         val idTemporal = -(System.currentTimeMillis() * 1000 + (Math.random() * 1000).toLong())
         val actuales = db.aprobacionStockCacheDao().obtener(localId)?.toModel() ?: emptyList()
@@ -122,6 +127,11 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
 
     /** El vendedor propone offline: queda visible como pendiente de inmediato, igual que Merma/Devolucion.solicitar. */
     suspend fun solicitarAumento(androidId: String, productoId: Long, productoNombre: String, cantidad: Double): Result<Unit> {
+        // Verificar si ya hay una solicitud pendiente para este producto
+        val yaPendiente = db.accionPendienteDao().obtenerPendientes()
+            .filter { it.tipo == "solicitar_aumento_stock" }
+            .any { it.payloadJson.contains("\"p_producto_id\":$productoId") }
+        if (yaPendiente) return Result.success(Unit)
         val localId = localIdActivo()
         val idTemporal = -(System.currentTimeMillis() * 1000 + (Math.random() * 1000).toLong())
         val actuales = db.aprobacionStockCacheDao().obtener(localId)?.toModel() ?: emptyList()

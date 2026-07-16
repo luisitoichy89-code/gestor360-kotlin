@@ -16,6 +16,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.CompositionLocalProvider
+import org.luisito.gestor360.ui.components.FeedbackBar
+import org.luisito.gestor360.ui.components.FeedbackViewModel
+import org.luisito.gestor360.ui.components.LocalFeedback
+import org.luisito.gestor360.ui.components.FeedbackTipo
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -200,6 +205,16 @@ fun Gestor360App() {
         }
     }
     SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
+            // Feedback global
+                    val feedbackVM = remember { FeedbackViewModel() }
+                    CompositionLocalProvider(LocalFeedback provides feedbackVM) {
+                        val feedbackState by feedbackVM.state.collectAsState()
+                        FeedbackBar(
+                            mensaje = feedbackState.mensaje,
+                            tipo = feedbackState.tipo,
+                            onDismiss = { feedbackVM.limpiar() }
+                        )
+                    }
     }
 }
 
