@@ -126,12 +126,12 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
     // patrón que getUsername()/getRol()/getAndroidId(); si el método se
     // llama distinto, ajustar aquí.
     LaunchedEffect(isLoggedIn) {
-        fotoUsuarioLogueado = if (isLoggedIn) fotoRepository.obtenerFoto(sessionManager.getUserId().toString()) else null
+        fotoUsuarioLogueado = if (isLoggedIn) fotoRepository.obtenerFoto(sessionManager.getAndroidId()) else null
     }
 
     fun onFotoDashboardSeleccionada(bytes: ByteArray) {
         fotoUsuarioLogueado = bytes
-        scope.launch { fotoRepository.guardarFoto(sessionManager.getUserId().toString(), bytes) }
+        scope.launch { fotoRepository.guardarFoto(sessionManager.getAndroidId(), bytes) }
     }
 
     LaunchedEffect(localRecienCambiado) {

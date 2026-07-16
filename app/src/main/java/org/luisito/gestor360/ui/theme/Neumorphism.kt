@@ -32,27 +32,21 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/**
- * Versión ligera del neomorfismo. Sombras a la mitad de intensidad,
- * bordes más suaves. Login usa intensidad aún menor.
- */
-
 fun Modifier.neuShadow(
     shape: Shape = RoundedCornerShape(16.dp),
-    elevation: Dp = 3.dp,
-    blur: Dp = 8.dp,
+    elevation: Dp = 2.dp,
+    blur: Dp = 6.dp,
     pressed: Boolean = false,
-    lightColor: Color = NeuLuz.copy(alpha = 0.5f),
-    darkColor: Color = NeuSombra.copy(alpha = 0.5f),
-    lightIntensity: Float = 1f
+    lightColor: Color = NeuLuz.copy(alpha = 0.4f),
+    darkColor: Color = Color(0xFF1A2A4A).copy(alpha = 0.25f)
 ): Modifier = this.drawBehind {
-    val elevationPx = elevation.toPx() * lightIntensity * if (pressed) -1f else 1f
+    val elevationPx = elevation.toPx() * if (pressed) -1f else 1f
     val blurPx = blur.toPx()
     val outline = shape.createOutline(size, layoutDirection, this)
     val path = Path().apply { addOutline(outline) }
     drawIntoCanvas { canvas ->
         val darkPaint = Paint().apply {
-            color = darkColor.copy(alpha = darkColor.alpha * lightIntensity)
+            color = darkColor
             asFrameworkPaint().maskFilter = BlurMaskFilter(blurPx, BlurMaskFilter.Blur.NORMAL)
         }
         canvas.save()
@@ -61,7 +55,7 @@ fun Modifier.neuShadow(
         canvas.restore()
 
         val lightPaint = Paint().apply {
-            color = lightColor.copy(alpha = lightColor.alpha * lightIntensity)
+            color = lightColor
             asFrameworkPaint().maskFilter = BlurMaskFilter(blurPx, BlurMaskFilter.Blur.NORMAL)
         }
         canvas.save()
@@ -71,27 +65,12 @@ fun Modifier.neuShadow(
     }
 }
 
-fun Modifier.neuShadowLogin(
-    shape: Shape = RoundedCornerShape(16.dp),
-    elevation: Dp = 2.dp,
-    blur: Dp = 6.dp,
-    pressed: Boolean = false
-): Modifier = this.neuShadow(
-    shape = shape,
-    elevation = elevation,
-    blur = blur,
-    pressed = pressed,
-    lightColor = NeuLuz.copy(alpha = 0.25f),
-    darkColor = NeuSombra.copy(alpha = 0.25f),
-    lightIntensity = 0.5f
-)
-
 @Composable
 fun NeuCard(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(16.dp),
     containerColor: Color = MaterialTheme.colorScheme.background,
-    elevation: Dp = 3.dp,
+    elevation: Dp = 2.dp,
     pressed: Boolean = false,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
@@ -123,7 +102,7 @@ fun NeuButton(
     shape: Shape = RoundedCornerShape(14.dp),
     containerColor: Color = MaterialTheme.colorScheme.primary,
     contentColor: Color = MaterialTheme.colorScheme.onPrimary,
-    elevation: Dp = 3.dp,
+    elevation: Dp = 2.dp,
     content: @Composable RowScope.() -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -159,7 +138,7 @@ fun NeuOutlinedButton(
     shape: Shape = RoundedCornerShape(14.dp),
     containerColor: Color = MaterialTheme.colorScheme.background,
     contentColor: Color = MaterialTheme.colorScheme.primary,
-    elevation: Dp = 3.dp,
+    elevation: Dp = 2.dp,
     content: @Composable RowScope.() -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
