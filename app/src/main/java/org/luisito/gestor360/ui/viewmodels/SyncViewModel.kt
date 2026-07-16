@@ -29,7 +29,7 @@ class SyncViewModel(application: Application) : AndroidViewModel(application) {
     val mensaje: StateFlow<String?> = _mensaje.asStateFlow()
 
     fun sincronizarAhora(androidId: String) {
-        if (_sincronizando.value) return
+        if (_sincronizando.value || pendientes.value == 0) return
         viewModelScope.launch {
             _sincronizando.value = true
             val resultado = SyncManager(getApplication()).sincronizar(androidId)
