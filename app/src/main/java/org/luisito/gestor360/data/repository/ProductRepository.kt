@@ -16,6 +16,7 @@ import org.luisito.gestor360.data.local.entities.toModel
 import org.luisito.gestor360.data.models.Product
 import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.data.sync.SyncWorker
+import org.luisito.gestor360.data.sync.SyncReporter
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 import java.time.LocalDate
@@ -151,6 +152,7 @@ class ProductRepository(
 
     private suspend fun encolarYSincronizar(androidId: String, tipo: String, payload: kotlinx.serialization.json.JsonObject, idTemporal: Long? = null) {
         db.accionPendienteDao().encolar(
+        SyncReporter.reportar(androidId, localIdActivo(), tipo, payload)
             AccionPendienteEntity(tipo = tipo, payloadJson = payload.toString(), idLocalTemporal = idTemporal)
         )
         if (NetworkMonitor.hayInternet(context)) {

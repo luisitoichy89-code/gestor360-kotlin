@@ -13,6 +13,7 @@ import org.luisito.gestor360.data.local.entities.toModel
 import org.luisito.gestor360.data.models.Tarjeta
 import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.data.sync.SyncWorker
+import org.luisito.gestor360.data.sync.SyncReporter
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 
@@ -79,6 +80,7 @@ class TarjetaRepository(
             put("p_android_id", androidId); put("p_local_id", localId); put("p_banco", banco); put("p_numero", numero); put("p_titular", titular)
         }
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "crear_tarjeta", payloadJson = payload.toString(), idLocalTemporal = idTemporal))
+        SyncReporter.reportar(androidId, localId, "crear_tarjeta", payload)
         if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
         return Result.success(Unit)
     }
@@ -91,6 +93,7 @@ class TarjetaRepository(
         val payload = buildJsonObject {
             put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id); put("p_banco", banco); put("p_numero", numero); put("p_titular", titular)
         }
+        SyncReporter.reportar(androidId, localId, "editar_tarjeta", payload)
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "editar_tarjeta", payloadJson = payload.toString()))
         if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
         return Result.success(Unit)
@@ -99,6 +102,7 @@ class TarjetaRepository(
     suspend fun setActivo(androidId: String, id: Long, activo: Boolean): Result<Unit> {
         val localId = localIdActivo()
         db.tarjetaDao().setActivo(id, activo, localId)
+        SyncReporter.reportar(androidId, localId, "activar_tarjeta", payload)
         val payload = buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id); put("p_activo", activo) }
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "activar_tarjeta", payloadJson = payload.toString()))
         if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
@@ -115,6 +119,7 @@ class TarjetaRepository(
             return Result.success(Unit)
         }
         
+        SyncReporter.reportar(androidId, localId, "eliminar_tarjeta", payload)
         db.tarjetaDao().eliminar(id, localId)
         val payload = buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id) }
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "eliminar_tarjeta", payloadJson = payload.toString()))

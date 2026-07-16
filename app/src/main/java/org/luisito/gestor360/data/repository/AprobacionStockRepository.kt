@@ -15,6 +15,7 @@ import org.luisito.gestor360.data.local.entities.toEntity
 import org.luisito.gestor360.data.local.entities.toModel
 import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.data.sync.SyncWorker
+import org.luisito.gestor360.data.sync.SyncReporter
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 
@@ -111,6 +112,7 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
 
         val payload = buildJsonObject {
             put("p_android_id", androidId); put("p_local_id", localId)
+        SyncReporter.reportar(androidId, localIdActivo(), "solicitar_producto", payload)
             put("p_nombre", nombre); put("p_precio", precio); put("p_cantidad", cantidad)
         }
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "solicitar_producto", payloadJson = payload.toString(), idLocalTemporal = idTemporal))
@@ -130,6 +132,7 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
         db.aprobacionStockCacheDao().guardar((listOf(nueva) + actuales).toEntity(localId))
 
         val payload = buildJsonObject {
+        SyncReporter.reportar(androidId, localIdActivo(), "solicitar_aumento_stock", payload)
             put("p_android_id", androidId); put("p_local_id", localId)
             put("p_producto_id", productoId); put("p_cantidad", cantidad)
         }
