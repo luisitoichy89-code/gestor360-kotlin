@@ -5,6 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
@@ -13,6 +16,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,44 +24,35 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.ui.semantics.Role
 
 /**
- * Estilo visual neomórfico (soft UI) para Gestor360°.
- *
- * No cambia paleta, tipografía ni lógica: solo agrega una doble sombra
- * (una clara arriba-izquierda, una oscura abajo-derecha) sobre el mismo
- * fondo, para que tarjetas y botones parezcan tallados/elevados del fondo
- * en lugar de usar bordes o Material elevation plano.
- *
- * `pressed = true` invierte las sombras para dar un efecto hundido
- * (usado en campos de texto o estados presionados).
+ * Versión ligera del neomorfismo. Sombras a la mitad de intensidad,
+ * bordes más suaves. Login usa intensidad aún menor.
  */
+
 fun Modifier.neuShadow(
     shape: Shape = RoundedCornerShape(16.dp),
-    elevation: Dp = 6.dp,
-    blur: Dp = 12.dp,
+    elevation: Dp = 3.dp,
+    blur: Dp = 8.dp,
     pressed: Boolean = false,
-    lightColor: Color = NeuLuz,
-    darkColor: Color = NeuSombra
+    lightColor: Color = NeuLuz.copy(alpha = 0.5f),
+    darkColor: Color = NeuSombra.copy(alpha = 0.5f),
+    lightIntensity: Float = 1f
 ): Modifier = this.drawBehind {
-    val elevationPx = elevation.toPx() * if (pressed) -1f else 1f
+    val elevationPx = elevation.toPx() * lightIntensity * if (pressed) -1f else 1f
     val blurPx = blur.toPx()
     val outline = shape.createOutline(size, layoutDirection, this)
     val path = Path().apply { addOutline(outline) }
-
     drawIntoCanvas { canvas ->
         val darkPaint = Paint().apply {
-            color = darkColor
+            color = darkColor.copy(alpha = darkColor.alpha * lightIntensity)
             asFrameworkPaint().maskFilter = BlurMaskFilter(blurPx, BlurMaskFilter.Blur.NORMAL)
         }
         canvas.save()
@@ -66,7 +61,7 @@ fun Modifier.neuShadow(
         canvas.restore()
 
         val lightPaint = Paint().apply {
-            color = lightColor
+            color = lightColor.copy(alpha = lightColor.alpha * lightIntensity)
             asFrameworkPaint().maskFilter = BlurMaskFilter(blurPx, BlurMaskFilter.Blur.NORMAL)
         }
         canvas.save()
@@ -76,13 +71,27 @@ fun Modifier.neuShadow(
     }
 }
 
-/** Reemplazo directo de `Card` / `ElevatedCard`: misma forma de uso, look neomórfico. */
+fun Modifier.neuShadowLogin(
+    shape: Shape = RoundedCornerShape(16.dp),
+    elevation: Dp = 2.dp,
+    blur: Dp = 6.dp,
+    pressed: Boolean = false
+): Modifier = this.neuShadow(
+    shape = shape,
+    elevation = elevation,
+    blur = blur,
+    pressed = pressed,
+    lightColor = NeuLuz.copy(alpha = 0.25f),
+    darkColor = NeuSombra.copy(alpha = 0.25f),
+    lightIntensity = 0.5f
+)
+
 @Composable
 fun NeuCard(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(16.dp),
     containerColor: Color = MaterialTheme.colorScheme.background,
-    elevation: Dp = 6.dp,
+    elevation: Dp = 3.dp,
     pressed: Boolean = false,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
@@ -106,7 +115,6 @@ fun NeuCard(
     }
 }
 
-/** Reemplazo directo de `Button`: pastilla elevada con sombra doble en vez de Material elevation. */
 @Composable
 fun NeuButton(
     onClick: () -> Unit,
@@ -115,7 +123,7 @@ fun NeuButton(
     shape: Shape = RoundedCornerShape(14.dp),
     containerColor: Color = MaterialTheme.colorScheme.primary,
     contentColor: Color = MaterialTheme.colorScheme.onPrimary,
-    elevation: Dp = 6.dp,
+    elevation: Dp = 3.dp,
     content: @Composable RowScope.() -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -136,14 +144,13 @@ fun NeuButton(
         contentAlignment = Alignment.Center
     ) {
         ProvideTextStyle(MaterialTheme.typography.labelLarge) {
-            androidx.compose.runtime.CompositionLocalProvider(LocalContentColor provides contentColor) {
+            CompositionLocalProvider(LocalContentColor provides contentColor) {
                 Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically, content = content)
             }
         }
     }
 }
 
-/** Reemplazo directo de `OutlinedButton`: mismo tamaño/uso, pero hundido (pressed) en vez de con borde. */
 @Composable
 fun NeuOutlinedButton(
     onClick: () -> Unit,
@@ -152,7 +159,7 @@ fun NeuOutlinedButton(
     shape: Shape = RoundedCornerShape(14.dp),
     containerColor: Color = MaterialTheme.colorScheme.background,
     contentColor: Color = MaterialTheme.colorScheme.primary,
-    elevation: Dp = 4.dp,
+    elevation: Dp = 3.dp,
     content: @Composable RowScope.() -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -173,7 +180,7 @@ fun NeuOutlinedButton(
         contentAlignment = Alignment.Center
     ) {
         ProvideTextStyle(MaterialTheme.typography.labelLarge) {
-            androidx.compose.runtime.CompositionLocalProvider(LocalContentColor provides contentColor) {
+            CompositionLocalProvider(LocalContentColor provides contentColor) {
                 Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically, content = content)
             }
         }
