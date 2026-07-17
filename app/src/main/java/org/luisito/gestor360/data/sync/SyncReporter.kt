@@ -15,7 +15,7 @@ object SyncReporter {
                     put("p_android_id", androidId)
                     put("p_local_id", localId)
                     put("p_tipo", tipo)
-                    put("p_payload", payload.toString())
+                    put("p_payload", payload)
                 }
             )
         } catch (_: Exception) { }
