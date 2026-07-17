@@ -17,6 +17,7 @@ import org.luisito.gestor360.data.local.dao.ProductoDao
 import org.luisito.gestor360.data.local.dao.ProductoEliminadoCacheDao
 import org.luisito.gestor360.data.local.dao.TarjetaDao
 import org.luisito.gestor360.data.local.dao.TurnoDao
+import org.luisito.gestor360.data.local.dao.UserDao
 import org.luisito.gestor360.data.local.dao.VentaDao
 import org.luisito.gestor360.data.local.entities.AccionPendienteEntity
 import org.luisito.gestor360.data.local.entities.AprobacionStockCacheEntity
@@ -29,6 +30,7 @@ import org.luisito.gestor360.data.local.entities.ProductoEntity
 import org.luisito.gestor360.data.local.entities.ProductoEliminadoCacheEntity
 import org.luisito.gestor360.data.local.entities.TarjetaEntity
 import org.luisito.gestor360.data.local.entities.TurnoEntity
+import org.luisito.gestor360.data.local.entities.UserEntity
 import org.luisito.gestor360.data.local.entities.VentaEntity
 
 val MIGRACION_8_9 = object : Migration(8, 9) {
@@ -161,9 +163,9 @@ val MIGRACION_10_11 = object : Migration(10, 11) {
  */
 @Database(
     entities = [
-        ProductoEntity::class, AccionPendienteEntity::class, VentaEntity::class, ConflictoEntity::class,
+        ProductoEntity::class, AccionPendienteEntity::class, TarjetaEntity::class, VentaEntity::class, ConflictoEntity::class,
         ProductoEliminadoCacheEntity::class,
-        TurnoEntity::class, TarjetaEntity::class, MermaEntity::class,
+        TurnoEntity::class, MermaEntity::class,
         UserEntity::class, LocalEntity::class, InventarioCacheEntity::class, DevolucionCacheEntity::class,
         AprobacionStockCacheEntity::class
     ],
@@ -175,7 +177,8 @@ val MIGRACION_10_11 = object : Migration(10, 11) {
     // v11: ventas_cache y mermas_cache, productoId (Long -> String) con
     // migración real (MIGRACION_10_11): ambas pueden tener filas creadas
     // offline sin sincronizar todavía.
-    version = 11,
+    // v12: agrega tabla tarjetas (MIGRATION_11_12, ver Migration_11_12.kt).
+    version = 12,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -203,7 +206,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "gestor360.db"
                 )
-                    .addMigrations(MIGRACION_8_9, MIGRACION_10_11)
+                    .addMigrations(MIGRACION_8_9, MIGRACION_10_11, MIGRATION_11_12)
                     .fallbackToDestructiveMigration()
                     .build().also { INSTANCE = it }
             }
