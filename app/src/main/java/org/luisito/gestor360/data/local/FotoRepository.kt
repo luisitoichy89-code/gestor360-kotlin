@@ -1,4 +1,5 @@
 package org.luisito.gestor360.data.local
+import org.luisito.gestor360.data.local.dao.UserDao
 
 /**
  * Puente delgado entre la UI y UserDao para la foto de perfil. No sabe nada

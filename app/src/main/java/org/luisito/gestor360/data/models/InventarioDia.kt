@@ -57,7 +57,7 @@ data class ProductoEliminadoInfo(
 
 @Serializable
 data class MermaInfo(
-    val id: Long,
+    val id: String,
     val producto_nombre: String,
     val cantidad: Double,
     val motivo: String,
@@ -69,8 +69,8 @@ data class MermaInfo(
 
 @Serializable
 data class DevueltoInfo(
+    val id: String,
     val id: Long,
-    val producto_nombre: String,
     val cantidad: Double,
     val metodo: String,
     val estado: String,
