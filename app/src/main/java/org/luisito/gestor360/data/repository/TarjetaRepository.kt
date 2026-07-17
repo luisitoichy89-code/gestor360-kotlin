@@ -19,64 +19,37 @@ class TarjetaRepository(
 
     // ---------- Lecturas ----------
 
-    fun observarActivas(localId: String): Flow<List<TarjetaEntity>> =
+    fun observarActivas(localId: Long): Flow<List<TarjetaEntity>> =
         dao.observarTarjetasActivas(localId)
 
-    fun observarTodas(localId: String): Flow<List<TarjetaEntity>> =
+    fun observarTodas(localId: Long): Flow<List<TarjetaEntity>> =
         dao.observarTarjetasDeLocal(localId)
 
-    // ---------- Escrituras: solo admin (verificar rol en el ViewModel) ----------
+    // ---------- Escrituras: solo admin (validado también server-side en el RPC) ----------
 
-    suspend fun crear(
-        localId: String,
-        nombre: String,
-        tipo: String?,
-        numeroCuenta: String?,
-        creadoPor: String
-    ) {
-        val ahora = System.currentTimeMillis()
+    suspend fun crear(localId: Long, nombre: String, tipo: String?, numeroCuenta: String?) {
         val id = UUID.randomUUID().toString() // RN #1
 
-        val tarjeta = TarjetaEntity(
-            id = id,
-            localId = localId,
-            nombre = nombre,
-            tipo = tipo,
-            numeroCuenta = numeroCuenta,
-            activo = true,
-            creadoPor = creadoPor,
-            createdAt = ahora,
-            updatedAt = ahora,
-            version = 1,
-            pendienteSync = true
+        dao.insertar(
+            TarjetaEntity(
+                id = id, localId = localId, nombre = nombre, tipo = tipo,
+                numeroCuenta = numeroCuenta, activo = true, pendienteSync = true
+            )
         )
-        dao.insertar(tarjeta)
 
         encolarAccion(
             tipoAccion = "CREAR",
             entidadId = id,
             payload = TarjetaPayload(
                 id = id, localId = localId, nombre = nombre, tipo = tipo,
-                numeroCuenta = numeroCuenta, activo = true, creadoPor = creadoPor,
-                updatedAt = ahora, deletedAt = null, version = 1
+                numeroCuenta = numeroCuenta, activo = true
             )
         )
     }
 
-    suspend fun actualizar(
-        tarjeta: TarjetaEntity,
-        nombre: String,
-        tipo: String?,
-        numeroCuenta: String?
-    ) {
-        val ahora = System.currentTimeMillis()
+    suspend fun actualizar(tarjeta: TarjetaEntity, nombre: String, tipo: String?, numeroCuenta: String?) {
         val actualizada = tarjeta.copy(
-            nombre = nombre,
-            tipo = tipo,
-            numeroCuenta = numeroCuenta,
-            updatedAt = ahora,
-            version = tarjeta.version + 1,
-            pendienteSync = true
+            nombre = nombre, tipo = tipo, numeroCuenta = numeroCuenta, pendienteSync = true
         )
         dao.actualizar(actualizada)
 
@@ -85,40 +58,48 @@ class TarjetaRepository(
             entidadId = tarjeta.id,
             payload = TarjetaPayload(
                 id = tarjeta.id, localId = tarjeta.localId, nombre = nombre, tipo = tipo,
-                numeroCuenta = numeroCuenta, activo = tarjeta.activo, creadoPor = tarjeta.creadoPor,
-                updatedAt = ahora, deletedAt = null, version = actualizada.version
+                numeroCuenta = numeroCuenta, activo = tarjeta.activo
             )
         )
     }
 
-    /** Soft delete: nunca se borra físicamente si puede estar referenciada en Ventas. */
-    suspend fun desactivar(tarjeta: TarjetaEntity) {
-        val ahora = System.currentTimeMillis()
-        val desactivada = tarjeta.copy(
-            activo = false,
-            deletedAt = ahora,
-            updatedAt = ahora,
-            version = tarjeta.version + 1,
-            pendienteSync = true
+    /** Toggle informativo (no es delete). Usa el mismo RPC actualizar_tarjeta con p_activo=false. */
+    suspend fun cambiarActivo(tarjeta: TarjetaEntity, activo: Boolean) {
+        val actualizada = tarjeta.copy(activo = activo, pendienteSync = true)
+        dao.actualizar(actualizada)
+
+        encolarAccion(
+            tipoAccion = "ACTUALIZAR",
+            entidadId = tarjeta.id,
+            payload = TarjetaPayload(
+                id = tarjeta.id, localId = tarjeta.localId, nombre = tarjeta.nombre,
+                tipo = tarjeta.tipo, numeroCuenta = tarjeta.numeroCuenta, activo = activo
+            )
         )
-        dao.actualizar(desactivada)
+    }
+
+    /** DELETE real, igual que Productos. Ojo con FKs desde Ventas (ver comentario en el SQL). */
+    suspend fun eliminar(tarjeta: TarjetaEntity) {
+        dao.actualizar(tarjeta.copy(pendienteSync = true))
 
         encolarAccion(
             tipoAccion = "ELIMINAR",
             entidadId = tarjeta.id,
             payload = TarjetaPayload(
                 id = tarjeta.id, localId = tarjeta.localId, nombre = tarjeta.nombre,
-                tipo = tarjeta.tipo, numeroCuenta = tarjeta.numeroCuenta, activo = false,
-                creadoPor = tarjeta.creadoPor, updatedAt = ahora, deletedAt = ahora,
-                version = desactivada.version
+                tipo = tarjeta.tipo, numeroCuenta = tarjeta.numeroCuenta, activo = tarjeta.activo
             )
         )
+        // No se borra la fila local hasta confirmar el DELETE remoto: si el
+        // dispositivo está offline, la fila debe seguir visible/consistente
+        // hasta que el worker aplique la eliminación exitosamente.
+        // El worker llama a dao.eliminarLocal(id) al recibir éxito (ver marcarAccionCompletada).
     }
 
     private suspend fun encolarAccion(tipoAccion: String, entidadId: String, payload: TarjetaPayload) {
         accionPendienteDao.encolar(
             AccionPendienteEntity(
-                accionId = UUID.randomUUID().toString(), // RN #2: idempotencia
+                accionId = UUID.randomUUID().toString(),
                 modulo = MODULO,
                 tipoAccion = tipoAccion,
                 entidadId = entidadId,
@@ -137,7 +118,11 @@ class TarjetaRepository(
     suspend fun marcarAccionCompletada(accion: AccionPendienteEntity) {
         accionPendienteDao.eliminar(accion)
         val quedanPendientes = accionPendienteDao.contarPendientesDeEntidad(MODULO, accion.entidadId) > 0
-        if (!quedanPendientes) {
+        if (quedanPendientes) return
+
+        if (accion.tipoAccion == "ELIMINAR") {
+            dao.eliminarLocal(accion.entidadId)
+        } else {
             dao.marcarPendienteSync(accion.entidadId, pendiente = false)
         }
     }
@@ -146,25 +131,21 @@ class TarjetaRepository(
         accionPendienteDao.registrarIntentoFallido(accion.accionId, error)
     }
 
-    suspend fun aplicarCambiosRemotos(remotas: List<TarjetaEntity>) =
+    /** Pull = refresco completo por local. */
+    suspend fun reemplazarConDatosDeServidor(localId: Long, remotas: List<TarjetaEntity>) {
+        dao.limpiarSincronizadasDeLocal(localId)
         dao.upsertDesdeServidor(remotas)
-
-    suspend fun obtenerUltimoUpdatedAt(localId: String): Long? =
-        dao.obtenerUltimoUpdatedAt(localId)
+    }
 }
 
 @Serializable
 data class TarjetaPayload(
     val id: String,
-    val localId: String,
+    val localId: Long,
     val nombre: String,
     val tipo: String?,
     val numeroCuenta: String?,
-    val activo: Boolean,
-    val creadoPor: String,
-    val updatedAt: Long,
-    val deletedAt: Long?,
-    val version: Int
+    val activo: Boolean
 )
 
 interface SyncScheduler {

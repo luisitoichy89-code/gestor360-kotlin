@@ -13,20 +13,12 @@ import com.gestor360.tarjetas.data.TarjetaRepository
 import com.gestor360.tarjetas.data.remote.TarjetaRemoteDataSource
 import java.util.concurrent.TimeUnit
 
-/**
- * RN #2 (idempotencia): cada AccionPendienteEntity trae su propio accionId.
- * Si el push fue aplicado en el servidor pero la respuesta se perdió (timeout),
- * reintentar es seguro: el RPC detecta el accionId repetido en
- * acciones_procesadas y no duplica nada.
- *
- * RN #6 (backoff exponencial): delegado a WorkManager.
- */
 class TarjetaSyncWorker(
     context: Context,
     params: WorkerParameters,
     private val repository: TarjetaRepository,
     private val remote: TarjetaRemoteDataSource,
-    private val localIdActual: () -> String
+    private val localIdActual: () -> Long
 ) : CoroutineWorker(context, params) {
 
     companion object {
@@ -36,9 +28,7 @@ class TarjetaSyncWorker(
         fun solicitar(): androidx.work.OneTimeWorkRequest =
             OneTimeWorkRequestBuilder<TarjetaSyncWorker>()
                 .setConstraints(
-                    Constraints.Builder()
-                        .setRequiredNetworkType(NetworkType.CONNECTED)
-                        .build()
+                    Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
                 )
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .build()
@@ -58,7 +48,6 @@ class TarjetaSyncWorker(
         }
     }
 
-    /** Procesa el outbox en orden de creación (createdAt ASC), una acción a la vez. */
     private suspend fun push() {
         val pendientes = repository.obtenerAccionesPendientes()
         for (accion in pendientes) {
@@ -67,29 +56,24 @@ class TarjetaSyncWorker(
                 onSuccess = { repository.marcarAccionCompletada(accion) },
                 onFailure = { error ->
                     if (esErrorPermanente(error)) {
-                        // No se va a arreglar solo (ej. rechazado por RLS/validación).
-                        // Se registra el intento pero NO se relanza: evita loop infinito.
-                        // Requiere revisión manual o UI que muestre accion.ultimoError.
                         repository.marcarAccionFallida(accion, error.message)
                     } else {
-                        throw error // dispara Result.retry() con backoff exponencial
+                        throw error // Result.retry() con backoff exponencial
                     }
                 }
             )
         }
     }
 
+    /** Sin updated_at en Supabase: pull = traer todo lo del local y reemplazar lo ya sincronizado. */
     private suspend fun pull() {
         val localId = localIdActual()
-        val desde = repository.obtenerUltimoUpdatedAt(localId) ?: 0L
-        val cambios = remote.obtenerCambiosDesde(localId, desde)
-        if (cambios.isNotEmpty()) {
-            repository.aplicarCambiosRemotos(cambios.map { it.toEntity() })
-        }
+        val remotas = remote.obtenerTodasDeLocal(localId)
+        repository.reemplazarConDatosDeServidor(localId, remotas.map { it.toEntity() })
     }
 
     private fun esErrorPermanente(error: Throwable): Boolean {
         val msg = error.message ?: return false
-        return msg.contains("400") || msg.contains("403") || msg.contains("422")
+        return msg.contains("400") || msg.contains("403") || msg.contains("422") || msg.contains("42501")
     }
 }

@@ -5,46 +5,34 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * Tarjeta = medio/cuenta de cobro informativa (ej. "BCP Ahorros", "Yape").
- * Pertenece a UN local. Se usa para etiquetar en Ventas por qué medio
- * entró el dinero cuando el pago es transferencia o mixto.
+ * Tarjeta = medio/cuenta de cobro informativa. Pertenece a UN local.
+ * Se usa para etiquetar en Ventas por qué medio entró el dinero cuando
+ * el pago es transferencia o mixto.
  *
- * A diferencia de mi primera versión, esta entity NO guarda accionId ni
- * syncStatus embebidos: el estado de sync vive en AccionPendienteEntity
- * (outbox genérico, ya usado por Productos). `pendienteSync` acá es solo
- * un flag denormalizado para que la UI pinte "sincronizando..." sin tener
- * que hacer join contra el outbox en cada render de lista.
+ * Alineada al patrón real de Productos:
+ * - id: UUID generado en el dispositivo (RN #1)
+ * - localId: Long, igual que productos.local_id (bigint autoincremental
+ *   de Supabase, NO uuid)
+ * - Sin created_at/updated_at/version: Productos tampoco los tiene.
+ * - `pendienteSync` es solo un flag local para la UI, no viaja a Supabase.
  */
 @Entity(
     tableName = "tarjetas",
-    indices = [
-        Index(value = ["localId"]),
-        Index(value = ["localId", "activo"])
-    ]
+    indices = [Index(value = ["localId"])]
 )
 data class TarjetaEntity(
     @PrimaryKey
-    val id: String, // UUID generado en el dispositivo (RN #1)
+    val id: String, // UUID como String en Room; se envía como uuid al RPC
 
-    val localId: String, // FK lógica a Local. Aislamiento estricto (RN #4)
+    val localId: Long, // FK lógica a Local (bigint, igual que Productos)
 
-    val nombre: String, // ej: "BCP Ahorros", "Yape", "Interbank Transferencia"
+    val nombre: String,
 
-    val tipo: String?, // "banco" | "billetera_digital" | "otro"
+    val tipo: String?,
 
     val numeroCuenta: String? = null,
 
     val activo: Boolean = true,
 
-    val creadoPor: String, // UUID del usuario (admin) que la creó
-
-    val createdAt: Long,
-
-    val updatedAt: Long,
-
-    val deletedAt: Long? = null, // soft delete; nunca se borra físicamente (puede estar en ventas)
-
-    val version: Int = 1, // optimista, para resolver conflictos last-write-wins
-
-    val pendienteSync: Boolean = true // true mientras exista alguna AccionPendienteEntity para este id
+    val pendienteSync: Boolean = true // true mientras haya una AccionPendienteEntity para este id
 )
