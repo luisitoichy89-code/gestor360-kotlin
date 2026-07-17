@@ -35,7 +35,7 @@ class SyncManager(private val context: Context) {
         var exitosas = 0
         var fallidas = 0
         val eliminadosProductos = mutableListOf<Pair<String, Long>>()
-        val eliminadosTarjetas = mutableListOf<Pair<Long, Long>>()
+        val eliminadosTarjetas = mutableListOf<Pair<String, Long>>()
 
         for (accion in pendientes) {
             try {
@@ -60,7 +60,7 @@ class SyncManager(private val context: Context) {
                         if (pid != null && lid != null) eliminadosProductos.add(pid to lid)
                     }
                     "eliminar_tarjeta" -> {
-                        val tid = payload["p_id"]?.toString()?.trim('"')?.toLongOrNull()
+                        val tid = payload["p_id"]?.toString()?.trim('"')
                         val lid = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull()
                         if (tid != null && lid != null) eliminadosTarjetas.add(tid to lid)
                     }
@@ -93,9 +93,10 @@ class SyncManager(private val context: Context) {
         for ((pid, lid) in eliminadosProductos) db.productoDao().eliminar(pid, lid)
         for ((tid, lid) in eliminadosTarjetas) db.tarjetaDao().eliminar(tid, lid)
 
-        if (session.getLocalId() != null) {
+        val localIdActivo = session.getLocalId()
+        if (localIdActivo != null) {
             refrescarProductosYDetectarConflictos(androidId)
-            tarjetaRepository.refrescarDesdeServidor(androidId)
+            tarjetaRepository.refrescarDesdeServidor(localIdActivo)
             mermaRepository.refrescarDesdeServidor(androidId)
             turnoRepository.refrescarDesdeServidor(androidId)
             aprobacionStockRepository.refrescarDesdeServidor(androidId)
@@ -118,8 +119,10 @@ class SyncManager(private val context: Context) {
             // id temporal que reemplazar).
             "abrir_turno" -> runCatching { respuesta.decodeAs<Long>() }.getOrNull()
                 ?.let { db.turnoDao().reemplazarIdTemporal(idTemporal, it, localId) }
-            "crear_tarjeta" -> runCatching { respuesta.decodeAs<Long>() }.getOrNull()
-                ?.let { db.tarjetaDao().reemplazarIdTemporal(idTemporal, it, localId) }
+            // "crear_tarjeta" no pasa por acá: el id es un UUID definitivo
+            // generado en el cliente (igual que productos), no hay id temporal
+            // que reemplazar. TarjetaRepository.createTarjeta nunca setea
+            // idLocalTemporal, así que esta rama nunca se alcanzaría igual.
         }
     }
 

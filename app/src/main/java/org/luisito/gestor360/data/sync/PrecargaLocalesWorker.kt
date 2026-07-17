@@ -103,7 +103,7 @@ class PrecargaLocalesWorker(
                 saleRepo.precargarLocal(androidId, local.id),
                 inventarioRepo.precargarLocal(androidId, local.id),
                 turnoRepo.precargarLocal(androidId, local.id),
-                tarjetaRepo.precargarLocal(androidId, local.id),
+                tarjetaRepo.precargarLocal(local.id),
                 mermaRepo.precargarLocal(androidId, local.id),
                 devolucionRepo.precargarLocal(androidId, local.id),
                 aprobacionRepo.precargarLocal(androidId, local.id)

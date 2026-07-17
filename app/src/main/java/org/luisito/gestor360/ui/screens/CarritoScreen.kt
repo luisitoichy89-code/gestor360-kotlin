@@ -17,7 +17,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
-import org.luisito.gestor360.data.models.Tarjeta
+import org.luisito.gestor360.data.local.entities.TarjetaEntity
 import org.luisito.gestor360.data.repository.SaleRepository
 import org.luisito.gestor360.data.sms.SmsPagoReceiver
 import org.luisito.gestor360.ui.components.EsperandoPagoOverlay
@@ -54,7 +54,7 @@ private data class DatosMixto(
     val ci: String = "",
     val tel: String = "",
     val nombre: String = "",
-    val tarjeta: Tarjeta? = null
+    val tarjeta: TarjetaEntity? = null
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -236,7 +236,7 @@ fun CarritoScreen(
             onDismiss = { paso = PasoCheckout.Ninguno; metodoVisual = false }
         ) { ci, tel, nombre, tarjeta ->
             val metodo = if (metodoVisual) "transfer_visual" else "transfer"
-            viewModel.confirmarVenta(metodo, 0.0, uiState.totalCarrito, 0L, SaleRepository.DatosCliente(ci, tel, nombre, tarjeta?.let { "${it.banco} · ${it.numero}" }, tarjeta?.id))
+            viewModel.confirmarVenta(metodo, 0.0, uiState.totalCarrito, 0L, SaleRepository.DatosCliente(ci, tel, nombre, tarjeta?.let { "${it.nombre} · ${it.numeroCuenta}" }, tarjeta?.id))
             paso = PasoCheckout.Ninguno
             metodoVisual = false
         }
@@ -288,7 +288,7 @@ fun CarritoScreen(
             ) { ci, tel, nombre, tarjeta ->
                 val metodo = if (metodoVisual) "mixed_visual" else "mixed"
                 datosMixto = datosMixto.copy(ci = ci, tel = tel, nombre = nombre, tarjeta = tarjeta)
-                viewModel.confirmarVenta(metodo, datosMixto.efectivo, restante, 0L, SaleRepository.DatosCliente(ci, tel, nombre, tarjeta?.let { "${it.banco} · ${it.numero}" }, tarjeta?.id))
+                viewModel.confirmarVenta(metodo, datosMixto.efectivo, restante, 0L, SaleRepository.DatosCliente(ci, tel, nombre, tarjeta?.let { "${it.nombre} · ${it.numeroCuenta}" }, tarjeta?.id))
                 paso = PasoCheckout.Ninguno
                 datosMixto = DatosMixto()
                 metodoVisual = false
@@ -312,7 +312,7 @@ fun CarritoScreen(
                             }
                         }
                         Spacer(Modifier.height(12.dp))
-                        datosMixto.tarjeta?.let { Text("Cuenta: ${it.banco} · ${it.numero}") }
+                        datosMixto.tarjeta?.let { Text("Cuenta: ${it.nombre} · ${it.numeroCuenta}") }
                         Text("Cliente: ${datosMixto.nombre}")
                         Text("CI: ${datosMixto.ci}")
                         Text("Teléfono: ${datosMixto.tel}")
@@ -326,7 +326,7 @@ fun CarritoScreen(
                         onConfirmar = {
                             viewModel.confirmarVenta(
                                 "mixed", datosMixto.efectivo, restante, 0L,
-                                SaleRepository.DatosCliente(datosMixto.ci, datosMixto.tel, datosMixto.nombre, datosMixto.tarjeta?.let { "${it.banco} · ${it.numero}" }, datosMixto.tarjeta?.id)
+                                SaleRepository.DatosCliente(datosMixto.ci, datosMixto.tel, datosMixto.nombre, datosMixto.tarjeta?.let { "${it.nombre} · ${it.numeroCuenta}" }, datosMixto.tarjeta?.id)
                             )
                             paso = PasoCheckout.Ninguno
                             datosMixto = DatosMixto()
@@ -369,14 +369,14 @@ private fun BotonesDialogoGrandes(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DatosClienteDialog(titulo: String, monto: Double, tarjetas: List<Tarjeta>, onDismiss: () -> Unit, onConfirmar: (String, String, String, Tarjeta?) -> Unit) {
+private fun DatosClienteDialog(titulo: String, monto: Double, tarjetas: List<TarjetaEntity>, onDismiss: () -> Unit, onConfirmar: (String, String, String, TarjetaEntity?) -> Unit) {
     var ci by remember { mutableStateOf("") }
     val ciError = remember(ci) { ci.isNotBlank() && !ciValida(ci) }
     var tel by remember { mutableStateOf("") }
     var nombre by remember { mutableStateOf("") }
     // Ya no se preselecciona ninguna tarjeta: el vendedor/admin ve "Seleccionar"
     // y elegir cuenta es opcional, para no bloquear la venta por datos.
-    var tarjetaSel by remember { mutableStateOf<Tarjeta?>(null) }
+    var tarjetaSel by remember { mutableStateOf<TarjetaEntity?>(null) }
     var menuAbierto by remember { mutableStateOf(false) }
 
     AlertDialog(
@@ -397,13 +397,13 @@ private fun DatosClienteDialog(titulo: String, monto: Double, tarjetas: List<Tar
                 } else {
                     ExposedDropdownMenuBox(menuAbierto, { menuAbierto = it }) {
                         OutlinedTextField(
-                            tarjetaSel?.let { "${it.banco} · ${it.numero}" } ?: "Seleccionar", {},
+                            tarjetaSel?.let { "${it.nombre} · ${it.numeroCuenta}" } ?: "Seleccionar", {},
                             readOnly = true, label = { Text("Cuenta destino (opcional)") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(menuAbierto) },
                             modifier = Modifier.fillMaxWidth().menuAnchor(), shape = RoundedCornerShape(14.dp)
                         )
                         ExposedDropdownMenu(menuAbierto, { menuAbierto = false }) {
-                            tarjetas.forEach { t -> DropdownMenuItem(text = { Text("${t.banco} · ${t.numero}") }, onClick = { tarjetaSel = t; menuAbierto = false }) }
+                            tarjetas.forEach { t -> DropdownMenuItem(text = { Text("${t.nombre} · ${t.numeroCuenta}") }, onClick = { tarjetaSel = t; menuAbierto = false }) }
                         }
                     }
                 }

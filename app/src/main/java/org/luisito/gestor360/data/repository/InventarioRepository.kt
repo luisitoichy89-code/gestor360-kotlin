@@ -148,10 +148,10 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         var tarjetaNumero: String? = null
         var tarjetaTitular: String? = null
         if (tarjetaId != null) {
-            val tarjeta = db.tarjetaDao().obtenerTodas(localId).find { it.id == tarjetaId }
-            tarjetaBanco = tarjeta?.banco
-            tarjetaNumero = tarjeta?.numero
-            tarjetaTitular = tarjeta?.titular
+            val tarjeta = db.tarjetaDao().obtenerPorId(tarjetaId, localId)
+            tarjetaBanco = tarjeta?.nombre
+            tarjetaNumero = tarjeta?.numeroCuenta
+            tarjetaTitular = null
         }
         return VentaInfo(
             id = id, producto_nombre = productoNombreLocal,
