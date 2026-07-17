@@ -9,7 +9,7 @@ data class ConflictoEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val tipo: String,
     val descripcion: String,
-    val productoId: Long? = null,
+    val productoId: String? = null,
     val detectadoEn: Long = System.currentTimeMillis(),
     val resuelto: Boolean = false
 )

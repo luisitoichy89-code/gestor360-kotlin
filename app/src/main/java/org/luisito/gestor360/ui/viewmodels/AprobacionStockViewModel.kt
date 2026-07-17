@@ -43,7 +43,7 @@ class AprobacionStockViewModel(
         }
     }
 
-    fun solicitarAumento(androidId: String, productoId: Long, productoNombre: String, cantidad: Double) {
+    fun solicitarAumento(androidId: String, productoId: String, productoNombre: String, cantidad: Double) {
         viewModelScope.launch {
             repository.solicitarAumento(androidId, productoId, productoNombre, cantidad)
                 .onSuccess { _uiState.value = _uiState.value.copy(mensaje = "Aumento enviado a aprobación"); cargar(androidId) }

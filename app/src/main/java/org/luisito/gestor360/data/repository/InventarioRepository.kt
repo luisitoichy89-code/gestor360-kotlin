@@ -142,7 +142,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
 
     private suspend fun VentaEntity.toVentaInfo(localId: Long, nombreUsuarioLocal: String?): VentaInfo {
         val productoNombreLocal = productoNombre
-            ?: db.productoDao().obtenerPorId(productoId, localId)?.nombre
+            ?: db.productoDao().obtenerPorId(productoId.toString(), localId)?.nombre
             ?: "Producto #$productoId"
         var tarjetaBanco: String? = null
         var tarjetaNumero: String? = null
@@ -171,7 +171,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         val localId = pendientes.firstOrNull()?.localId ?: return existentes
         for (venta in pendientes) {
             val nombre = venta.productoNombre
-                ?: db.productoDao().obtenerPorId(venta.productoId, localId)?.nombre
+                ?: db.productoDao().obtenerPorId(venta.productoId.toString(), localId)?.nombre
                 ?: "Producto #${venta.productoId}"
             val actual = porNombre[nombre] ?: ProductoVendidoInfo(nombre = nombre)
             porNombre[nombre] = actual.copy(total_vendido = actual.total_vendido + venta.cantidad)

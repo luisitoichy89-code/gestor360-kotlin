@@ -36,7 +36,7 @@ data class TurnoInfo(
 
 @Serializable
 data class ProductoInfo(
-    val id: Long,
+    val id: String,
     val nombre: String,
     val precio: Double = 0.0,
     val stock: Double = 0.0,
@@ -48,7 +48,7 @@ data class ProductoInfo(
 
 @Serializable
 data class ProductoEliminadoInfo(
-    val id: Long,
+    val id: String,
     val nombre: String,
     val stock: Double = 0.0,
     val fecha: String? = null,

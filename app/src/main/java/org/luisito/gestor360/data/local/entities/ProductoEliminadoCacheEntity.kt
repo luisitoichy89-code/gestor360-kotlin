@@ -7,7 +7,7 @@ import androidx.room.Entity
     primaryKeys = ["id", "localId"]
 )
 data class ProductoEliminadoCacheEntity(
-    val id: Long,
+    val id: String,
     val localId: Long,
     val nombre: String,
     val stock: Double = 0.0,
