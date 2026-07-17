@@ -6,14 +6,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import org.luisito.gestor360.data.models.MermaPendiente
+import org.luisito.gestor360.data.local.entities.MermaEntity
 import org.luisito.gestor360.data.repository.MermaRepository
 import org.luisito.gestor360.ui.util.mensajeAmigable
 
 data class MermaUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
-    val pendientes: List<MermaPendiente> = emptyList(),
+    val pendientes: List<MermaEntity> = emptyList(),
     val error: String? = null,
     val mensaje: String? = null
 )
@@ -44,7 +44,7 @@ class MermaViewModel(
     fun solicitar(androidId: String, productoId: String, productoNombre: String, cantidad: Double, motivo: String, onListo: () -> Unit = {}) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
-            repository.solicitar(androidId, productoId, productoNombre, cantidad, motivo)
+            repository.crear(androidId, productoId, productoNombre, cantidad, motivo)
                 .onSuccess {
                     _uiState.value = _uiState.value.copy(mensaje = "Merma enviada para aprobación del admin")
                     onListo()
@@ -54,7 +54,7 @@ class MermaViewModel(
         }
     }
 
-    fun aprobar(merma: MermaPendiente) {
+    fun aprobar(merma: MermaEntity) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             repository.aprobar(androidIdActual, merma.id)
@@ -64,7 +64,7 @@ class MermaViewModel(
         }
     }
 
-    fun rechazar(merma: MermaPendiente) {
+    fun rechazar(merma: MermaEntity) {
         viewModelScope.launch {
             repository.rechazar(androidIdActual, merma.id).onSuccess { refrescar() }
         }

@@ -19,7 +19,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
-import org.luisito.gestor360.data.models.Tarjeta
+import org.luisito.gestor360.data.local.entities.TarjetaEntity
 import org.luisito.gestor360.ui.components.*
 import org.luisito.gestor360.ui.viewmodels.TarjetaViewModel
 import org.luisito.gestor360.ui.theme.NeuCard
@@ -31,9 +31,9 @@ import org.luisito.gestor360.ui.theme.neuShadow
 @Composable
 fun TarjetasScreen(androidId: String, onBack: (() -> Unit)? = null, viewModel: TarjetaViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
-    var tarjetaEnEdicion by remember { mutableStateOf<Tarjeta?>(null) }
+    var tarjetaEnEdicion by remember { mutableStateOf<TarjetaEntity?>(null) }
     var mostrarFormulario by remember { mutableStateOf(false) }
-    var tarjetaAEliminar by remember { mutableStateOf<Tarjeta?>(null) }
+    var tarjetaAEliminar by remember { mutableStateOf<TarjetaEntity?>(null) }
 
     LaunchedEffect(androidId) { viewModel.cargar(androidId) }
 
@@ -57,12 +57,12 @@ fun TarjetasScreen(androidId: String, onBack: (() -> Unit)? = null, viewModel: T
         }
     }
 
-    if (mostrarFormulario) TarjetaFormDialog(tarjetaEnEdicion, uiState.tarjetas, uiState.isSaving, { mostrarFormulario = false }) { banco, numero, titular ->
-        if (tarjetaEnEdicion == null) viewModel.crear(banco, "", numero) else viewModel.editar(tarjetaEnEdicion!!.id, banco, "", numero, tarjetaEnEdicion!!.activo)
+    if (mostrarFormulario) TarjetaFormDialog(tarjetaEnEdicion, uiState.tarjetas, uiState.isSaving, { mostrarFormulario = false }) { nombre, numeroCuenta, tipo ->
+        if (tarjetaEnEdicion == null) viewModel.crear(nombre, tipo, numeroCuenta) else viewModel.editar(tarjetaEnEdicion!!.id, nombre, tipo, numeroCuenta, tarjetaEnEdicion!!.activo)
         mostrarFormulario = false
     }
 
-    tarjetaAEliminar?.let { ConfirmarEliminarDialog("${it.banco} · ${it.numero}", { viewModel.eliminar(it.id); tarjetaAEliminar = null }, { tarjetaAEliminar = null }) }
+    tarjetaAEliminar?.let { ConfirmarEliminarDialog("${it.nombre} · ${it.numeroCuenta}", { viewModel.eliminar(it.id); tarjetaAEliminar = null }, { tarjetaAEliminar = null }) }
 }
 
 private fun agruparNumeroTarjeta(numero: String): String = numero.chunked(4).joinToString("-")
@@ -89,16 +89,16 @@ private val formatoNumeroTarjeta = VisualTransformation { texto ->
 }
 
 @Composable
-private fun TarjetaCard(tarjeta: Tarjeta, onEditar: () -> Unit, onToggleActivo: () -> Unit, onEliminar: () -> Unit) {
+private fun TarjetaCard(tarjeta: TarjetaEntity, onEditar: () -> Unit, onToggleActivo: () -> Unit, onEliminar: () -> Unit) {
     var menuAbierto by remember { mutableStateOf(false) }
     NeuCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.CreditCard, null, tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(tarjeta.banco, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(agruparNumeroTarjeta(tarjeta.numero), style = MaterialTheme.typography.bodyMedium)
-                if (!tarjeta.titular.isNullOrBlank()) Text(tarjeta.titular, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(tarjeta.nombre, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(agruparNumeroTarjeta(tarjeta.numeroCuenta ?: ""), style = MaterialTheme.typography.bodyMedium)
+                if (!tarjeta.tipo.isNullOrBlank()) Text(tarjeta.tipo, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(4.dp)); EstadoChip(activo = tarjeta.activo)
             }
             Box {
@@ -114,27 +114,27 @@ private fun TarjetaCard(tarjeta: Tarjeta, onEditar: () -> Unit, onToggleActivo: 
 }
 
 @Composable
-private fun TarjetaFormDialog(tarjeta: Tarjeta?, tarjetasExistentes: List<Tarjeta>, isSaving: Boolean, onDismiss: () -> Unit, onGuardar: (banco: String, numero: String, titular: String) -> Unit) {
-    var banco by remember { mutableStateOf(tarjeta?.banco ?: "") }; var numero by remember { mutableStateOf(tarjeta?.numero ?: "") }; var titular by remember { mutableStateOf(tarjeta?.titular ?: "") }
-    val bancoVacio = banco.isBlank()
-    val numeroVacio = numero.isBlank()
-    val numeroIncompleto = numero.isNotBlank() && numero.length != 16
-    val numeroDuplicado = remember(numero, tarjetasExistentes, tarjeta) {
-        val numeroNormalizado = numero.trim()
-        numeroNormalizado.length == 16 && tarjetasExistentes.any { it.id != tarjeta?.id && it.numero.trim() == numeroNormalizado }
+private fun TarjetaFormDialog(tarjeta: TarjetaEntity?, tarjetasExistentes: List<TarjetaEntity>, isSaving: Boolean, onDismiss: () -> Unit, onGuardar: (nombre: String, numeroCuenta: String, tipo: String) -> Unit) {
+    var nombre by remember { mutableStateOf(tarjeta?.nombre ?: "") }; var numeroCuenta by remember { mutableStateOf(tarjeta?.numeroCuenta ?: "") }; var tipo by remember { mutableStateOf(tarjeta?.tipo ?: "") }
+    val nombreVacio = nombre.isBlank()
+    val numeroVacio = numeroCuenta.isBlank()
+    val numeroIncompleto = numeroCuenta.isNotBlank() && numeroCuenta.length != 16
+    val numeroDuplicado = remember(numeroCuenta, tarjetasExistentes, tarjeta) {
+        val numeroNormalizado = numeroCuenta.trim()
+        numeroNormalizado.length == 16 && tarjetasExistentes.any { it.id != tarjeta?.id && it.numeroCuenta?.trim() == numeroNormalizado }
     }
-    val valido = !bancoVacio && !numeroVacio && !numeroIncompleto && !numeroDuplicado
+    val valido = !nombreVacio && !numeroVacio && !numeroIncompleto && !numeroDuplicado
     AlertDialog(
         onDismissRequest = onDismiss, shape = RoundedCornerShape(18.dp),
         title = { Text(if (tarjeta == null) "Nueva tarjeta" else "Editar tarjeta", fontWeight = FontWeight.Bold) },
         text = { Column {
-            OutlinedTextField(banco, { banco = it }, label = { Text("Banco") }, isError = bancoVacio, supportingText = { if (bancoVacio) Text("El banco es obligatorio") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
+            OutlinedTextField(nombre, { nombre = it }, label = { Text("Banco") }, isError = nombreVacio, supportingText = { if (nombreVacio) Text("El banco es obligatorio") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
             Spacer(Modifier.height(10.dp))
-            OutlinedTextField(numero, { numero = it.filter { c -> c.isDigit() }.take(16) }, label = { Text("Número de cuenta") }, placeholder = { Text("0000-0000-0000-0000") }, visualTransformation = formatoNumeroTarjeta, isError = numeroVacio || numeroIncompleto || numeroDuplicado, supportingText = { when { numeroVacio -> Text("El número de cuenta es obligatorio"); numeroIncompleto -> Text("Debe tener exactamente 16 dígitos (${numero.length}/16)"); numeroDuplicado -> Text("Ya existe una tarjeta con ese número") } }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+            OutlinedTextField(numeroCuenta, { numeroCuenta = it.filter { c -> c.isDigit() }.take(16) }, label = { Text("Número de cuenta") }, placeholder = { Text("0000-0000-0000-0000") }, visualTransformation = formatoNumeroTarjeta, isError = numeroVacio || numeroIncompleto || numeroDuplicado, supportingText = { when { numeroVacio -> Text("El número de cuenta es obligatorio"); numeroIncompleto -> Text("Debe tener exactamente 16 dígitos (${numeroCuenta.length}/16)"); numeroDuplicado -> Text("Ya existe una tarjeta con ese número") } }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
             Spacer(Modifier.height(10.dp))
-            OutlinedTextField(titular, { titular = it }, label = { Text("Titular (opcional)") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
+            OutlinedTextField(tipo, { tipo = it }, label = { Text("Tipo de cuenta (opcional)") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
         }},
-        confirmButton = { TextButton(enabled = valido && !isSaving, onClick = { onGuardar(banco.trim(), numero.trim(), titular.trim()) }) { Text(if (isSaving) "Guardando..." else "Guardar") } },
+        confirmButton = { TextButton(enabled = valido && !isSaving, onClick = { onGuardar(nombre.trim(), numeroCuenta.trim(), tipo.trim()) }) { Text(if (isSaving) "Guardando..." else "Guardar") } },
         dismissButton = { TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }
     )
 }

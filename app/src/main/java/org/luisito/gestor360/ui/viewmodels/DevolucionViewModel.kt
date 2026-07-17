@@ -47,7 +47,7 @@ class DevolucionViewModel(
         }
     }
 
-    fun aprobar(id: Long, destino: String) {
+    fun aprobar(id: String, destino: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             repository.resolver(androidIdActual, id, "aprobada", destino)
@@ -57,7 +57,7 @@ class DevolucionViewModel(
         }
     }
 
-    fun rechazar(id: Long) {
+    fun rechazar(id: String) {
         viewModelScope.launch {
             repository.resolver(androidIdActual, id, "rechazada").onSuccess { refrescar() }
         }

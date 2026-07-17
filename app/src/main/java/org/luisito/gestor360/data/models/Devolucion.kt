@@ -6,10 +6,13 @@ import kotlinx.serialization.Serializable
  * Un cliente regresa a devolver un producto: el vendedor solicita (queda
  * "pendiente"), el admin la resuelve — si aprueba, elige a dónde va el
  * producto: "stock" (vuelve a venderse) o "merma" (no sirve, se descarta).
+ *
+ * id: UUID generado en el dispositivo (igual que Producto/Tarjeta/Merma), ya
+ * no bigserial del servidor. Ver DevolucionRepository.solicitar.
  */
 @Serializable
 data class Devolucion(
-    val id: Long,
+    val id: String,
     val producto_id: String? = null,
     val producto_nombre: String,
     val cantidad: Double,

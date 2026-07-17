@@ -6,6 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.luisito.gestor360.data.SupabaseClientProvider
@@ -15,13 +16,18 @@ import org.luisito.gestor360.data.local.entities.toEntity
 import org.luisito.gestor360.data.local.entities.toModel
 import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.data.sync.SyncWorker
-import org.luisito.gestor360.data.sync.SyncReporter
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
+import java.util.UUID
 
+/**
+ * id: UUID generado en el dispositivo (igual que Producto/Tarjeta/Merma/
+ * Devolucion), ya no bigserial+idTemporal negativo. Ver solicitarProducto/
+ * solicitarAumento.
+ */
 @Serializable
 data class AprobacionStock(
-    val id: Long? = null,
+    val id: String? = null,
     val producto_id: String? = null,
     val producto_nombre: String = "",
     val precio: Double? = null,
@@ -39,13 +45,15 @@ data class AprobacionStock(
 )
 
 /**
- * Offline-first (antes pedía siempre en vivo y devolvía vacío sin internet):
+ * "Solicitud de Ingreso" (producto nuevo / aumento de stock) + anular venta.
+ *
+ * Offline-first, calcado a Producto/Tarjeta/Merma/Devolucion:
  * getPendientes lee primero el caché de aprobaciones_cache (ver
  * AprobacionStockCacheEntity) y refresca en background si hay internet.
- * solicitarAumento (agregar a stock un producto existente) sigue el mismo
- * patrón que Merma/Devolucion.solicitar: guarda optimista en caché con id
- * temporal negativo y encola en acciones_pendientes para sincronizar cuando
- * vuelva la conexión.
+ * solicitarProducto/solicitarAumento: el vendedor propone offline — UUID
+ * generado en el dispositivo como id definitivo (p_id) + p_accion_id para
+ * idempotencia contra acciones_procesadas, encolado en acciones_pendientes
+ * igual que crear_producto/crear_tarjeta/crear_merma/solicitar_devolucion.
  * Resolver (aprobar/rechazar) sigue requiriendo conexión sí o sí: mueve stock
  * real del lado del servidor, mismo criterio que Merma/Devolucion.resolver.
  */
@@ -99,29 +107,30 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
         }
     }
 
-    /** El vendedor propone offline: queda visible como pendiente de inmediato, igual que solicitarAumento/Merma/Devolucion. */
+    /** El vendedor propone offline: queda visible como pendiente de inmediato. UUID generado en el dispositivo (p_id). */
     suspend fun solicitarProducto(androidId: String, nombre: String, precio: Double, cantidad: Double): Result<Unit> {
         // Verificar si ya hay una solicitud pendiente para este nombre
         val yaPendiente = db.accionPendienteDao().obtenerPendientes()
             .filter { it.tipo == "solicitar_producto" }
             .any { it.payloadJson.contains("\"p_nombre\":\"$nombre\"") }
         if (yaPendiente) return Result.success(Unit)
+
         val localId = localIdActivo()
-        val idTemporal = -(System.currentTimeMillis() * 1000 + (Math.random() * 1000).toLong())
+        val id = UUID.randomUUID().toString()
+        val accionId = UUID.randomUUID().toString()
         val actuales = db.aprobacionStockCacheDao().obtener(localId)?.toModel() ?: emptyList()
         val nueva = AprobacionStock(
-            id = idTemporal, producto_id = null, producto_nombre = nombre, precio = precio,
+            id = id, producto_id = null, producto_nombre = nombre, precio = precio,
             cantidad = cantidad, tipo = "producto", estado = "pendiente", local_id = localId
         )
         db.aprobacionStockCacheDao().guardar((listOf(nueva) + actuales).toEntity(localId))
 
         val payload = buildJsonObject {
-            put("p_android_id", androidId); put("p_local_id", localId)
+            put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id)
             put("p_nombre", nombre); put("p_precio", precio); put("p_cantidad", cantidad)
+            put("p_accion_id", accionId)
         }
-        db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "solicitar_producto", payloadJson = payload.toString(), idLocalTemporal = idTemporal))
-        SyncReporter.reportar(androidId, localIdActivo(), "solicitar_producto", payload)
-        if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
+        encolarYSincronizar("solicitar_producto", payload)
         return Result.success(Unit)
     }
 
@@ -132,22 +141,23 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
             .filter { it.tipo == "solicitar_aumento_stock" }
             .any { it.payloadJson.contains("\"p_producto_id\":\"$productoId\"") }
         if (yaPendiente) return Result.success(Unit)
+
         val localId = localIdActivo()
-        val idTemporal = -(System.currentTimeMillis() * 1000 + (Math.random() * 1000).toLong())
+        val id = UUID.randomUUID().toString()
+        val accionId = UUID.randomUUID().toString()
         val actuales = db.aprobacionStockCacheDao().obtener(localId)?.toModel() ?: emptyList()
         val nueva = AprobacionStock(
-            id = idTemporal, producto_id = productoId, producto_nombre = productoNombre,
+            id = id, producto_id = productoId, producto_nombre = productoNombre,
             cantidad = cantidad, tipo = "aumento", estado = "pendiente", local_id = localId
         )
         db.aprobacionStockCacheDao().guardar((listOf(nueva) + actuales).toEntity(localId))
 
         val payload = buildJsonObject {
-            put("p_android_id", androidId); put("p_local_id", localId)
+            put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id)
             put("p_producto_id", productoId); put("p_cantidad", cantidad)
+            put("p_accion_id", accionId)
         }
-        db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "solicitar_aumento_stock", payloadJson = payload.toString(), idLocalTemporal = idTemporal))
-        SyncReporter.reportar(androidId, localIdActivo(), "solicitar_aumento_stock", payload)
-        if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
+        encolarYSincronizar("solicitar_aumento_stock", payload)
         return Result.success(Unit)
     }
 
@@ -161,7 +171,7 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
         } catch (e: Exception) { Result.failure(e) }
     }
 
-    suspend fun resolver(androidId: String, id: Long, estado: String, aprobadoPor: Long): Result<Unit> {
+    suspend fun resolver(androidId: String, id: String, estado: String, aprobadoPor: Long): Result<Unit> {
         if (!NetworkMonitor.hayInternet(context)) {
             return Result.failure(IllegalStateException("Necesitas conexión para resolver una aprobación"))
         }
@@ -173,5 +183,14 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
             refrescarDesdeServidor(androidId)
             Result.success(Unit)
         } catch (e: Exception) { Result.failure(e) }
+    }
+
+    private suspend fun encolarYSincronizar(tipo: String, payload: JsonObject) {
+        db.accionPendienteDao().encolar(
+            AccionPendienteEntity(tipo = tipo, payloadJson = payload.toString())
+        )
+        if (NetworkMonitor.hayInternet(context)) {
+            SyncWorker.sincronizarAhora(context)
+        }
     }
 }

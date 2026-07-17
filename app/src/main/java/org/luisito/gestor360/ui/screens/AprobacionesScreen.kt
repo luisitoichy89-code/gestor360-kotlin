@@ -14,7 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import org.luisito.gestor360.data.models.MermaPendiente
+import org.luisito.gestor360.data.local.entities.MermaEntity
 import org.luisito.gestor360.data.repository.AprobacionStock
 import org.luisito.gestor360.ui.components.*
 import org.luisito.gestor360.ui.viewmodels.AprobacionStockViewModel
@@ -113,13 +113,13 @@ private fun ConfirmacionSmsCard(activo: Boolean, habilitado: Boolean, onCambiar:
 }
 
 @Composable
-private fun MermaCard(merma: MermaPendiente, isSaving: Boolean, onAprobar: () -> Unit, onRechazar: () -> Unit) {
+private fun MermaCard(merma: MermaEntity, isSaving: Boolean, onAprobar: () -> Unit, onRechazar: () -> Unit) {
     NeuCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.RemoveCircleOutline, null, tint = MaterialTheme.colorScheme.error)
                 Spacer(Modifier.width(10.dp))
-                Text(merma.producto_nombre, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(merma.productoNombre, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.weight(1f))
                 Text("Merma", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -127,8 +127,7 @@ private fun MermaCard(merma: MermaPendiente, isSaving: Boolean, onAprobar: () ->
             Text("Cantidad: ${merma.cantidad}", fontWeight = FontWeight.Medium)
             if (!merma.motivo.isNullOrBlank()) { Spacer(Modifier.height(4.dp)); Text("Motivo: ${merma.motivo}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             Spacer(Modifier.height(6.dp))
-            Text("Solicitado por: ${merma.solicitado_por_nombre ?: "Usuario #${merma.solicitado_por}"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (!merma.created_at.isNullOrBlank()) Text(merma.created_at.take(16).replace("T", " "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Solicitado por: ${merma.solicitadoPorNombre ?: "Usuario #${merma.solicitadoPor}"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 NeuButton(onClick = onAprobar, enabled = !isSaving, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) { Icon(Icons.Default.Check, null); Spacer(Modifier.width(6.dp)); Text("Aprobar") }
