@@ -104,7 +104,7 @@ class PrecargaLocalesWorker(
                 inventarioRepo.precargarLocal(androidId, local.id),
                 turnoRepo.precargarLocal(androidId, local.id),
                 tarjetaRepo.precargarLocal(local.id),
-                mermaRepo.precargarLocal(androidId, local.id),
+                mermaRepo.precargarLocal(local.id),
                 devolucionRepo.precargarLocal(androidId, local.id),
                 aprobacionRepo.precargarLocal(androidId, local.id)
             )

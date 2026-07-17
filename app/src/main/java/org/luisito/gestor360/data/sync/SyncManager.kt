@@ -97,14 +97,13 @@ class SyncManager(private val context: Context) {
         if (localIdActivo != null) {
             refrescarProductosYDetectarConflictos(androidId)
             tarjetaRepository.refrescarDesdeServidor(localIdActivo)
-            mermaRepository.refrescarDesdeServidor(androidId)
+            mermaRepository.refrescarDesdeServidor(session.getLocalId() ?: 0)
             turnoRepository.refrescarDesdeServidor(androidId)
             aprobacionStockRepository.refrescarDesdeServidor(androidId)
         }
 
         db.accionPendienteDao().limpiarSincronizadas()
         db.ventaDao().limpiarSincronizadas()
-        db.mermaDao().limpiarResueltas()
         db.turnoDao().limpiarCerrados()
         return SyncResultado(exitosas, fallidas, null)
     }

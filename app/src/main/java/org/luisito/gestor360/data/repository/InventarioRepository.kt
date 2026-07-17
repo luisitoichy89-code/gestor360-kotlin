@@ -80,7 +80,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 d.created_at?.startsWith(fechaStr) == true || d.resuelto_at?.startsWith(fechaStr) == true
             }.map { d ->
                 DevueltoInfo(
-                    id = d.id ?: 0L, producto_nombre = d.producto_nombre, cantidad = d.cantidad,
+                    id = d.id ?: "", producto_nombre = d.producto_nombre, cantidad = d.cantidad,
                     metodo = d.metodo, estado = d.estado,
                     solicitado_por_nombre = d.solicitado_por_nombre,
                     resuelto_por_nombre = d.resuelto_por_nombre, resuelto_por_rol = null,

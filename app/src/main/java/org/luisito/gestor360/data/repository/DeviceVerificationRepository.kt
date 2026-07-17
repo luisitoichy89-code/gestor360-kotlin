@@ -7,7 +7,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.local.AppDatabase
-import org.luisito.gestor360.data.local.UserEntity
+import org.luisito.gestor360.data.local.entities.UserEntity
 import org.luisito.gestor360.data.models.User
 import org.luisito.gestor360.security.PinSecurity
 import org.luisito.gestor360.utils.AppContextHolder
