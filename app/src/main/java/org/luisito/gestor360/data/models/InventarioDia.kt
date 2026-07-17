@@ -71,7 +71,6 @@ data class MermaInfo(
 data class DevueltoInfo(
     val id: String,
     val id: Long,
-    val cantidad: Double,
     val metodo: String,
     val estado: String,
     val solicitado_por_nombre: String? = null,
