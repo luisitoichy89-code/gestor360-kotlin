@@ -62,7 +62,7 @@ class SyncManager(private val context: Context) {
                     "crear_merma", "resolver_merma",
                     "crear_devolucion", "resolver_devolucion",
                     "solicitar_producto", "solicitar_aumento_stock",
-                    "registrar_venta", "anular_venta" -> { /* procesado por el RPC, sin acción local extra */ }
+                    "registrar_venta", "anular_venta" -> { }
                     "eliminar_tarjeta" -> {
                         val tid = payload["p_id"]?.toString()?.trim('"')
                         val lid = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull()
@@ -100,8 +100,8 @@ class SyncManager(private val context: Context) {
             refrescarProductosYDetectarConflictos(androidId)
             tarjetaRepository.refrescarDesdeServidor(localIdActivo)
             mermaRepository.refrescarDesdeServidor(localIdActivo)
-            turnoRepository.refrescarDesdeServidor(localIdActivo ?: 0)
-            aprobacionStockRepository.refrescarDesdeServidor(localIdActivo ?: 0)
+            turnoRepository.refrescarDesdeServidor(localIdActivo)
+            aprobacionStockRepository.refrescarDesdeServidor(localIdActivo)
         }
 
         db.accionPendienteDao().limpiarSincronizadas()
