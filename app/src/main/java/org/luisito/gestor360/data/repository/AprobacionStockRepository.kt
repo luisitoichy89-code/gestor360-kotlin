@@ -76,7 +76,11 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
         if (!NetworkMonitor.hayInternet(context)) {
             return Result.success(emptyList())
         }
-        return refrescarDesdeServidor(androidId)
+        return try {
+            refrescarDesdeServidor(androidId)
+        } catch (e: Exception) {
+            Result.success(emptyList())
+        }
     }
 
     /** Trae la verdad del servidor (ya filtrada por local_id) y reemplaza el caché de ese local. */

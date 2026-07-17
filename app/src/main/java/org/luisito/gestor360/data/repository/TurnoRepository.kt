@@ -33,7 +33,11 @@ class TurnoRepository(
             return Result.success(activoLocal.toModel())
         }
         if (!NetworkMonitor.hayInternet(context)) return Result.success(null)
-        return refrescarDesdeServidor(androidId).map { it }
+        return try {
+            refrescarDesdeServidor(androidId).map { it }
+        } catch (e: Exception) {
+            Result.success(null)
+        }
     }
 
     /** Trae el turno activo real del servidor (ya filtrado por local_id) y actualiza el caché. */

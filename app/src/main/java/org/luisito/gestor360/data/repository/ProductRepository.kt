@@ -42,7 +42,11 @@ class ProductRepository(
         if (!NetworkMonitor.hayInternet(context)) {
             return Result.success(emptyList())
         }
-        return refrescarDesdeServidor(androidId)
+        return try {
+            refrescarDesdeServidor(androidId)
+        } catch (e: Exception) {
+            Result.success(emptyList())
+        }
     }
 
     suspend fun refrescarDesdeServidor(androidId: String): Result<List<Product>> {

@@ -45,7 +45,11 @@ class MermaRepository(
         if (!NetworkMonitor.hayInternet(context)) {
             return Result.success(emptyList())
         }
-        return refrescarDesdeServidor(localId).map { lista -> lista.filter { it.estado == "pendiente" } }
+        return try {
+            refrescarDesdeServidor(localId).map { lista -> lista.filter { it.estado == "pendiente" } }
+        } catch (e: Exception) {
+            Result.success(emptyList())
+        }
     }
 
     suspend fun getTodas(androidId: String): Result<List<MermaEntity>> {
@@ -60,7 +64,11 @@ class MermaRepository(
         if (!NetworkMonitor.hayInternet(context)) {
             return Result.success(emptyList())
         }
-        return refrescarDesdeServidor(localId)
+        return try {
+            refrescarDesdeServidor(localId)
+        } catch (e: Exception) {
+            Result.success(emptyList())
+        }
     }
 
     suspend fun refrescarDesdeServidor(localId: Long): Result<List<MermaEntity>> {

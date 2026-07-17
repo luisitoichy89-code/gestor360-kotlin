@@ -47,7 +47,11 @@ class TarjetaRepository(
         if (!NetworkMonitor.hayInternet(context)) {
             return Result.success(emptyList())
         }
-        return refrescarDesdeServidor(localId)
+        return try {
+            refrescarDesdeServidor(localId)
+        } catch (e: Exception) {
+            Result.success(emptyList())
+        }
     }
 
     suspend fun refrescarDesdeServidor(localId: Long): Result<List<TarjetaEntity>> {
