@@ -1,4 +1,5 @@
 package org.luisito.gestor360.data.local.dao
+import org.luisito.gestor360.data.local.entities.UserEntity
 
 import androidx.room.Dao
 import androidx.room.Insert
