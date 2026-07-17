@@ -1,4 +1,4 @@
-package com.gestor360.core.database.migrations
+package org.luisito.gestor360.data.local
 
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase

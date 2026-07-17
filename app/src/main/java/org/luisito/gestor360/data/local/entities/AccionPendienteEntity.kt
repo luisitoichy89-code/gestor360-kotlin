@@ -1,4 +1,4 @@
-package com.gestor360.core.sync
+package org.luisito.gestor360.data.local.entities
 
 import androidx.room.Entity
 import androidx.room.Index

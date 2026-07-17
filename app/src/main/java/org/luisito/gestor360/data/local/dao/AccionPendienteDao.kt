@@ -1,4 +1,4 @@
-package com.gestor360.core.sync
+package org.luisito.gestor360.data.local.dao
 
 import androidx.room.Dao
 import androidx.room.Delete
