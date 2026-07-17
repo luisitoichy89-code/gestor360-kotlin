@@ -23,4 +23,14 @@ interface AccionPendienteDao {
 
     @Query("DELETE FROM acciones_pendientes WHERE idLocalTemporal = :idTemporal AND estado = 'pendiente'")
     suspend fun cancelarPorIdTemporal(idTemporal: Long)
+
+    /**
+     * NUEVO (módulo Productos): borra una acción pendiente puntual. Se usa,
+     * por ejemplo, cuando se elimina un producto que se creó offline y nunca
+     * llegó a sincronizar — en ese caso no hay nada que avisarle al servidor,
+     * simplemente se cancela la creación completa antes de que se dispare.
+     * Genérico y aditivo: no cambia el comportamiento de ningún otro módulo.
+     */
+    @Delete
+    suspend fun eliminar(accion: AccionPendienteEntity)
 }

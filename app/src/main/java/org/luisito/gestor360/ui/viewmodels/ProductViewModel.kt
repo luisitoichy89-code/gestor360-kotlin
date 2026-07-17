@@ -50,7 +50,7 @@ class ProductViewModel(
         }
     }
 
-    fun editar(id: Long, nombre: String, precio: Double, stock: Double, ubicacion: String, categoria: String) {
+    fun editar(id: String, nombre: String, precio: Double, stock: Double, ubicacion: String, categoria: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             repository.updateProduct(androidIdActual, id, nombre, precio, stock, ubicacion, categoria)
@@ -68,7 +68,7 @@ class ProductViewModel(
         }
     }
 
-    fun eliminar(id: Long) {
+    fun eliminar(id: String) {
         viewModelScope.launch {
             repository.deleteProduct(androidIdActual, id)
                 .onSuccess { refrescar() }

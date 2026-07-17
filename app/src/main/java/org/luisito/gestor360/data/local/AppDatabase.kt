@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import org.luisito.gestor360.data.local.dao.AccionPendienteDao
 import org.luisito.gestor360.data.local.dao.AprobacionStockCacheDao
 import org.luisito.gestor360.data.local.dao.ConflictoDao
@@ -28,6 +30,62 @@ import org.luisito.gestor360.data.local.entities.ProductoEliminadoCacheEntity
 import org.luisito.gestor360.data.local.entities.TarjetaEntity
 import org.luisito.gestor360.data.local.entities.TurnoEntity
 import org.luisito.gestor360.data.local.entities.VentaEntity
+
+/**
+ * v9: productos_cache pasa a tener "id" de tipo TEXT (UUID generado en el
+ * cliente) en vez de INTEGER, y se agrega la columna "pendienteSync". Esta es
+ * la primera tabla de negocio que sale de fallbackToDestructiveMigration():
+ * ahora tiene una migración real (MIGRACION_8_9) que reconstruye la tabla
+ * preservando cada fila (los productos ya sincronizados conservan su id
+ * numérico original, solo que ahora como texto — es el mismo id que ya tienen
+ * en Supabase, así que no hay ninguna inconsistencia).
+ *
+ * Las demás tablas de negocio (Tarjetas, Ventas, Merma, Solicitudes) siguen
+ * en fallbackToDestructiveMigration() hasta que se trabaje su módulo
+ * correspondiente, tal como se acordó: se migran una por una, no todas de
+ * golpe.
+ */
+val MIGRACION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS productos_cache_new (
+                id TEXT NOT NULL,
+                nombre TEXT NOT NULL,
+                precio REAL NOT NULL,
+                stock REAL NOT NULL,
+                ubicacion TEXT,
+                categoria TEXT,
+                localId INTEGER NOT NULL,
+                createdAt TEXT,
+                updatedAt TEXT,
+                pendienteSync INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY(id, localId)
+            )
+            """.trimIndent()
+        )
+        // CAST(id AS TEXT): los productos ya sincronizados conservan su id
+        // numérico real (ahora como texto). pendienteSync = 0 porque todo lo
+        // que ya estaba en el caché antes de esta migración vino del servidor.
+        db.execSQL(
+            """
+            INSERT INTO productos_cache_new (id, nombre, precio, stock, ubicacion, categoria, localId, createdAt, updatedAt, pendienteSync)
+            SELECT CAST(id AS TEXT), nombre, precio, stock, ubicacion, categoria, localId, createdAt, updatedAt, 0
+            FROM productos_cache
+            """.trimIndent()
+        )
+        db.execSQL("DROP TABLE productos_cache")
+        db.execSQL("ALTER TABLE productos_cache_new RENAME TO productos_cache")
+
+        // Caso borde: un producto creado offline con el sistema viejo (id
+        // temporal negativo) que todavía no había sincronizado en el momento
+        // de esta actualización. Su fila de caché sobrevive (ej. id "-123..."),
+        // pero su acción "crear_producto" pendiente no tiene "p_id" en el
+        // payload (el RPC viejo no lo pedía). SyncManager.repararAccionesLegacyCreacionProducto()
+        // la detecta y la repara la primera vez que se intenta sincronizar
+        // después de la actualización — ver comentario en SyncManager.
+    }
+}
 
 @Database(
     entities = [
@@ -58,7 +116,11 @@ import org.luisito.gestor360.data.local.entities.VentaEntity
     // fallbackToDestructiveMigration: se recrea la tabla de caché, cero
     // pérdida real (las ventas ya sincronizadas se vuelven a traer del
     // servidor; las pendientes de sincronizar viven en AccionPendienteEntity).
-    version = 8,
+    //
+    // v9: productos_cache (id -> UUID string) con migración real, ver
+    // MIGRACION_8_9 arriba. Primer módulo migrado del plan offline-first;
+    // el resto sigue con fallbackToDestructiveMigration() hasta su turno.
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -85,7 +147,10 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "gestor360.db"
-                ).fallbackToDestructiveMigration().build().also { INSTANCE = it }
+                )
+                    .addMigrations(MIGRACION_8_9)
+                    .fallbackToDestructiveMigration()
+                    .build().also { INSTANCE = it }
             }
     }
 }
