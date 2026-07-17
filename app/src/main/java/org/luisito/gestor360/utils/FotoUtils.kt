@@ -8,6 +8,7 @@ import android.graphics.Rect
 import android.media.ExifInterface
 import android.net.Uri
 import android.util.Log
+import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
 
 object FotoUtils {
@@ -40,26 +41,36 @@ object FotoUtils {
     }
 
     private fun decodificarBitmapMuestreado(context: Context, uri: Uri): Bitmap? {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-            ?: run {
+        return try {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                val buffered = BufferedInputStream(stream)
+                BitmapFactory.decodeStream(buffered, null, bounds)
+            } ?: run {
                 Log.e(TAG, "openInputStream devolvió null (sin permiso o uri inválida) para $uri")
                 return null
             }
 
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
-            Log.e(TAG, "BitmapFactory no pudo leer las dimensiones (formato no soportado?) de $uri")
-            return null
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+                Log.e(TAG, "BitmapFactory no pudo leer las dimensiones (formato no soportado?) de $uri")
+                return null
+            }
+
+            var sampleSize = 1
+            val menorLado = minOf(bounds.outWidth, bounds.outHeight)
+            while (menorLado / (sampleSize * 2) >= LADO) sampleSize *= 2
+
+            val opciones = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+            val bitmap = context.contentResolver.openInputStream(uri)?.use { stream ->
+                val buffered = BufferedInputStream(stream)
+                BitmapFactory.decodeStream(buffered, null, opciones)
+            }
+            if (bitmap == null) Log.e(TAG, "El decode final devolvió null para $uri (sampleSize=$sampleSize)")
+            bitmap
+        } catch (e: Exception) {
+            Log.e(TAG, "Error en decodificarBitmapMuestreado para $uri", e)
+            null
         }
-
-        var sampleSize = 1
-        val menorLado = minOf(bounds.outWidth, bounds.outHeight)
-        while (menorLado / (sampleSize * 2) >= LADO) sampleSize *= 2
-
-        val opciones = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-        val bitmap = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opciones) }
-        if (bitmap == null) Log.e(TAG, "El decode final devolvió null para $uri (sampleSize=$sampleSize)")
-        return bitmap
     }
 
     private fun recortarAlCentro(bitmap: Bitmap): Bitmap {
@@ -73,9 +84,16 @@ object FotoUtils {
 
     fun decodificarParaEdicion(context: Context, uri: Uri): Bitmap? {
         return try {
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+            // Tomar contenido de la URI (puede ser content:// o file://)
+            val inputStream = context.contentResolver.openInputStream(uri)
                 ?: run { Log.e(TAG, "openInputStream nulo (edición) para $uri"); return null }
+
+            val bytes = inputStream.use { it.readBytes() }
+
+            // Decodificar bounds
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
                 Log.e(TAG, "Bounds inválidos (edición) para $uri")
                 return null
@@ -86,23 +104,26 @@ object FotoUtils {
             while (mayorLado / (sampleSize * 2) >= EDICION_LADO_MAX) sampleSize *= 2
 
             val opciones = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-            val bitmap = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opciones) }
+            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opciones)
             if (bitmap == null) {
                 Log.e(TAG, "Decode de edición devolvió null para $uri")
                 return null
             }
-            corregirOrientacionExif(context, uri, bitmap)
+            corregirOrientacionExif(bytes, bitmap)
         } catch (e: Exception) {
             Log.e(TAG, "Error decodificando para edición uri=$uri", e)
             null
         }
     }
 
-    private fun corregirOrientacionExif(context: Context, uri: Uri, bitmap: Bitmap): Bitmap {
+    private fun corregirOrientacionExif(jpegBytes: ByteArray, bitmap: Bitmap): Bitmap {
         return try {
-            val orientacion = context.contentResolver.openInputStream(uri)?.use { stream ->
-                ExifInterface(stream).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
-            } ?: ExifInterface.ORIENTATION_NORMAL
+            val orientacion = try {
+                val exif = ExifInterface(jpegBytes.inputStream())
+                exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+            } catch (e: Exception) {
+                ExifInterface.ORIENTATION_NORMAL
+            }
 
             val grados = when (orientacion) {
                 ExifInterface.ORIENTATION_ROTATE_90 -> 90f
