@@ -100,8 +100,8 @@ class SyncManager(private val context: Context) {
             refrescarProductosYDetectarConflictos(androidId)
             tarjetaRepository.refrescarDesdeServidor(localIdActivo)
             mermaRepository.refrescarDesdeServidor(localIdActivo)
-            turnoRepository.refrescarDesdeServidor(localIdActivo)
-            aprobacionStockRepository.refrescarDesdeServidor(androidId)
+            turnoRepository.refrescarDesdeServidor(localIdActivo ?: 0)
+            aprobacionStockRepository.refrescarDesdeServidor(localIdActivo ?: 0)
         }
 
         db.accionPendienteDao().limpiarSincronizadas()
