@@ -40,20 +40,20 @@ class TarjetaViewModel(
         if (androidIdActual.isNotBlank()) cargar(androidIdActual)
     }
 
-    fun crear(banco: String, numero: String, titular: String) {
+    fun crear(nombre: String, tipo: String, numeroCuenta: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
-            repository.crearTarjeta(androidIdActual, banco, numero, titular)
+            repository.crearTarjeta(androidIdActual, nombre, tipo, numeroCuenta)
                 .onSuccess { refrescar() }
                 .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo guardar la tarjeta")) }
             _uiState.value = _uiState.value.copy(isSaving = false)
         }
     }
 
-    fun editar(id: Long, banco: String, numero: String, titular: String) {
+    fun editar(id: String, nombre: String, tipo: String, numeroCuenta: String, activo: Boolean) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
-            repository.editarTarjeta(androidIdActual, id, banco, numero, titular)
+            repository.actualizarTarjeta(androidIdActual, id, nombre, tipo, numeroCuenta, activo)
                 .onSuccess { refrescar() }
                 .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo actualizar la tarjeta")) }
             _uiState.value = _uiState.value.copy(isSaving = false)
@@ -61,14 +61,18 @@ class TarjetaViewModel(
     }
 
     fun toggleActivo(tarjeta: Tarjeta) {
+        editar(tarjeta.id, tarjeta.nombre, tarjeta.tipo ?: "", tarjeta.numeroCuenta, !tarjeta.activo)
+    }
+
+    fun eliminar(id: String) {
         viewModelScope.launch {
-            repository.setActivo(androidIdActual, tarjeta.id, !tarjeta.activo).onSuccess { refrescar() }
+            _uiState.value = _uiState.value.copy(isSaving = true, error = null)
+            repository.eliminarTarjeta(androidIdActual, id)
+                .onSuccess { refrescar() }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo eliminar la tarjeta")) }
+            _uiState.value = _uiState.value.copy(isSaving = false)
         }
     }
 
-    fun eliminar(id: Long) {
-        viewModelScope.launch {
-            repository.eliminarTarjeta(androidIdActual, id).onSuccess { refrescar() }
-        }
-    }
+    fun clearError() { _uiState.value = _uiState.value.copy(error = null) }
 }

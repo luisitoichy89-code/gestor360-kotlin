@@ -58,7 +58,7 @@ fun TarjetasScreen(androidId: String, onBack: (() -> Unit)? = null, viewModel: T
     }
 
     if (mostrarFormulario) TarjetaFormDialog(tarjetaEnEdicion, uiState.tarjetas, uiState.isSaving, { mostrarFormulario = false }) { banco, numero, titular ->
-        if (tarjetaEnEdicion == null) viewModel.crear(banco, numero, titular) else viewModel.editar(tarjetaEnEdicion!!.id, banco, numero, titular)
+        if (tarjetaEnEdicion == null) viewModel.crear(banco, "", numero) else viewModel.editar(tarjetaEnEdicion!!.id, banco, "", numero, tarjetaEnEdicion!!.activo)
         mostrarFormulario = false
     }
 
