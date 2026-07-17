@@ -59,6 +59,7 @@ class SyncManager(private val context: Context) {
                         val lid = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull()
                         if (pid != null && lid != null) eliminadosProductos.add(pid to lid)
                     }
+            "crear_tarjeta", "actualizar_tarjeta", "activar_tarjeta" -> { }
                     "eliminar_tarjeta" -> {
                         val tid = payload["p_id"]?.toString()?.trim('"')
                         val lid = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull()
