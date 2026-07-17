@@ -161,6 +161,48 @@ val MIGRACION_10_11 = object : Migration(10, 11) {
  * próxima vez que ocurra, no es una pérdida de datos de negocio real. Por
  * eso se dejan en destructiva en vez de escribirles una migración real.
  */
+/**
+ * v12 -> v13: mermas_cache pasa de id bigint (asignado por el servidor, con
+ * un id temporal negativo mientras no sincronizaba) a id TEXT uuid
+ * (asignado en el dispositivo), igual que tarjetas y productos.
+ *
+ * A diferencia de MIGRACION_8_9/MIGRACION_10_11, acá NO hay un CAST real
+ * posible: un id numérico viejo (1, 2, 3...) no se puede convertir en un
+ * uuid que vaya a coincidir con nada en el servidor bajo el nuevo contrato
+ * de crear_merma/resolver_merma (que ahora exige p_id uuid + p_accion_id).
+ * Por eso esta migración es DESTRUCTIVA para mermas_cache únicamente.
+ *
+ * IMPORTANTE — decidir antes de aplicar en producción:
+ * 1) Mermas ya resueltas (aprobada/rechazada) se pierden del caché local.
+ *    Si hacen falta para reportes, exportarlas antes de actualizar.
+ * 2) Mermas pendientes creadas offline bajo el contrato viejo (encoladas en
+ *    acciones_pendientes con tipo "crear_merma" pero sin p_id/p_accion_id)
+ *    van a fallar contra el nuevo RPC. Conviene limpiar/reconciliar esa
+ *    cola antes de repartir esta actualización.
+ */
+val MIGRATION_12_13 = object : Migration(12, 13) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("DROP TABLE IF EXISTS mermas_cache")
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS mermas_cache (
+                id TEXT NOT NULL PRIMARY KEY,
+                localId INTEGER NOT NULL,
+                productoId TEXT NOT NULL,
+                productoNombre TEXT NOT NULL,
+                cantidad REAL NOT NULL,
+                motivo TEXT,
+                solicitadoPor INTEGER,
+                solicitadoPorNombre TEXT,
+                estado TEXT NOT NULL DEFAULT 'pendiente',
+                pendienteSync INTEGER NOT NULL DEFAULT 1
+            )
+            """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_mermas_cache_localId ON mermas_cache(localId)")
+    }
+}
+
 @Database(
     entities = [
         ProductoEntity::class, AccionPendienteEntity::class, TarjetaEntity::class, VentaEntity::class, ConflictoEntity::class,
@@ -178,7 +220,9 @@ val MIGRACION_10_11 = object : Migration(10, 11) {
     // migración real (MIGRACION_10_11): ambas pueden tener filas creadas
     // offline sin sincronizar todavía.
     // v12: agrega tabla tarjetas (MIGRATION_11_12, ver Migration_11_12.kt).
-    version = 12,
+    // v13: mermas_cache, id (bigint -> uuid) con migración DESTRUCTIVA
+    // (MIGRATION_12_13, ver comentario arriba de la clase).
+    version = 13,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -206,7 +250,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "gestor360.db"
                 )
-                    .addMigrations(MIGRACION_8_9, MIGRACION_10_11, MIGRATION_11_12)
+                    .addMigrations(MIGRACION_8_9, MIGRACION_10_11, MIGRATION_11_12, MIGRATION_12_13)
                     .fallbackToDestructiveMigration()
                     .build().also { INSTANCE = it }
             }

@@ -2,19 +2,21 @@ package org.luisito.gestor360.data.repository
 
 import android.content.Context
 import io.github.jan.supabase.postgrest.postgrest
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.local.AppDatabase
 import org.luisito.gestor360.data.local.entities.AccionPendienteEntity
-import org.luisito.gestor360.data.local.entities.toEntity
-import org.luisito.gestor360.data.local.entities.toModel
-import org.luisito.gestor360.data.models.MermaPendiente
+import org.luisito.gestor360.data.local.entities.MermaEntity
 import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.data.sync.SyncWorker
-import org.luisito.gestor360.data.sync.SyncReporter
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
+import java.util.UUID
 
 class MermaRepository(
     private val context: Context = AppContextHolder.context
@@ -25,88 +27,138 @@ class MermaRepository(
     private fun localIdActivo(): Long =
         session.getLocalId() ?: throw IllegalStateException("No hay un local activo seleccionado")
 
-    suspend fun getPendientes(androidId: String): Result<List<MermaPendiente>> {
+    // ---------- Lecturas ----------
+    // Igual que Tarjetas: solo hay 2 RPCs (crear_merma, resolver_merma), así
+    // que la lectura es directo por postgrest sobre la tabla "mermas", sin
+    // pasar por validar_admin_merma (esa función solo la llaman los RPC de
+    // escritura; ver comentario en mermas_setup.sql).
+
+    suspend fun getPendientes(androidId: String): Result<List<MermaEntity>> {
         val localId = localIdActivo()
         val cacheadas = db.mermaDao().obtenerPendientes(localId)
         if (cacheadas.isNotEmpty()) {
-            if (NetworkMonitor.hayInternet(context)) refrescarDesdeServidor(androidId)
-            return Result.success(cacheadas.map { it.toModel() })
+            if (NetworkMonitor.hayInternet(context)) {
+                CoroutineScope(Dispatchers.IO).launch { refrescarDesdeServidor(localId) }
+            }
+            return Result.success(cacheadas)
         }
         if (!NetworkMonitor.hayInternet(context)) {
             return Result.success(emptyList())
         }
-        return refrescarDesdeServidor(androidId)
+        return refrescarDesdeServidor(localId).map { lista -> lista.filter { it.estado == "pendiente" } }
     }
 
-    suspend fun refrescarDesdeServidor(androidId: String): Result<List<MermaPendiente>> {
+    suspend fun getTodas(androidId: String): Result<List<MermaEntity>> {
         val localId = localIdActivo()
+        val cacheadas = db.mermaDao().obtenerTodas(localId)
+        if (cacheadas.isNotEmpty()) {
+            if (NetworkMonitor.hayInternet(context)) {
+                CoroutineScope(Dispatchers.IO).launch { refrescarDesdeServidor(localId) }
+            }
+            return Result.success(cacheadas)
+        }
+        if (!NetworkMonitor.hayInternet(context)) {
+            return Result.success(emptyList())
+        }
+        return refrescarDesdeServidor(localId)
+    }
+
+    suspend fun refrescarDesdeServidor(localId: Long): Result<List<MermaEntity>> {
         return try {
-            val mermas = SupabaseClientProvider.client.postgrest
-                .rpc("get_mermas_pendientes", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
-                .decodeList<MermaPendiente>()
-            db.mermaDao().limpiarPendientesDeLocal(localId)
-            db.mermaDao().insertarTodas(mermas.map { it.toEntity(localId) })
+            val mermas = fetchRemoto(localId)
+            // Antes de reinsertar lo confirmado por el servidor, se limpia solo
+            // lo que ya estaba confirmado (pendienteSync = 0): así una merma
+            // creada offline que todavía no sincronizó no desaparece de la
+            // lista mientras se espera la confirmación.
+            db.mermaDao().limpiarSincronizadasDeLocal(localId)
+            db.mermaDao().insertarTodas(mermas.map { it.copy(pendienteSync = false) })
             Result.success(mermas)
         } catch (e: Exception) {
-            val cacheadas = db.mermaDao().obtenerPendientes(localId)
-            if (cacheadas.isNotEmpty()) Result.success(cacheadas.map { it.toModel() }) else Result.failure(e)
+            Result.failure(e)
         }
     }
 
-    suspend fun solicitar(androidId: String, productoId: String, productoNombre: String, cantidad: Double, motivo: String): Result<Unit> {
-        // Verificar si ya hay una acción crear_merma pendiente para este producto
-        val yaPendiente = db.accionPendienteDao().obtenerPendientes()
-            .filter { it.tipo == "crear_merma" }
-            .any { it.payloadJson.contains("\"p_producto_id\":\"$productoId\"") }
-        if (yaPendiente) return Result.success(Unit)
-        val localId = localIdActivo()
-        val idTemporal = -(System.currentTimeMillis() * 1000 + (Math.random() * 1000).toLong())
-        db.mermaDao().insertarUna(
-            org.luisito.gestor360.data.local.entities.MermaEntity(
-                id = idTemporal, productoId = productoId, productoNombre = productoNombre,
-                cantidad = cantidad, motivo = motivo, solicitadoPor = null, solicitadoPorNombre = null,
-                estado = "pendiente", localId = localId
-            )
-        )
-        val payload = buildJsonObject {
-            put("p_android_id", androidId); put("p_local_id", localId); put("p_producto_id", productoId)
-            put("p_cantidad", cantidad); put("p_motivo", motivo)
+    suspend fun precargarLocal(localId: Long): Result<Unit> {
+        return try {
+            val mermas = fetchRemoto(localId)
+            db.mermaDao().insertarTodas(mermas.map { it.copy(pendienteSync = false) })
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
-        db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "crear_merma", payloadJson = payload.toString(), idLocalTemporal = idTemporal))
-        SyncReporter.reportar(androidId, localIdActivo(), "crear_merma", payload)
-        if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
+    }
+
+    private suspend fun fetchRemoto(localId: Long): List<MermaEntity> =
+        SupabaseClientProvider.client.postgrest.from("mermas")
+            .select {
+                filter { eq("local_id", localId) }
+            }
+            .decodeList<MermaEntity>()
+
+    // ---------- Escrituras ----------
+
+    /**
+     * Cualquier usuario activo del local puede solicitar una merma (no hace
+     * falta ser admin para pedirla, solo para resolverla — ver
+     * validar_usuario_local vs validar_admin_merma en el SQL).
+     */
+    suspend fun crear(
+        androidId: String, productoId: String, productoNombre: String, cantidad: Double, motivo: String
+    ): Result<Unit> {
+        val localId = localIdActivo()
+        // UUID generado en el dispositivo: es el id definitivo, el mismo antes
+        // y después de sincronizar. Igual que Productos y Tarjetas.
+        val id = UUID.randomUUID().toString()
+        val accionId = UUID.randomUUID().toString()
+        val merma = MermaEntity(
+            id = id, localId = localId, productoId = productoId, productoNombre = productoNombre,
+            cantidad = cantidad, motivo = motivo, solicitadoPor = null, solicitadoPorNombre = null,
+            estado = "pendiente", pendienteSync = true
+        )
+        db.mermaDao().insertarUna(merma)
+
+        val payload = buildJsonObject {
+            put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id)
+            put("p_producto_id", productoId); put("p_cantidad", cantidad); put("p_motivo", motivo)
+            put("p_accion_id", accionId)
+        }
+        encolarYSincronizar("crear_merma", payload)
         return Result.success(Unit)
     }
 
-    suspend fun resolver(androidId: String, mermaId: Long, estado: String): Result<Unit> {
-        if (!NetworkMonitor.hayInternet(context)) {
-            return Result.failure(IllegalStateException("Necesitas conexión para aprobar o rechazar una merma"))
-        }
+    /**
+     * Solo admin (validado también server-side en el RPC). estado debe ser
+     * "aprobada" o "rechazada". Si se aprueba, el RPC descuenta el stock del
+     * producto en el servidor; acá se descuenta también en el caché local
+     * para que la UI no espere a la próxima sincronización.
+     */
+    suspend fun resolver(androidId: String, id: String, estado: String): Result<Unit> {
         val localId = localIdActivo()
-        return try {
-            val params = buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId); put("p_merma_id", mermaId); put("p_estado", estado) }
-            SupabaseClientProvider.client.postgrest.rpc("resolver_merma", params)
-            db.mermaDao().actualizarEstado(mermaId, estado, localId)
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
+        val accionId = UUID.randomUUID().toString()
+        val merma = db.mermaDao().obtenerPorId(id, localId)
+        merma?.let {
+            db.mermaDao().insertarUna(it.copy(estado = estado, pendienteSync = true))
+            if (estado == "aprobada") {
+                db.productoDao().descontarStock(it.productoId, it.cantidad, localId)
+            }
         }
+        val payload = buildJsonObject {
+            put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id)
+            put("p_estado", estado); put("p_accion_id", accionId)
+        }
+        encolarYSincronizar("resolver_merma", payload)
+        return Result.success(Unit)
     }
 
-    suspend fun aprobar(androidId: String, mermaId: Long): Result<Unit> = resolver(androidId, mermaId, "aprobada")
-    suspend fun rechazar(androidId: String, mermaId: Long): Result<Unit> = resolver(androidId, mermaId, "rechazada")
+    suspend fun aprobar(androidId: String, id: String): Result<Unit> = resolver(androidId, id, "aprobada")
+    suspend fun rechazar(androidId: String, id: String): Result<Unit> = resolver(androidId, id, "rechazada")
 
-    /** Precarga las mermas pendientes de UN local específico, sin depender del local activo en sesión. */
-    suspend fun precargarLocal(androidId: String, localId: Long): Result<Unit> {
-        return try {
-            val mermas = SupabaseClientProvider.client.postgrest
-                .rpc("get_mermas_pendientes", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
-                .decodeList<MermaPendiente>()
-            db.mermaDao().limpiarPendientesDeLocal(localId)
-            db.mermaDao().insertarTodas(mermas.map { it.toEntity(localId) })
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
+    private suspend fun encolarYSincronizar(tipo: String, payload: JsonObject) {
+        db.accionPendienteDao().encolar(
+            AccionPendienteEntity(tipo = tipo, payloadJson = payload.toString())
+        )
+        if (NetworkMonitor.hayInternet(context)) {
+            SyncWorker.sincronizarAhora(context)
         }
     }
 }
