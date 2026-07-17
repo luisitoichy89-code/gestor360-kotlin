@@ -1,120 +1,172 @@
-package org.luisito.gestor360.data.repository
+package com.gestor360.tarjetas.data
 
-import android.content.Context
-import io.github.jan.supabase.postgrest.postgrest
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import org.luisito.gestor360.data.SupabaseClientProvider
-import org.luisito.gestor360.data.local.AppDatabase
-import org.luisito.gestor360.data.local.entities.AccionPendienteEntity
-import org.luisito.gestor360.data.local.entities.TarjetaEntity
-import org.luisito.gestor360.data.local.entities.toEntity
-import org.luisito.gestor360.data.local.entities.toModel
-import org.luisito.gestor360.data.models.Tarjeta
-import org.luisito.gestor360.data.sync.NetworkMonitor
-import org.luisito.gestor360.data.sync.SyncWorker
-import org.luisito.gestor360.utils.AppContextHolder
-import org.luisito.gestor360.utils.SessionManager
+import com.gestor360.core.sync.AccionPendienteDao
+import com.gestor360.core.sync.AccionPendienteEntity
+import com.gestor360.tarjetas.data.local.TarjetaDao
+import com.gestor360.tarjetas.data.local.TarjetaEntity
+import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import java.util.UUID
+
+private const val MODULO = "tarjetas"
 
 class TarjetaRepository(
-    private val context: Context = AppContextHolder.context
+    private val dao: TarjetaDao,
+    private val accionPendienteDao: AccionPendienteDao,
+    private val syncScheduler: SyncScheduler
 ) {
-    private val db = AppDatabase.obtener(context)
-    private val session = SessionManager(context)
 
-    private fun localIdActivo(): Long =
-        session.getLocalId() ?: throw IllegalStateException("No hay un local activo seleccionado")
+    // ---------- Lecturas ----------
 
-    suspend fun getTarjetas(androidId: String): Result<List<Tarjeta>> {
-        val localId = localIdActivo()
-        val cacheadas = db.tarjetaDao().obtenerTodas(localId)
-        if (cacheadas.isNotEmpty()) {
-            if (NetworkMonitor.hayInternet(context)) refrescarDesdeServidor(androidId)
-            return Result.success(cacheadas.map { it.toModel() })
+    fun observarActivas(localId: String): Flow<List<TarjetaEntity>> =
+        dao.observarTarjetasActivas(localId)
+
+    fun observarTodas(localId: String): Flow<List<TarjetaEntity>> =
+        dao.observarTarjetasDeLocal(localId)
+
+    // ---------- Escrituras: solo admin (verificar rol en el ViewModel) ----------
+
+    suspend fun crear(
+        localId: String,
+        nombre: String,
+        tipo: String?,
+        numeroCuenta: String?,
+        creadoPor: String
+    ) {
+        val ahora = System.currentTimeMillis()
+        val id = UUID.randomUUID().toString() // RN #1
+
+        val tarjeta = TarjetaEntity(
+            id = id,
+            localId = localId,
+            nombre = nombre,
+            tipo = tipo,
+            numeroCuenta = numeroCuenta,
+            activo = true,
+            creadoPor = creadoPor,
+            createdAt = ahora,
+            updatedAt = ahora,
+            version = 1,
+            pendienteSync = true
+        )
+        dao.insertar(tarjeta)
+
+        encolarAccion(
+            tipoAccion = "CREAR",
+            entidadId = id,
+            payload = TarjetaPayload(
+                id = id, localId = localId, nombre = nombre, tipo = tipo,
+                numeroCuenta = numeroCuenta, activo = true, creadoPor = creadoPor,
+                updatedAt = ahora, deletedAt = null, version = 1
+            )
+        )
+    }
+
+    suspend fun actualizar(
+        tarjeta: TarjetaEntity,
+        nombre: String,
+        tipo: String?,
+        numeroCuenta: String?
+    ) {
+        val ahora = System.currentTimeMillis()
+        val actualizada = tarjeta.copy(
+            nombre = nombre,
+            tipo = tipo,
+            numeroCuenta = numeroCuenta,
+            updatedAt = ahora,
+            version = tarjeta.version + 1,
+            pendienteSync = true
+        )
+        dao.actualizar(actualizada)
+
+        encolarAccion(
+            tipoAccion = "ACTUALIZAR",
+            entidadId = tarjeta.id,
+            payload = TarjetaPayload(
+                id = tarjeta.id, localId = tarjeta.localId, nombre = nombre, tipo = tipo,
+                numeroCuenta = numeroCuenta, activo = tarjeta.activo, creadoPor = tarjeta.creadoPor,
+                updatedAt = ahora, deletedAt = null, version = actualizada.version
+            )
+        )
+    }
+
+    /** Soft delete: nunca se borra físicamente si puede estar referenciada en Ventas. */
+    suspend fun desactivar(tarjeta: TarjetaEntity) {
+        val ahora = System.currentTimeMillis()
+        val desactivada = tarjeta.copy(
+            activo = false,
+            deletedAt = ahora,
+            updatedAt = ahora,
+            version = tarjeta.version + 1,
+            pendienteSync = true
+        )
+        dao.actualizar(desactivada)
+
+        encolarAccion(
+            tipoAccion = "ELIMINAR",
+            entidadId = tarjeta.id,
+            payload = TarjetaPayload(
+                id = tarjeta.id, localId = tarjeta.localId, nombre = tarjeta.nombre,
+                tipo = tarjeta.tipo, numeroCuenta = tarjeta.numeroCuenta, activo = false,
+                creadoPor = tarjeta.creadoPor, updatedAt = ahora, deletedAt = ahora,
+                version = desactivada.version
+            )
+        )
+    }
+
+    private suspend fun encolarAccion(tipoAccion: String, entidadId: String, payload: TarjetaPayload) {
+        accionPendienteDao.encolar(
+            AccionPendienteEntity(
+                accionId = UUID.randomUUID().toString(), // RN #2: idempotencia
+                modulo = MODULO,
+                tipoAccion = tipoAccion,
+                entidadId = entidadId,
+                payloadJson = Json.encodeToString(TarjetaPayload.serializer(), payload),
+                createdAt = System.currentTimeMillis()
+            )
+        )
+        syncScheduler.solicitarSyncInmediato()
+    }
+
+    // ---------- Usado por el SyncWorker ----------
+
+    suspend fun obtenerAccionesPendientes(): List<AccionPendienteEntity> =
+        accionPendienteDao.obtenerPendientesPorModulo(MODULO)
+
+    suspend fun marcarAccionCompletada(accion: AccionPendienteEntity) {
+        accionPendienteDao.eliminar(accion)
+        val quedanPendientes = accionPendienteDao.contarPendientesDeEntidad(MODULO, accion.entidadId) > 0
+        if (!quedanPendientes) {
+            dao.marcarPendienteSync(accion.entidadId, pendiente = false)
         }
-        if (!NetworkMonitor.hayInternet(context)) return Result.success(emptyList())
-        return refrescarDesdeServidor(androidId)
     }
 
-    suspend fun getTarjetasActivas(androidId: String): Result<List<Tarjeta>> {
-        return getTarjetas(androidId).map { it.filter { t -> t.activo } }
+    suspend fun marcarAccionFallida(accion: AccionPendienteEntity, error: String?) {
+        accionPendienteDao.registrarIntentoFallido(accion.accionId, error)
     }
 
-    suspend fun refrescarDesdeServidor(androidId: String): Result<List<Tarjeta>> {
-        val localId = localIdActivo()
-        return try {
-            val tarjetas = SupabaseClientProvider.client.postgrest
-                .rpc("get_tarjetas", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
-                .decodeList<Tarjeta>()
-            db.tarjetaDao().insertarTodas(tarjetas.map { it.toEntity(localId) })
-            Result.success(tarjetas)
-        } catch (e: Exception) {
-            val cacheadas = db.tarjetaDao().obtenerTodas(localId)
-            if (cacheadas.isNotEmpty()) Result.success(cacheadas.map { it.toModel() }) else Result.failure(e)
-        }
-    }
+    suspend fun aplicarCambiosRemotos(remotas: List<TarjetaEntity>) =
+        dao.upsertDesdeServidor(remotas)
 
-    suspend fun precargarLocal(androidId: String, localId: Long): Result<Unit> {
-        return try {
-            val tarjetas = SupabaseClientProvider.client.postgrest
-                .rpc("get_tarjetas", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
-                .decodeList<Tarjeta>()
-            db.tarjetaDao().insertarTodas(tarjetas.map { it.toEntity(localId) })
-            Result.success(Unit)
-        } catch (e: Exception) { Result.failure(e) }
-    }
+    suspend fun obtenerUltimoUpdatedAt(localId: String): Long? =
+        dao.obtenerUltimoUpdatedAt(localId)
+}
 
-    suspend fun crearTarjeta(androidId: String, banco: String, numero: String, titular: String): Result<Unit> {
-        val localId = localIdActivo()
-        val idTemporal = -(System.currentTimeMillis() * 1000 + (Math.random() * 1000).toLong())
-        db.tarjetaDao().insertarUna(TarjetaEntity(idTemporal, banco, numero, titular, activo = true, localId = localId))
-        val payload = buildJsonObject {
-            put("p_android_id", androidId); put("p_local_id", localId); put("p_banco", banco); put("p_numero", numero); put("p_titular", titular)
-        }
-        db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "crear_tarjeta", payloadJson = payload.toString(), idLocalTemporal = idTemporal))
-        if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
-        return Result.success(Unit)
-    }
+@Serializable
+data class TarjetaPayload(
+    val id: String,
+    val localId: String,
+    val nombre: String,
+    val tipo: String?,
+    val numeroCuenta: String?,
+    val activo: Boolean,
+    val creadoPor: String,
+    val updatedAt: Long,
+    val deletedAt: Long?,
+    val version: Int
+)
 
-    suspend fun editarTarjeta(androidId: String, id: Long, banco: String, numero: String, titular: String): Result<Unit> {
-        val localId = localIdActivo()
-        val activoActual = db.tarjetaDao().obtenerTodas(localId).find { it.id == id }?.activo ?: true
-        db.tarjetaDao().insertarUna(TarjetaEntity(id, banco, numero, titular, activo = activoActual, localId = localId))
-        val payload = buildJsonObject {
-            put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id); put("p_banco", banco); put("p_numero", numero); put("p_titular", titular)
-        }
-        db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "editar_tarjeta", payloadJson = payload.toString()))
-        if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
-        return Result.success(Unit)
-    }
-
-    suspend fun setActivo(androidId: String, id: Long, activo: Boolean): Result<Unit> {
-        val localId = localIdActivo()
-        db.tarjetaDao().setActivo(id, activo, localId)
-        val payload = buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id); put("p_activo", activo) }
-        db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "activar_tarjeta", payloadJson = payload.toString()))
-        if (NetworkMonitor.hayInternet(context)) SyncWorker.sincronizarAhora(context)
-        return Result.success(Unit)
-    }
-
-    suspend fun eliminarTarjeta(androidId: String, id: Long): Result<Unit> {
-        val localId = localIdActivo()
-        
-        // Verificar si ya hay una acción eliminar_tarjeta pendiente para este id
-        val yaPendiente = db.accionPendienteDao().obtenerPendientes()
-            .filter { it.tipo == "eliminar_tarjeta" }
-            .any { it.payloadJson.contains("\"p_id\":$id") || it.payloadJson.contains("\"p_id\": $id") }
-        if (yaPendiente) return Result.success(Unit)
-        
-        if (id < 0) {
-            db.tarjetaDao().eliminar(id, localId)
-            db.accionPendienteDao().cancelarPorIdTemporal(id)
-            return Result.success(Unit)
-        }
-        db.tarjetaDao().eliminar(id, localId)
-        db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "eliminar_tarjeta", payloadJson = buildJsonObject {
-            put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id)
-        }.toString()))
-        return Result.success(Unit)
-    }
+interface SyncScheduler {
+    fun solicitarSyncInmediato()
 }

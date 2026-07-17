@@ -1,29 +1,48 @@
-package org.luisito.gestor360.data.local.dao
+package com.gestor360.tarjetas.data.local
 
-import androidx.room.*
-import org.luisito.gestor360.data.local.entities.TarjetaEntity
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TarjetaDao {
-    @Query("SELECT * FROM tarjetas_cache WHERE localId = :localId ORDER BY banco ASC")
-    suspend fun obtenerTodas(localId: Long): List<TarjetaEntity>
+
+    @Query(
+        """
+        SELECT * FROM tarjetas
+        WHERE localId = :localId AND deletedAt IS NULL
+        ORDER BY nombre ASC
+        """
+    )
+    fun observarTarjetasDeLocal(localId: String): Flow<List<TarjetaEntity>>
+
+    @Query(
+        """
+        SELECT * FROM tarjetas
+        WHERE localId = :localId AND activo = 1 AND deletedAt IS NULL
+        ORDER BY nombre ASC
+        """
+    )
+    fun observarTarjetasActivas(localId: String): Flow<List<TarjetaEntity>>
+
+    @Query("SELECT * FROM tarjetas WHERE id = :id LIMIT 1")
+    suspend fun obtenerPorId(id: String): TarjetaEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertarTodas(tarjetas: List<TarjetaEntity>)
+    suspend fun insertar(tarjeta: TarjetaEntity)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertarUna(tarjeta: TarjetaEntity)
+    suspend fun upsertDesdeServidor(tarjetas: List<TarjetaEntity>)
 
-    @Query("UPDATE tarjetas_cache SET id = :idReal WHERE id = :idTemporal AND localId = :localId")
-    suspend fun reemplazarIdTemporal(idTemporal: Long, idReal: Long, localId: Long)
+    @Update
+    suspend fun actualizar(tarjeta: TarjetaEntity)
 
-    @Query("UPDATE tarjetas_cache SET activo = :activo WHERE id = :id AND localId = :localId")
-    suspend fun setActivo(id: Long, activo: Boolean, localId: Long)
+    @Query("UPDATE tarjetas SET pendienteSync = :pendiente WHERE id = :id")
+    suspend fun marcarPendienteSync(id: String, pendiente: Boolean)
 
-    @Query("DELETE FROM tarjetas_cache WHERE id = :id AND localId = :localId")
-    suspend fun eliminar(id: Long, localId: Long)
-
-    /** Limpia todo el caché (se usa al cambiar de local activo). */
-    @Query("DELETE FROM tarjetas_cache")
-    suspend fun limpiar()
+    @Query("SELECT MAX(updatedAt) FROM tarjetas WHERE localId = :localId AND pendienteSync = 0")
+    suspend fun obtenerUltimoUpdatedAt(localId: String): Long?
 }
