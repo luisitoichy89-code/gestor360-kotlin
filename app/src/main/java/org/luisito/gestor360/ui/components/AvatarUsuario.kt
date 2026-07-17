@@ -39,7 +39,7 @@ fun AvatarUsuario(
     onError: () -> Unit = {}
 ) {
     var uriParaRecortar by remember { mutableStateOf<Uri?>(null) }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) uriParaRecortar = uri
     }
 
@@ -57,7 +57,7 @@ fun AvatarUsuario(
                         indication = null,
                         role = Role.Button
                     ) {
-                        launcher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        launcher.launch("image/*")
                     }
                 } else Modifier
             ),
