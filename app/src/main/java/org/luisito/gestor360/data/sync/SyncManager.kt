@@ -3,6 +3,8 @@ package org.luisito.gestor360.data.sync
 import android.content.Context
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.local.AppDatabase
@@ -42,9 +44,6 @@ class SyncManager(private val context: Context) {
                 val payload = Json.parseToJsonElement(accion.payloadJson).jsonObject
                 val respuesta = SupabaseClientProvider.client.postgrest.rpc(accion.tipo, payload)
 
-                // Productos ya no usa idLocalTemporal (su id es el UUID definitivo
-                // desde el momento en que se crea); esta rama sigue viva para
-                // Tarjetas/Turnos, que todavía no pasaron por este módulo.
                 if (accion.idLocalTemporal != null) {
                     val localIdDeLaAccion = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull()
                         ?: session.getLocalId()
@@ -59,7 +58,11 @@ class SyncManager(private val context: Context) {
                         val lid = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull()
                         if (pid != null && lid != null) eliminadosProductos.add(pid to lid)
                     }
-            "crear_tarjeta", "actualizar_tarjeta", "activar_tarjeta" -> { }
+                    "crear_tarjeta", "actualizar_tarjeta", "activar_tarjeta",
+                    "crear_merma", "resolver_merma",
+                    "crear_devolucion", "resolver_devolucion",
+                    "solicitar_producto", "solicitar_aumento_stock",
+                    "registrar_venta", "anular_venta" -> { /* procesado por el RPC, sin acción local extra */ }
                     "eliminar_tarjeta" -> {
                         val tid = payload["p_id"]?.toString()?.trim('"')
                         val lid = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull()
@@ -68,7 +71,6 @@ class SyncManager(private val context: Context) {
                 }
 
                 db.accionPendienteDao().actualizar(accion.copy(estado = "sincronizado"))
-                // Reportar éxito a sync_queue
                 try {
                     val localIdAccion = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull() ?: session.getLocalId()
                     if (localIdAccion != null) {
@@ -80,7 +82,6 @@ class SyncManager(private val context: Context) {
                 db.accionPendienteDao().actualizar(
                     accion.copy(intentos = accion.intentos + 1, ultimoError = e.message?.take(300))
                 )
-                // Reportar error a sync_queue
                 try {
                     val localIdAccion = session.getLocalId()
                     if (localIdAccion != null) {
@@ -98,8 +99,8 @@ class SyncManager(private val context: Context) {
         if (localIdActivo != null) {
             refrescarProductosYDetectarConflictos(androidId)
             tarjetaRepository.refrescarDesdeServidor(localIdActivo)
-            mermaRepository.refrescarDesdeServidor(session.getLocalId() ?: 0)
-            turnoRepository.refrescarDesdeServidor(androidId)
+            mermaRepository.refrescarDesdeServidor(localIdActivo)
+            turnoRepository.refrescarDesdeServidor(localIdActivo)
             aprobacionStockRepository.refrescarDesdeServidor(androidId)
         }
 
@@ -114,39 +115,23 @@ class SyncManager(private val context: Context) {
         respuesta: io.github.jan.supabase.postgrest.result.PostgrestResult, localId: Long
     ) {
         when (tipo) {
-            // "crear_producto" ya no pasa por acá: ver ProductRepository.createProduct
-            // (el id ahora es un UUID definitivo generado en el cliente, no hay
-            // id temporal que reemplazar).
             "abrir_turno" -> runCatching { respuesta.decodeAs<Long>() }.getOrNull()
                 ?.let { db.turnoDao().reemplazarIdTemporal(idTemporal, it, localId) }
-            // "crear_tarjeta" no pasa por acá: el id es un UUID definitivo
-            // generado en el cliente (igual que productos), no hay id temporal
-            // que reemplazar. TarjetaRepository.createTarjeta nunca setea
-            // idLocalTemporal, así que esta rama nunca se alcanzaría igual.
         }
     }
 
-    /**
-     * Caso borde de la migración a UUID (v9): si un producto se creó offline
-     * con el sistema viejo (id temporal negativo) y esa creación quedó
-     * pendiente justo cuando se actualizó la app, su acción "crear_producto"
-     * no tiene "p_id" en el payload (el RPC viejo no lo pedía, generaba el id
-     * en el servidor). El nuevo RPC sí lo exige, así que sin este parche esa
-     * acción fallaría para siempre. Se corrige una sola vez: se genera un UUID
-     * nuevo, se lo agrega al payload y se actualiza el id de esa fila en el
-     * caché para que coincidan.
-     */
     private suspend fun repararAccionesLegacyCreacionProducto() {
         val legacy = db.accionPendienteDao().obtenerPendientes()
             .filter { it.tipo == "crear_producto" && !it.payloadJson.contains("\"p_id\"") && it.idLocalTemporal != null }
+
         for (accion in legacy) {
             try {
                 val idTemporal = accion.idLocalTemporal ?: continue
                 val payload = Json.parseToJsonElement(accion.payloadJson).jsonObject.toMutableMap()
                 val localId = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull() ?: continue
                 val nuevoId = java.util.UUID.randomUUID().toString()
-                payload["p_id"] = kotlinx.serialization.json.JsonPrimitive(nuevoId)
-                payload["p_accion_id"] = kotlinx.serialization.json.JsonPrimitive(java.util.UUID.randomUUID().toString())
+                payload["p_id"] = JsonPrimitive(nuevoId)
+                payload["p_accion_id"] = JsonPrimitive(java.util.UUID.randomUUID().toString())
 
                 val filaVieja = db.productoDao().obtenerPorId(idTemporal.toString(), localId)
                 if (filaVieja != null) {
@@ -154,12 +139,9 @@ class SyncManager(private val context: Context) {
                     db.productoDao().insertarUno(filaVieja.copy(id = nuevoId))
                 }
                 db.accionPendienteDao().actualizar(
-                    accion.copy(payloadJson = kotlinx.serialization.json.JsonObject(payload).toString(), idLocalTemporal = null)
+                    accion.copy(payloadJson = JsonObject(payload).toString(), idLocalTemporal = null)
                 )
-            } catch (_: Exception) {
-                // Si algo falla acá, la acción sigue pendiente tal cual y se
-                // reintenta en el próximo ciclo de sync; no se pierde nada.
-            }
+            } catch (_: Exception) { }
         }
     }
 
