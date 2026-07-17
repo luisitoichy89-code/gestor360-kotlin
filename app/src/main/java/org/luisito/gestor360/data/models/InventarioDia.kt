@@ -2,12 +2,6 @@ package org.luisito.gestor360.data.models
 
 import kotlinx.serialization.Serializable
 
-/**
- * Toda la "hoja" de un día operativo de un local: arma en una sola llamada
- * (get_inventario_dia) lo que antes eran varias consultas sueltas. Cada
- * sub-lista trae fecha y quién (nombre + rol) hizo cada cosa, porque eso es
- * lo que reemplaza a la traza genérica que se eliminó.
- */
 @Serializable
 data class InventarioDia(
     val fecha: String,
@@ -70,7 +64,8 @@ data class MermaInfo(
 @Serializable
 data class DevueltoInfo(
     val id: String,
-    val id: Long,
+    val producto_nombre: String,
+    val cantidad: Double,
     val metodo: String,
     val estado: String,
     val solicitado_por_nombre: String? = null,
@@ -100,7 +95,6 @@ data class VentaInfo(
     val tarjeta_titular: String? = null
 )
 
-/** Fila de "PRODUCTOS VENDIDOS" del reporte: nombre + los 5 totales pedidos. */
 @Serializable
 data class ProductoVendidoInfo(
     val nombre: String,
