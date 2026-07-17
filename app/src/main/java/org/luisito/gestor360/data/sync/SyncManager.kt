@@ -27,13 +27,18 @@ class SyncManager(private val context: Context) {
     private val turnoRepository = TurnoRepository(context)
     private val aprobacionStockRepository = AprobacionStockRepository(context)
 
+    companion object {
+        /** Máximo de acciones a procesar por ciclo para no saturar conexiones lentas. */
+        private const val MAX_ACCIONES_POR_CICLO = 50
+    }
+
     suspend fun sincronizar(androidId: String): SyncResultado {
         if (androidId.isBlank()) return SyncResultado(0, 0, "Sin sesión activa")
         if (!NetworkMonitor.hayInternet(context)) return SyncResultado(0, 0, "Sin conexión")
 
         repararAccionesLegacyCreacionProducto()
 
-        val pendientes = db.accionPendienteDao().obtenerPendientes()
+        val pendientes = db.accionPendienteDao().obtenerPendientes().take(MAX_ACCIONES_POR_CICLO)
         var exitosas = 0
         var fallidas = 0
         val eliminadosProductos = mutableListOf<Pair<String, Long>>()
