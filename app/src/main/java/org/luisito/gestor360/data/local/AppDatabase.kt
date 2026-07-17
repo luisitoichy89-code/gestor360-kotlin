@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import androidx.room.db.JournalMode
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import org.luisito.gestor360.data.local.dao.AccionPendienteDao
@@ -226,7 +225,7 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                     .addMigrations(MIGRACION_8_9, MIGRACION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
                     .fallbackToDestructiveMigration()
-                    .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
+                    .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                     .build().also { db ->
                         db.query("PRAGMA auto_vacuum = FULL", null)
                         INSTANCE = db
