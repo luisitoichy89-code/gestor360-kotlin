@@ -1,4 +1,4 @@
-package org.luisito.gestor360.data.local
+package org.luisito.gestor360.data.local.entities
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey

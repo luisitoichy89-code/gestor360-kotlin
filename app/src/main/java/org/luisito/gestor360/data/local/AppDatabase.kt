@@ -203,6 +203,63 @@ val MIGRATION_12_13 = object : Migration(12, 13) {
     }
 }
 
+/**
+ * v13 -> v14: ventas_cache.tarjetaId pasa de Long a String (uuid). Mismo
+ * motivo que productoId en v11: TarjetaEntity.id ya es un uuid generado en
+ * el dispositivo (ver TarjetaEntity.kt), así que un tarjetaId bigint nunca
+ * pudo hacer match contra una tarjeta real — es la causa de que las ventas
+ * con tarjeta no aparecieran en la sección de tarjetas del inventario.
+ *
+ * A diferencia de MIGRACION_10_11 (productoId), acá NO hay un CAST útil:
+ * los valores Long viejos de tarjetaId nunca correspondieron a un uuid real
+ * (las tarjetas nunca tuvieron id numérico), así que convertirlos a texto
+ * solo conservaría basura que tampoco va a matchear nada. Se ponen en NULL:
+ * mismo criterio que MIGRATION_12_13 aplicó a mermas_cache.id.
+ *
+ * ATENCIÓN — igual que con producto_id (ver Sale.kt): esto destraba la
+ * COMPILACIÓN en Android. Falta migrar del lado de Supabase la columna
+ * tarjeta_id en la tabla "ventas" (bigint -> uuid) y los RPC
+ * registrar_venta/get_ventas para que acepten/devuelvan uuid ahí también;
+ * hasta entonces, vender con tarjeta puede seguir fallando en tiempo de
+ * ejecución contra esos RPC viejos.
+ */
+val MIGRATION_13_14 = object : Migration(13, 14) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS ventas_cache_new (
+                id TEXT NOT NULL,
+                productoId TEXT NOT NULL,
+                productoNombre TEXT,
+                cantidad REAL NOT NULL,
+                total REAL NOT NULL,
+                metodo TEXT NOT NULL,
+                efectivo REAL NOT NULL,
+                transferencia REAL NOT NULL,
+                usuarioId INTEGER,
+                localId INTEGER NOT NULL,
+                clienteCi TEXT,
+                clienteTel TEXT,
+                clienteNombre TEXT,
+                tarjetaId TEXT,
+                createdAt TEXT,
+                sincronizada INTEGER NOT NULL DEFAULT 1,
+                PRIMARY KEY(id)
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            INSERT INTO ventas_cache_new (id, productoId, productoNombre, cantidad, total, metodo, efectivo, transferencia, usuarioId, localId, clienteCi, clienteTel, clienteNombre, tarjetaId, createdAt, sincronizada)
+            SELECT id, productoId, productoNombre, cantidad, total, metodo, efectivo, transferencia, usuarioId, localId, clienteCi, clienteTel, clienteNombre, NULL, createdAt, sincronizada
+            FROM ventas_cache
+            """.trimIndent()
+        )
+        db.execSQL("DROP TABLE ventas_cache")
+        db.execSQL("ALTER TABLE ventas_cache_new RENAME TO ventas_cache")
+    }
+}
+
 @Database(
     entities = [
         ProductoEntity::class, AccionPendienteEntity::class, TarjetaEntity::class, VentaEntity::class, ConflictoEntity::class,
@@ -222,7 +279,9 @@ val MIGRATION_12_13 = object : Migration(12, 13) {
     // v12: agrega tabla tarjetas (MIGRATION_11_12, ver Migration_11_12.kt).
     // v13: mermas_cache, id (bigint -> uuid) con migración DESTRUCTIVA
     // (MIGRATION_12_13, ver comentario arriba de la clase).
-    version = 13,
+    // v14: ventas_cache, tarjetaId (bigint -> uuid) con migración DESTRUCTIVA
+    // solo para esa columna (MIGRATION_13_14, ver comentario arriba de la clase).
+    version = 14,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -250,7 +309,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "gestor360.db"
                 )
-                    .addMigrations(MIGRACION_8_9, MIGRACION_10_11, MIGRATION_11_12, MIGRATION_12_13)
+                    .addMigrations(MIGRACION_8_9, MIGRACION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
                     .fallbackToDestructiveMigration()
                     .build().also { INSTANCE = it }
             }

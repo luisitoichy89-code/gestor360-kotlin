@@ -30,8 +30,17 @@ data class Sale(
     val cliente_ci: String? = null,
     val cliente_tel: String? = null,
     val cliente_nombre: String? = null,
-    // tarjeta_id se queda en Long: Tarjetas todavía no se migró a uuid.
-    val tarjeta_id: Long? = null,
+    // tarjeta_id ahora es String (uuid), igual que producto_id: TarjetaEntity.id
+    // ya es un uuid generado en el dispositivo (ver TarjetaEntity.kt). Quedarse
+    // en Long era la causa de que las ventas con tarjeta nunca matchearan
+    // contra la tabla tarjetas.
+    //
+    // ATENCIÓN — igual que con producto_id: esto destraba la COMPILACIÓN en
+    // Android. Falta migrar del lado de Supabase la columna tarjeta_id en la
+    // tabla "ventas" (bigint -> uuid) y los RPC registrar_venta/get_ventas
+    // para que acepten/devuelvan uuid ahí también; hasta entonces, vender con
+    // tarjeta puede seguir fallando en tiempo de ejecución contra esos RPC viejos.
+    val tarjeta_id: String? = null,
     val created_at: String? = null,
     val updated_at: String? = null
 )

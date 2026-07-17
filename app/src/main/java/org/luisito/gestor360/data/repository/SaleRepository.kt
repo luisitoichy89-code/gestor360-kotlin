@@ -36,7 +36,7 @@ class SaleRepository(
     private fun localIdActivo(): Long =
         session.getLocalId() ?: throw IllegalStateException("No hay un local activo seleccionado")
 
-    data class DatosCliente(val ci: String, val telefono: String, val nombre: String, val banco: String? = null, val tarjetaId: Long? = null)
+    data class DatosCliente(val ci: String, val telefono: String, val nombre: String, val banco: String? = null, val tarjetaId: String? = null)
 
     /**
      * Guarda local YA (stock descontado al instante + fila de venta visible de

@@ -20,7 +20,7 @@ data class VentaEntity(
     val clienteCi: String?,
     val clienteTel: String?,
     val clienteNombre: String?,
-    val tarjetaId: Long?,
+    val tarjetaId: String?,
     val createdAt: String?,
     val sincronizada: Boolean = true
 )
