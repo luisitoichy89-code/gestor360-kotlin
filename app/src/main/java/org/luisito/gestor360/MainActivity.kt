@@ -29,10 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 import org.luisito.gestor360.data.local.FotoRepository
-// AJUSTAR: reemplaza este import y el accessor usado más abajo
-// (AppDatabase.obtener(context).userDao()) por los reales de tu
-// AppDatabase.kt — ese archivo no estaba entre los que compartiste, así
-// que no conozco el nombre exacto del singleton/accessor.
 import org.luisito.gestor360.data.local.AppDatabase
 import org.luisito.gestor360.data.models.User
 import org.luisito.gestor360.data.models.Local
@@ -100,7 +96,6 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val sessionManager = remember { SessionManager(context) }
-    // AJUSTAR: ver nota en los imports sobre AppDatabase.obtener(context).
     val fotoRepository = remember { FotoRepository(AppDatabase.obtener(context).userDao()) }
     val scope = rememberCoroutineScope()
     val accesoViewModel: AccesoViewModel = viewModel()
@@ -115,28 +110,17 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
     val snackbarHostState = remember { SnackbarHostState() }
     var localRecienCambiado by remember { mutableStateOf<Local?>(null) }
 
-    // Carga la foto guardada del usuario que está por meter su PIN, para
-    // mostrarla en el cuadrado donde va el candado en PinLoginScreen.
     LaunchedEffect(usuarioParaPin) {
-        fotoUsuarioPin = usuarioParaPin?.let { fotoRepository.obtenerFoto(it.id.toString()) }
+        fotoUsuarioPin = usuarioParaPin?.let { it.android_id?.let { id -> fotoRepository.obtenerFoto(id) } }
     }
 
-    // Carga la foto del usuario ya logueado para el avatar del dashboard.
-    // BUG CORREGIDO: antes se guardaba/leía con sessionManager.getAndroidId(),
-    // pero UserEntity.id (la clave primaria que usa actualizarFoto/getFoto en
-    // Room) es el id real del usuario (usuario.id, ver saveSession más abajo
-    // y PinLoginScreen que sí usa usuario.id.toString()), NO el android_id.
-    // El UPDATE/SELECT con el id equivocado no encontraba fila -> la foto se
-    // veía al seleccionarla (estaba en memoria) pero nunca quedaba guardada,
-    // y al recargar sesión volvía a salir null. Se usa getUserId() para que
-    // coincida con la misma clave que ya usa el login por PIN.
     LaunchedEffect(isLoggedIn) {
-        fotoUsuarioLogueado = if (isLoggedIn) fotoRepository.obtenerFoto(sessionManager.getUserId().toString()) else null
+        fotoUsuarioLogueado = if (isLoggedIn) fotoRepository.obtenerFoto(sessionManager.getAndroidId()) else null
     }
 
     fun onFotoDashboardSeleccionada(bytes: ByteArray) {
         fotoUsuarioLogueado = bytes
-        scope.launch { fotoRepository.guardarFoto(sessionManager.getUserId().toString(), bytes) }
+        scope.launch { fotoRepository.guardarFoto(sessionManager.getAndroidId(), bytes) }
     }
 
     LaunchedEffect(localRecienCambiado) {
@@ -267,28 +251,18 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
         }
     }
     SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
-            // Feedback global
-                    val feedbackVM = remember { FeedbackViewModel() }
-                    CompositionLocalProvider(LocalFeedback provides feedbackVM) {
-                        val feedbackState by feedbackVM.state.collectAsState()
-                        FeedbackBar(
-                            mensaje = feedbackState.mensaje,
-                            tipo = feedbackState.tipo,
-                            onDismiss = { feedbackVM.limpiar() }
-                        )
-                    }
+            val feedbackVM = remember { FeedbackViewModel() }
+            CompositionLocalProvider(LocalFeedback provides feedbackVM) {
+                val feedbackState by feedbackVM.state.collectAsState()
+                FeedbackBar(
+                    mensaje = feedbackState.mensaje,
+                    tipo = feedbackState.tipo,
+                    onDismiss = { feedbackVM.limpiar() }
+                )
+            }
     }
 }
 
-/**
- * Barra superior única de la pantalla de inicio: neomórfica, con esquinas
- * redondeadas igual que el contenido del dashboard. Orden fijo:
- * 1) avatar (foto de perfil, editable) + nombre de usuario,
- * 2) botón redondo ☀️/🌙 de tema,
- * 3) icono + nombre del local (al presionar despliega el selector, sin
- *    botón "Cambiar"),
- * 4) icono de cerrar sesión.
- */
 @Composable
 private fun InicioTopBar(
     username: String,
@@ -311,9 +285,6 @@ private fun InicioTopBar(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Mismo tamaño que tenía el icono de cuenta (26dp) que reemplaza.
-            // Mientras no haya foto guardada, "Añadir foto" aparece arriba
-            // como pista de que el avatar es tocable.
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 if (fotoUsuario == null) {
                     Text(
@@ -361,7 +332,6 @@ private fun InicioTopBar(
     }
 }
 
-/** Segmento del local dentro de InicioTopBar: al presionar, despliega el selector (DropdownMenu). */
 @Composable
 private fun SelectorDeLocalInline(
     androidId: String,

@@ -21,23 +21,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
-import org.luisito.gestor360.utils.FotoUtils
+import android.net.Uri
 
-/**
- * Avatar cuadrado del usuario. Un solo componente para dos usos:
- * - Dashboard (InicioTopBar): `editable = true`, mismo tamaño que el icono
- *   de cuenta que reemplaza; al tocarla abre el selector de imágenes de la
- *   galería (Android Photo Picker, sin permiso de almacenamiento) y entrega
- *   el ByteArray ya procesado (128x128, JPEG 70) vía onFotoSeleccionada.
- * - Login (PinLoginScreen): solo lectura, se arma con Surface propio ahí
- *   para heredar el color de bloqueado/no-bloqueado; ver rememberFotoBitmap.
- *
- * La foto nunca se sube a Supabase Storage: solo vive en Room (columna
- * `foto` de UserEntity) en este dispositivo.
- */
 @Composable
 fun AvatarUsuario(
     fotoBytes: ByteArray?,
@@ -48,12 +38,9 @@ fun AvatarUsuario(
     onFotoSeleccionada: (ByteArray) -> Unit = {},
     onError: () -> Unit = {}
 ) {
-    val context = LocalContext.current
+    var uriParaRecortar by remember { mutableStateOf<Uri?>(null) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) {
-            val bytes = FotoUtils.procesarUriAFoto(context, uri)
-            if (bytes != null) onFotoSeleccionada(bytes) else onError()
-        }
+        if (uri != null) uriParaRecortar = uri
     }
 
     val bitmap = rememberFotoBitmap(fotoBytes)
@@ -86,5 +73,20 @@ fun AvatarUsuario(
                 modifier = Modifier.fillMaxSize()
             )
         }
+    }
+
+    uriParaRecortar?.let { uri ->
+        FotoRecortadorDialog(
+            uri = uri,
+            onConfirmar = { bytes ->
+                uriParaRecortar = null
+                onFotoSeleccionada(bytes)
+            },
+            onCancelar = { uriParaRecortar = null },
+            onError = {
+                uriParaRecortar = null
+                onError()
+            }
+        )
     }
 }
