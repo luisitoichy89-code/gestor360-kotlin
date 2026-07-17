@@ -7,7 +7,7 @@ import org.luisito.gestor360.data.models.MermaPendiente
 @Entity(tableName = "mermas_cache", primaryKeys = ["id", "localId"])
 data class MermaEntity(
     val id: Long,
-    val productoId: Long,
+    val productoId: String,
     val productoNombre: String,
     val cantidad: Double,
     val motivo: String?,

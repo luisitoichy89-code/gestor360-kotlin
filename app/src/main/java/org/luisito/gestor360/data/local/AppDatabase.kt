@@ -63,6 +63,86 @@ val MIGRACION_8_9 = object : Migration(8, 9) {
 }
 
 /**
+ * v11: VentaEntity.productoId y MermaEntity.productoId pasan de Long a String
+ * (mismo motivo que productos_cache en v9: ahora referencian un Product.id
+ * que es uuid). A diferencia de ProductoEliminadoCacheEntity/ConflictoEntity
+ * (v10, destructivas), ventas_cache y mermas_cache SÍ llevan migración real:
+ * ambas pueden contener filas creadas offline (venta o merma solicitada sin
+ * conexión, con id temporal) que todavía no se sincronizaron con el
+ * servidor — una destructiva las borraría antes de que lleguen a encolarse
+ * o resolverse, que es pérdida de datos de negocio real.
+ *
+ * aprobaciones_cache y devoluciones_cache NO se tocan acá: son JSON blob por
+ * local (columna "json" TEXT), el cambio de tipo de producto_id vive dentro
+ * del JSON serializado, no en una columna de la tabla, así que no requieren
+ * migración de esquema.
+ */
+val MIGRACION_10_11 = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // ventas_cache: PK simple (id)
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS ventas_cache_new (
+                id TEXT NOT NULL,
+                productoId TEXT NOT NULL,
+                productoNombre TEXT,
+                cantidad REAL NOT NULL,
+                total REAL NOT NULL,
+                metodo TEXT NOT NULL,
+                efectivo REAL NOT NULL,
+                transferencia REAL NOT NULL,
+                usuarioId INTEGER,
+                localId INTEGER NOT NULL,
+                clienteCi TEXT,
+                clienteTel TEXT,
+                clienteNombre TEXT,
+                tarjetaId INTEGER,
+                createdAt TEXT,
+                sincronizada INTEGER NOT NULL DEFAULT 1,
+                PRIMARY KEY(id)
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            INSERT INTO ventas_cache_new (id, productoId, productoNombre, cantidad, total, metodo, efectivo, transferencia, usuarioId, localId, clienteCi, clienteTel, clienteNombre, tarjetaId, createdAt, sincronizada)
+            SELECT id, CAST(productoId AS TEXT), productoNombre, cantidad, total, metodo, efectivo, transferencia, usuarioId, localId, clienteCi, clienteTel, clienteNombre, tarjetaId, createdAt, sincronizada
+            FROM ventas_cache
+            """.trimIndent()
+        )
+        db.execSQL("DROP TABLE ventas_cache")
+        db.execSQL("ALTER TABLE ventas_cache_new RENAME TO ventas_cache")
+
+        // mermas_cache: PK compuesta (id, localId)
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS mermas_cache_new (
+                id INTEGER NOT NULL,
+                productoId TEXT NOT NULL,
+                productoNombre TEXT NOT NULL,
+                cantidad REAL NOT NULL,
+                motivo TEXT,
+                solicitadoPor INTEGER,
+                solicitadoPorNombre TEXT,
+                estado TEXT NOT NULL,
+                localId INTEGER NOT NULL,
+                PRIMARY KEY(id, localId)
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            INSERT INTO mermas_cache_new (id, productoId, productoNombre, cantidad, motivo, solicitadoPor, solicitadoPorNombre, estado, localId)
+            SELECT id, CAST(productoId AS TEXT), productoNombre, cantidad, motivo, solicitadoPor, solicitadoPorNombre, estado, localId
+            FROM mermas_cache
+            """.trimIndent()
+        )
+        db.execSQL("DROP TABLE mermas_cache")
+        db.execSQL("ALTER TABLE mermas_cache_new RENAME TO mermas_cache")
+    }
+}
+
+/**
  * v10: ProductoEliminadoCacheEntity.id y ConflictoEntity.productoId pasan de
  * Long a String (mismo motivo que productos_cache: ahora referencian un
  * Product.id que es uuid). A diferencia de productos_cache, estas dos NO
@@ -92,7 +172,10 @@ val MIGRACION_8_9 = object : Migration(8, 9) {
     // v10: ProductoEliminadoCacheEntity.id y ConflictoEntity.productoId
     // (Long -> String), bajo fallbackToDestructiveMigration (ver comentario
     // arriba de la clase: ambas son cachés locales sin pérdida real).
-    version = 10,
+    // v11: ventas_cache y mermas_cache, productoId (Long -> String) con
+    // migración real (MIGRACION_10_11): ambas pueden tener filas creadas
+    // offline sin sincronizar todavía.
+    version = 11,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -120,7 +203,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "gestor360.db"
                 )
-                    .addMigrations(MIGRACION_8_9)
+                    .addMigrations(MIGRACION_8_9, MIGRACION_10_11)
                     .fallbackToDestructiveMigration()
                     .build().also { INSTANCE = it }
             }

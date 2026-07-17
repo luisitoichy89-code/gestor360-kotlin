@@ -22,7 +22,7 @@ import org.luisito.gestor360.utils.SessionManager
 @Serializable
 data class AprobacionStock(
     val id: Long? = null,
-    val producto_id: Long? = null,
+    val producto_id: String? = null,
     val producto_nombre: String = "",
     val precio: Double? = null,
     val cantidad: Double = 0.0,
@@ -126,11 +126,11 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
     }
 
     /** El vendedor propone offline: queda visible como pendiente de inmediato, igual que Merma/Devolucion.solicitar. */
-    suspend fun solicitarAumento(androidId: String, productoId: Long, productoNombre: String, cantidad: Double): Result<Unit> {
+    suspend fun solicitarAumento(androidId: String, productoId: String, productoNombre: String, cantidad: Double): Result<Unit> {
         // Verificar si ya hay una solicitud pendiente para este producto
         val yaPendiente = db.accionPendienteDao().obtenerPendientes()
             .filter { it.tipo == "solicitar_aumento_stock" }
-            .any { it.payloadJson.contains("\"p_producto_id\":$productoId") }
+            .any { it.payloadJson.contains("\"p_producto_id\":\"$productoId\"") }
         if (yaPendiente) return Result.success(Unit)
         val localId = localIdActivo()
         val idTemporal = -(System.currentTimeMillis() * 1000 + (Math.random() * 1000).toLong())

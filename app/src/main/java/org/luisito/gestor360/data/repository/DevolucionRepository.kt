@@ -66,11 +66,11 @@ class DevolucionRepository(private val context: Context = AppContextHolder.conte
     }
 
     /** El vendedor propone offline: queda visible como pendiente de inmediato, sin mover stock todavía. */
-    suspend fun solicitar(androidId: String, productoId: Long, productoNombre: String, cantidad: Double, metodo: String, motivo: String): Result<Unit> {
+    suspend fun solicitar(androidId: String, productoId: String, productoNombre: String, cantidad: Double, metodo: String, motivo: String): Result<Unit> {
         // Verificar si ya hay una acción solicitar_devolucion pendiente para este producto
         val yaPendiente = db.accionPendienteDao().obtenerPendientes()
             .filter { it.tipo == "solicitar_devolucion" }
-            .any { it.payloadJson.contains("\"p_producto_id\":$productoId") }
+            .any { it.payloadJson.contains("\"p_producto_id\":\"$productoId\"") }
         if (yaPendiente) return Result.success(Unit)
         val localId = localIdActivo()
         val idTemporal = -(System.currentTimeMillis() * 1000 + (Math.random() * 1000).toLong())

@@ -8,7 +8,7 @@ import java.util.UUID
 @Entity(tableName = "ventas_cache")
 data class VentaEntity(
     @PrimaryKey val id: String,
-    val productoId: Long,
+    val productoId: String,
     val productoNombre: String? = null,
     val cantidad: Double,
     val total: Double,

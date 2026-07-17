@@ -9,7 +9,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class MermaPendiente(
     val id: Long,
-    val producto_id: Long,
+    val producto_id: String,
     val producto_nombre: String,
     val cantidad: Double,
     val motivo: String? = null,

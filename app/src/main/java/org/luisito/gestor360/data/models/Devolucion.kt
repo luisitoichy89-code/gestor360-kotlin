@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class Devolucion(
     val id: Long,
-    val producto_id: Long? = null,
+    val producto_id: String? = null,
     val producto_nombre: String,
     val cantidad: Double,
     val metodo: String,
