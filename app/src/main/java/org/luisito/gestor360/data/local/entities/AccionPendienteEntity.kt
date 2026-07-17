@@ -1,41 +1,24 @@
 package org.luisito.gestor360.data.local.entities
 
 import androidx.room.Entity
-import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * Outbox genérico de acciones pendientes de sincronizar.
- *
- * IMPORTANTE: según resumen_implementado.md, esta tabla YA EXISTE (la usa
- * Productos). Esta clase es mi reconstrucción de su forma probable a partir
- * de la descripción ("Cada acción tiene p_accion_id único (UUID) en
- * AccionPendienteEntity"). Si el nombre real de campos difiere, ajustar
- * TarjetaRepository/TarjetaSyncWorker a la firma real — NO crear una tabla
- * duplicada en Room (rompería la migración v11 ya aplicada).
+ * Cola genérica de sincronización: cada fila es UNA llamada RPC pendiente.
+ * "tipo" es el nombre exacto de la función en Postgres (ej. "registrar_venta"),
+ * y "payloadJson" es el mismo JsonObject que ya arma cada repositorio antes de
+ * llamar a .rpc(...), guardado como texto. Así el motor de sync no necesita
+ * saber nada específico de productos/ventas/etc: solo reproduce la llamada.
  */
-@Entity(
-    tableName = "acciones_pendientes",
-    indices = [
-        Index(value = ["modulo"]),
-        Index(value = ["entidadId"])
-    ]
-)
+@Entity(tableName = "acciones_pendientes")
 data class AccionPendienteEntity(
-    @PrimaryKey
-    val accionId: String, // UUID generado en el dispositivo (RN #1 / RN #2)
-
-    val modulo: String, // "tarjetas", "productos", "ventas", "mermas", ...
-
-    val tipoAccion: String, // "CREAR" | "ACTUALIZAR" | "ELIMINAR"
-
-    val entidadId: String, // id de la fila afectada (tarjeta.id)
-
-    val payloadJson: String, // datos necesarios para reconstruir la llamada RPC
-
-    val createdAt: Long,
-
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val tipo: String,
+    val payloadJson: String,
+    val creadoEn: Long = System.currentTimeMillis(),
     val intentos: Int = 0,
-
-    val ultimoError: String? = null
+    val ultimoError: String? = null,
+    val estado: String = "pendiente", // pendiente | sincronizado
+    /** Para acciones que crean algo (ej. crear_producto): el id temporal local, para reemplazarlo cuando el servidor devuelva el id real. */
+    val idLocalTemporal: Long? = null
 )
