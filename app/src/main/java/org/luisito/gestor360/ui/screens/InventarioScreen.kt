@@ -334,7 +334,7 @@ private fun DevueltoInfoRow(d: DevueltoInfo) {
                 Text(d.producto_nombre, fontWeight = FontWeight.Bold)
                 EstadoDevolucionChip(d.estado)
             }
-            Text("Cantidad: ${d.cantidad}  ·  Método: ${d.metodo}", style = MaterialTheme.typography.bodySmall)
+            Text("Cantidad: ${d.cantidad.toInt()}  ·  Método: ${d.metodo}", style = MaterialTheme.typography.bodySmall)
             FilaConRol(if (d.estado == "pendiente") "Solicitado por" else "Resuelto por", d.resuelto_por_nombre ?: d.solicitado_por_nombre, d.resuelto_por_rol, d.fecha)
         }
     }
@@ -359,7 +359,7 @@ private fun VentaInfoRow(v: VentaInfo) {
                 Text(v.producto_nombre, fontWeight = FontWeight.Bold)
                 Text("${formatearMonto(v.total)} CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
-            Text("Cantidad: ${v.cantidad}  ·  Método: ${v.metodo}", style = MaterialTheme.typography.bodySmall)
+            Text("Cantidad: ${v.cantidad.toInt()}  ·  Método: ${v.metodo}", style = MaterialTheme.typography.bodySmall)
             FilaConRol("Vendido por", v.usuario_nombre, v.usuario_rol, v.fecha)
         }
     }
@@ -407,11 +407,11 @@ private fun ProductoVendidoRow(p: ProductoVendidoInfo) {
         Column(Modifier.padding(12.dp)) {
             Text(p.nombre, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
-            Text("Total vendidos: ${p.total_vendido}", style = MaterialTheme.typography.bodySmall)
-            Text("Total actual: ${p.total_actual}", style = MaterialTheme.typography.bodySmall)
-            Text("Total agregados: ${p.total_agregado}", style = MaterialTheme.typography.bodySmall)
-            Text("Total merma: ${p.total_merma}", style = MaterialTheme.typography.bodySmall)
-            Text("Total inicial: ${p.total_inicial}", style = MaterialTheme.typography.bodySmall)
+            Text("Total vendidos: ${p.total_vendido.toInt()}", style = MaterialTheme.typography.bodySmall)
+            Text("Total actual: ${p.total_actual.toInt()}", style = MaterialTheme.typography.bodySmall)
+            Text("Total agregados: ${p.total_agregado.toInt()}", style = MaterialTheme.typography.bodySmall)
+            Text("Total merma: ${p.total_merma.toInt()}", style = MaterialTheme.typography.bodySmall)
+            Text("Total inicial: ${p.total_inicial.toInt()}", style = MaterialTheme.typography.bodySmall)
         }
     }
 }
