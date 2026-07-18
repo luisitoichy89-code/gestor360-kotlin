@@ -12,6 +12,32 @@ interface AccionPendienteDao {
     @Query("SELECT * FROM acciones_pendientes WHERE estado = 'pendiente' ORDER BY creadoEn ASC")
     suspend fun obtenerPendientes(): List<AccionPendienteEntity>
 
+    /**
+     * NUEVO: igual que obtenerPendientes() pero acotado a un lote. Pensado para
+     * que SyncManager sincronice en tandas (ej. de 50) en vez de traer y mandar
+     * todo de un tirón cuando la cola se acumuló por semanas/meses offline —
+     * eso evita timeouts del RPC y que un fallo a mitad de una sincronización
+     * gigante deje todo en un estado ambiguo.
+     * Uso sugerido en SyncManager:
+     *   var lote = dao.obtenerLotePendiente(50)
+     *   while (lote.isNotEmpty()) {
+     *       // procesar lote, marcar cada acción como sincronizada o fallida
+     *       lote = dao.obtenerLotePendiente(50)
+     *   }
+     */
+    @Query("SELECT * FROM acciones_pendientes WHERE estado = 'pendiente' ORDER BY creadoEn ASC LIMIT :tamanoLote")
+    suspend fun obtenerLotePendiente(tamanoLote: Int = 50): List<AccionPendienteEntity>
+
+    /**
+     * NUEVO: acciones que dejaron de reintentarse solas tras agotar los
+     * intentos (ver MAX_INTENTOS en SyncManager). No incluye "registrar_venta"
+     * ni "anular_venta" — esas nunca se abandonan automáticamente. Pensada
+     * para una futura pantalla de "conflictos de sincronización" donde el
+     * admin las revise y decida si reintentar a mano o descartar.
+     */
+    @Query("SELECT * FROM acciones_pendientes WHERE estado = 'error_permanente' ORDER BY creadoEn ASC")
+    suspend fun obtenerConErrorPermanente(): List<AccionPendienteEntity>
+
     @Query("SELECT COUNT(*) FROM acciones_pendientes WHERE estado = 'pendiente'")
     fun observarCantidadPendiente(): Flow<Int>
 

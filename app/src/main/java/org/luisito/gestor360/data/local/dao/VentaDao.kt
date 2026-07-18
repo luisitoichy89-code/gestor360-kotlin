@@ -14,6 +14,16 @@ interface VentaDao {
     @Query("SELECT * FROM ventas_cache WHERE localId = :localId ORDER BY createdAt DESC")
     suspend fun obtenerTodas(localId: Long): List<VentaEntity>
 
+    /**
+     * NUEVO: marca UNA venta puntual como confirmada por el servidor. Se usa
+     * desde SyncManager justo después de que el RPC "registrar_venta" tiene
+     * éxito. Antes nada llamaba esto, así que limpiarSincronizadas() de abajo
+     * nunca encontraba nada que borrar y ventas_cache crecía sin límite para
+     * siempre, aunque la venta ya estuviera segura en Supabase.
+     */
+    @Query("UPDATE ventas_cache SET sincronizada = 1 WHERE id = :id")
+    suspend fun marcarSincronizada(id: String)
+
     @Query("DELETE FROM ventas_cache WHERE sincronizada = 1")
     suspend fun limpiarSincronizadas()
 

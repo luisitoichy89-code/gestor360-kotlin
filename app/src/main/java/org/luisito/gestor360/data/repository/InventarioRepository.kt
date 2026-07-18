@@ -25,7 +25,11 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
     private fun localIdActivo(): Long =
         session.getLocalId() ?: throw IllegalStateException("No hay un local activo seleccionado")
 
-    suspend fun getInventarioDia(androidId: String, fecha: LocalDate): Result<InventarioDia> {
+    suspend fun getInventarioDia(
+        androidId: String,
+        fecha: LocalDate,
+        onActualizadoDesdeServidor: (suspend (InventarioDia) -> Unit)? = null
+    ): Result<InventarioDia> {
         val localId = localIdActivo()
         val fechaStr = fecha.toString()
 
@@ -38,9 +42,19 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             desdeRoom
         }
 
+        // OJO: antes este refresco corría en un coroutine desechable y su resultado
+        // se perdía por completo (solo quedaba guardado en la caché de Room, pero
+        // nadie volvía a leerlo ni a notificar a la UI). Por eso "productos vendidos"
+        // y el resto de los datos que solo calcula el servidor (turno, tarjetas,
+        // agregados, mermas) nunca aparecían en la primera carga: la pantalla se
+        // quedaba mostrando para siempre la versión local (solo con total_vendido).
+        // Ahora se propaga el resultado ya fusionado con lo local mediante el callback.
         if (NetworkMonitor.hayInternet(context)) {
             CoroutineScope(Dispatchers.IO).launch {
-                refrescarDesdeServidor(androidId, fecha)
+                refrescarDesdeServidor(androidId, fecha).onSuccess { servidor ->
+                    val actualizado = completarDesdeRoom(servidor, localId, fecha)
+                    onActualizadoDesdeServidor?.invoke(actualizado)
+                }
             }
         }
 

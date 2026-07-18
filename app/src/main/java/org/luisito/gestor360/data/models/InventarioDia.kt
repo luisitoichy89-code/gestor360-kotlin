@@ -14,7 +14,14 @@ data class InventarioDia(
     val mermas: List<MermaInfo> = emptyList(),
     val ventas: List<VentaInfo> = emptyList(),
     val productos_vendidos: List<ProductoVendidoInfo> = emptyList(),
-    val totales_ventas: TotalesVentas = TotalesVentas()
+    val totales_ventas: TotalesVentas = TotalesVentas(),
+    val totales_por_tarjeta: List<TotalTarjetaInfo> = emptyList()
+)
+
+@Serializable
+data class TotalTarjetaInfo(
+    val nombre: String,
+    val total: Double = 0.0
 )
 
 @Serializable

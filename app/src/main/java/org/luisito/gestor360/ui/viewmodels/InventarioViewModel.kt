@@ -43,7 +43,15 @@ class InventarioViewModel(
         if (androidIdActual.isBlank()) return
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-            repository.getInventarioDia(androidIdActual, fecha)
+            repository.getInventarioDia(
+                androidIdActual, fecha,
+                onActualizadoDesdeServidor = { actualizado ->
+                    // Si el usuario ya cambió de fecha mientras esto llegaba, no pisar la pantalla actual.
+                    if (_uiState.value.fecha == fecha) {
+                        _uiState.value = _uiState.value.copy(dia = actualizado)
+                    }
+                }
+            )
                 .onSuccess { dia -> _uiState.value = _uiState.value.copy(isLoading = false, dia = dia) }
                 .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.mensajeAmigable("No se pudo cargar el inventario del día")) }
         }

@@ -30,7 +30,7 @@ import org.luisito.gestor360.ui.theme.neuShadow
 private const val VENTAS_POR_PAGINA = 20
 
 /** Fila calculada de "TARJETA": una cuenta + cuánto entró por ella ese día. */
-private data class TarjetaResumen(val etiqueta: String, val titular: String?, val total: Double)
+private data class TarjetaResumen(val nombre: String, val numero: String, val titular: String?, val total: Double)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,7 +59,7 @@ fun InventarioScreen(androidId: String, rol: String, onBack: (() -> Unit)? = nul
         ventasNoAnuladas
             .filter { !it.tarjeta_numero.isNullOrBlank() }
             .groupBy { Triple(it.tarjeta_banco, it.tarjeta_numero, it.tarjeta_titular) }
-            .map { (clave, filas) -> TarjetaResumen("${clave.first ?: ""} · ${clave.second}", clave.third, filas.sumOf { it.transferencia }) }
+            .map { (clave, filas) -> TarjetaResumen(clave.first ?: "Tarjeta", clave.second ?: "", clave.third, filas.sumOf { it.transferencia }) }
             .sortedByDescending { it.total }
     }
 
@@ -84,13 +84,28 @@ fun InventarioScreen(androidId: String, rol: String, onBack: (() -> Unit)? = nul
                             IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = MaterialTheme.colorScheme.onSurface) }
                             Spacer(Modifier.width(4.dp))
                         }
-                        Text(
-                            "Inventario",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f)
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Inventario",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    uiState.fecha.format(formatter),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                if (dia?.solo_lectura == true) {
+                                    Spacer(Modifier.width(6.dp))
+                                    Icon(Icons.Default.Lock, "Solo lectura", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(12.dp))
+                                }
+                            }
+                        }
+                        if (dia?.turno != null && dia.turno.cierre == null && uiState.esHoy && !dia.solo_lectura) {
+                            IconButton(onClick = { mostrarCerrarTurno = true }) { Icon(Icons.Default.LockOpen, "Cerrar turno", tint = MaterialTheme.colorScheme.error) }
+                        }
                         IconButton(onClick = { mostrarDatePicker = true }) { Icon(Icons.Default.CalendarMonth, "Elegir día", tint = MaterialTheme.colorScheme.onSurface) }
                         IconButton(onClick = { viewModel.refrescar() }) { Icon(Icons.Default.Refresh, null, tint = MaterialTheme.colorScheme.onSurface) }
                         if (dia != null && ventasNoAnuladas.isNotEmpty()) {
@@ -124,15 +139,11 @@ fun InventarioScreen(androidId: String, rol: String, onBack: (() -> Unit)? = nul
             else -> {
                 val dia = dia!!
                 LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                item { EncabezadoDia(uiState.fecha, formatter, dia.solo_lectura) }
-                item { TurnoCard(dia.turno, uiState.esHoy && !dia.solo_lectura, uiState.isSaving, onCerrar = { mostrarCerrarTurno = true }) }
-
-                item { Spacer(Modifier.height(4.dp)); Divider(); Spacer(Modifier.height(4.dp)) }
                 item { TotalesGeneralesCard(dia.totales_ventas) }
 
                 item { SeccionTitulo("Tarjeta", Icons.Default.CreditCard) }
                 if (tarjetasResumen.isEmpty()) item { TextoVacioSeccion("Sin cobros por tarjeta este día") }
-                items(tarjetasResumen, key = { "tj_${it.etiqueta}" }) { t -> TarjetaResumenRow(t) }
+                items(tarjetasResumen, key = { "tj_${it.nombre}_${it.numero}" }) { t -> TarjetaResumenRow(t) }
 
                 item { SeccionTitulo("Productos vendidos", Icons.Default.PointOfSale) }
                 if (dia.productos_vendidos.isEmpty()) item { TextoVacioSeccion("Sin ventas este día") }
@@ -210,55 +221,6 @@ fun InventarioScreen(androidId: String, rol: String, onBack: (() -> Unit)? = nul
 }
 
 private fun InventarioDia.totalEsperadoEnCaja(): Double = totales_ventas.efectivo
-
-@Composable
-private fun EncabezadoDia(fecha: LocalDate, formatter: DateTimeFormatter, soloLectura: Boolean) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Default.Today, null, tint = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.width(8.dp))
-        Text(fecha.format(formatter), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.width(8.dp))
-        Text("(24 horas de ese día)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (soloLectura) {
-            Spacer(Modifier.weight(1f))
-            AssistChip(onClick = {}, enabled = false, label = { Text("Solo lectura") }, leadingIcon = { Icon(Icons.Default.Lock, null, Modifier.size(16.dp)) })
-        }
-    }
-}
-
-@Composable
-private fun TurnoCard(turno: TurnoInfo?, puedeCerrar: Boolean, isSaving: Boolean, onCerrar: () -> Unit) {
-    NeuCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp)) {
-            if (turno == null) {
-                Text("Sin actividad registrada todavía", fontWeight = FontWeight.Bold)
-                Text("El turno se abre solo con el primer registro del día (una venta, un producto, etc.)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                return@Column
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(if (turno.cierre == null) Icons.Default.LockOpen else Icons.Default.Lock, null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(8.dp))
-                Text(if (turno.cierre == null) "Turno abierto" else "Turno cerrado", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            }
-            Spacer(Modifier.height(6.dp))
-            FilaConRol("Abierto por", turno.usuario_nombre, turno.usuario_rol, turno.created_at)
-            if (turno.cierre != null) {
-                Spacer(Modifier.height(4.dp))
-                val dif = turno.diferencia ?: 0.0
-                Text(
-                    when { dif > 0 -> "Sobran ${formatearMonto(dif)} CUP"; dif < 0 -> "Faltan ${formatearMonto(-dif)} CUP"; else -> "Cuadra exacto ✅" },
-                    fontWeight = FontWeight.Bold,
-                    color = when { dif > 0 -> MaterialTheme.colorScheme.tertiary; dif < 0 -> MaterialTheme.colorScheme.error; else -> MaterialTheme.colorScheme.primary }
-                )
-            } else if (puedeCerrar) {
-                Spacer(Modifier.height(10.dp))
-                NeuButton(onClick = onCerrar, enabled = !isSaving, shape = RoundedCornerShape(14.dp), containerColor = MaterialTheme.colorScheme.error) {
-                    Icon(Icons.Default.Lock, null); Spacer(Modifier.width(8.dp)); Text("Cerrar turno")
-                }
-            }
-        }
-    }
-}
 
 @Composable
 private fun SeccionTitulo(texto: String, icono: androidx.compose.ui.graphics.vector.ImageVector) {
@@ -391,11 +353,24 @@ private fun FilaResumenDinero(etiqueta: String, valor: Double, destacado: Boolea
 private fun TarjetaResumenRow(t: TarjetaResumen) {
     NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Column {
-                Text(t.etiqueta, fontWeight = FontWeight.Bold)
-                if (!t.titular.isNullOrBlank()) Text(t.titular, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(modifier = Modifier.weight(1f, fill = false)) {
+                Text(
+                    t.nombre,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+                Text(t.numero, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (!t.titular.isNullOrBlank()) Text(t.titular, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text("${formatearMonto(t.total)} CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(12.dp))
+            Text(
+                "${formatearMonto(t.total)} CUP",
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                softWrap = false
+            )
         }
     }
 }

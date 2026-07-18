@@ -37,8 +37,34 @@ class SyncManager(private val context: Context) {
     private val aprobacionStockRepository = AprobacionStockRepository(context)
 
     companion object {
-        /** Máximo de acciones a procesar por ciclo para no saturar conexiones lentas. */
-        private const val MAX_ACCIONES_POR_CICLO = 50
+        /** Tamaño de cada lote — evita mandar todo junto y saturar conexiones lentas o RPCs con timeout. */
+        private const val TAMANO_LOTE = 50
+
+        /**
+         * Tope total de acciones a procesar en UNA sola invocación de sincronizar(),
+         * aunque queden más lotes pendientes. Sin esto, tras semanas/meses offline con
+         * miles de acciones en cola, un solo ciclo intentaría vaciarla entera y podría
+         * chocar contra el límite de ejecución que Android le da a un CoroutineWorker
+         * en background. El resto se procesa en el siguiente ciclo (periódico cada
+         * 15 min, o el próximo "sincronizar ahora" — ver SyncWorker).
+         */
+        private const val MAX_ACCIONES_POR_SESION = 500
+
+        /** Pausa entre lotes para no ráfaguear la conexión ni a Supabase. */
+        private const val PAUSA_ENTRE_LOTES_MS = 300L
+
+        /**
+         * Intentos fallidos antes de dejar de reintentar SOLA una acción y marcarla
+         * error_permanente, para que no ocupe un lugar en la cola para siempre por
+         * una sola acción rota (ej. referencia a un producto ya eliminado).
+         * OJO: "registrar_venta" y "anular_venta" quedan afuera de este límite a
+         * propósito — son dinero, y preferimos que reintenten para siempre a que se
+         * abandonen solas. Ver TIPOS_NUNCA_ABANDONAR abajo.
+         */
+        private const val MAX_INTENTOS = 8
+
+        /** Tipos que NUNCA pasan a error_permanente sin importar cuántas veces fallen. */
+        private val TIPOS_NUNCA_ABANDONAR = setOf("registrar_venta", "anular_venta")
     }
 
     suspend fun sincronizar(androidId: String): SyncResultado {
@@ -67,63 +93,90 @@ class SyncManager(private val context: Context) {
 
         repararAccionesLegacyCreacionProducto()
 
-        val pendientes = db.accionPendienteDao().obtenerPendientes().take(MAX_ACCIONES_POR_CICLO)
         var exitosas = 0
         var fallidas = 0
+        var procesadasEnSesion = 0
         val eliminadosProductos = mutableListOf<Pair<String, Long>>()
         val eliminadosTarjetas = mutableListOf<Pair<String, Long>>()
 
-        for (accion in pendientes) {
-            try {
-                val payload = Json.parseToJsonElement(accion.payloadJson).jsonObject
-                val respuesta = SupabaseClientProvider.client.postgrest.rpc(accion.tipo, payload)
+        // Loop real por lotes: procesa de a TAMANO_LOTE (50) hasta vaciar la cola,
+        // hasta llegar al tope de sesión, o hasta que se corte la conexión a mitad
+        // de la puesta al día. Cada lote se trae de la base con LIMIT (no se carga
+        // toda la cola pendiente en memoria de una vez).
+        while (procesadasEnSesion < MAX_ACCIONES_POR_SESION) {
+            if (!NetworkMonitor.hayInternet(context)) break
 
-                if (accion.idLocalTemporal != null) {
-                    val localIdDeLaAccion = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull()
-                        ?: session.getLocalId()
-                    if (localIdDeLaAccion != null) {
-                        reemplazarIdTemporal(accion.tipo, accion.idLocalTemporal, respuesta, localIdDeLaAccion)
-                    }
-                }
+            val lote = db.accionPendienteDao().obtenerLotePendiente(TAMANO_LOTE)
+            if (lote.isEmpty()) break
 
-                when (accion.tipo) {
-                    "eliminar_producto" -> {
-                        val pid = payload["p_id"]?.toString()?.trim('"')
-                        val lid = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull()
-                        if (pid != null && lid != null) eliminadosProductos.add(pid to lid)
-                    }
-                    "crear_tarjeta", "actualizar_tarjeta", "activar_tarjeta",
-                    "crear_merma", "resolver_merma",
-                    "crear_devolucion", "resolver_devolucion",
-                    "solicitar_producto", "solicitar_aumento_stock",
-                    "registrar_venta", "anular_venta" -> { }
-                    "eliminar_tarjeta" -> {
-                        val tid = payload["p_id"]?.toString()?.trim('"')
-                        val lid = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull()
-                        if (tid != null && lid != null) eliminadosTarjetas.add(tid to lid)
-                    }
-                }
-
-                db.accionPendienteDao().actualizar(accion.copy(estado = "sincronizado"))
+            for (accion in lote) {
                 try {
-                    val localIdAccion = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull() ?: session.getLocalId()
-                    if (localIdAccion != null) {
-                        SyncReporter.reportar(androidId, localIdAccion, accion.tipo, payload)
+                    val payload = Json.parseToJsonElement(accion.payloadJson).jsonObject
+                    val respuesta = SupabaseClientProvider.client.postgrest.rpc(accion.tipo, payload)
+
+                    if (accion.idLocalTemporal != null) {
+                        val localIdDeLaAccion = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull()
+                            ?: session.getLocalId()
+                        if (localIdDeLaAccion != null) {
+                            reemplazarIdTemporal(accion.tipo, accion.idLocalTemporal, respuesta, localIdDeLaAccion)
+                        }
                     }
-                } catch (_: Exception) {}
-                exitosas++
-            } catch (e: Exception) {
-                db.accionPendienteDao().actualizar(
-                    accion.copy(intentos = accion.intentos + 1, ultimoError = e.message?.take(300))
-                )
-                try {
-                    val localIdAccion = session.getLocalId()
-                    if (localIdAccion != null) {
-                        SyncReporter.reportarError(androidId, localIdAccion, accion.tipo, e.message ?: "Error desconocido")
+
+                    when (accion.tipo) {
+                        "eliminar_producto" -> {
+                            val pid = payload["p_id"]?.toString()?.trim('"')
+                            val lid = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull()
+                            if (pid != null && lid != null) eliminadosProductos.add(pid to lid)
+                        }
+                        "registrar_venta" -> {
+                            // Confirma la venta local para que limpiarSincronizadas()
+                            // (al final del ciclo) sí la pueda purgar de ventas_cache.
+                            val ventaId = payload["p_id"]?.toString()?.trim('"')
+                            if (ventaId != null) db.ventaDao().marcarSincronizada(ventaId)
+                        }
+                        "crear_tarjeta", "actualizar_tarjeta", "activar_tarjeta",
+                        "crear_merma", "resolver_merma",
+                        "crear_devolucion", "resolver_devolucion",
+                        "solicitar_producto", "solicitar_aumento_stock",
+                        "anular_venta" -> { }
+                        "eliminar_tarjeta" -> {
+                            val tid = payload["p_id"]?.toString()?.trim('"')
+                            val lid = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull()
+                            if (tid != null && lid != null) eliminadosTarjetas.add(tid to lid)
+                        }
                     }
-                } catch (_: Exception) {}
-                fallidas++
+
+                    db.accionPendienteDao().actualizar(accion.copy(estado = "sincronizado"))
+                    try {
+                        val localIdAccion = payload["p_local_id"]?.toString()?.trim('"')?.toLongOrNull() ?: session.getLocalId()
+                        if (localIdAccion != null) {
+                            SyncReporter.reportar(androidId, localIdAccion, accion.tipo, payload)
+                        }
+                    } catch (_: Exception) {}
+                    exitosas++
+                } catch (e: Exception) {
+                    val intentos = accion.intentos + 1
+                    val seAbandona = intentos >= MAX_INTENTOS && accion.tipo !in TIPOS_NUNCA_ABANDONAR
+                    db.accionPendienteDao().actualizar(
+                        accion.copy(
+                            intentos = intentos,
+                            ultimoError = e.message?.take(300),
+                            estado = if (seAbandona) "error_permanente" else "pendiente"
+                        )
+                    )
+                    try {
+                        val localIdAccion = session.getLocalId()
+                        if (localIdAccion != null) {
+                            SyncReporter.reportarError(androidId, localIdAccion, accion.tipo, e.message ?: "Error desconocido")
+                        }
+                    } catch (_: Exception) {}
+                    fallidas++
+                }
             }
+
+            procesadasEnSesion += lote.size
+            if (lote.size < TAMANO_LOTE) break // ya no quedan más pendientes, no hace falta pausar
+            kotlinx.coroutines.delay(PAUSA_ENTRE_LOTES_MS)
         }
 
         for ((pid, lid) in eliminadosProductos) db.productoDao().eliminar(pid, lid)

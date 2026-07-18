@@ -18,7 +18,7 @@ data class AccionPendienteEntity(
     val creadoEn: Long = System.currentTimeMillis(),
     val intentos: Int = 0,
     val ultimoError: String? = null,
-    val estado: String = "pendiente", // pendiente | sincronizado
+    val estado: String = "pendiente", // pendiente | sincronizado | error_permanente
     /** Para acciones que crean algo (ej. crear_producto): el id temporal local, para reemplazarlo cuando el servidor devuelva el id real. */
     val idLocalTemporal: Long? = null
 )
