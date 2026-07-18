@@ -5,60 +5,121 @@ import android.content.Intent
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
 import androidx.core.content.FileProvider
+import org.luisito.gestor360.data.models.InventarioDia
 import java.io.File
 import java.io.FileOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-/**
- * Exporta el cierre de caja en 4 formatos: PDF, TXT, Word (.docx) y Compartir
- * (texto plano directo, sin archivo — para pegar en WhatsApp/Telegram rápido).
- *
- * Los 4 parten de la MISMA función generarLineas(), que solo usa los datos que
- * ya trae CierreCajaUiState del turno activo (productos vendidos, totales,
- * apertura). No se agrega nada de otros turnos ni historial: cada archivo
- * "solo manda lo afectado" por el cierre que se está exportando en ese momento.
- *
- * PDF y Word se generan sin librerías externas (android.graphics.pdf.PdfDocument
- * es parte del SDK de Android; el .docx es simplemente un .zip con XML interno,
- * así que se arma a mano con java.util.zip). No hace falta tocar build.gradle.kts.
- */
 object ReporteExporter {
 
-    data class DatosCierreCaja(
-        val fecha: String,
-        val productosVendidos: List<Pair<String, Double>>,
-        val totalEfectivo: Double,
-        val totalTransferencia: Double,
-        val totalMixto: Double,
-        val totalMixtoEfectivo: Double,
-        val totalMixtoTransferencia: Double,
-        val apertura: Double
-    )
-
-    private fun generarLineas(d: DatosCierreCaja): List<String> {
+    private fun generarLineas(dia: InventarioDia): List<String> {
         val generadoEl = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
-        val efectivoEnCaja = d.totalEfectivo + d.totalMixtoEfectivo
+        val tot = dia.totales_ventas
+        val turno = dia.turno
+
         val lineas = mutableListOf(
-            "Gestor360 - Cierre de caja",
-            "Fecha del turno: ${d.fecha}",
+            "Gestor360 - Inventario",
+            "Fecha: ${dia.fecha}",
             "Generado el: $generadoEl",
             ""
         )
-        lineas.add("PRODUCTOS VENDIDOS")
-        if (d.productosVendidos.isEmpty()) lineas.add("  (sin ventas en este turno)")
-        d.productosVendidos.forEach { (nombre, cantidad) -> lineas.add("  $nombre: ${formatearNumero(cantidad)}") }
+
+        // Totales
+        lineas.add("TOTALES")
+        lineas.add("  Efectivo: ${formatearNumero(tot.efectivo)} CUP")
+        lineas.add("  Transferencia: ${formatearNumero(tot.transferencia)} CUP")
+        lineas.add("  Total: ${formatearNumero(tot.efectivo + tot.transferencia)} CUP")
+        lineas.add("  Ventas: ${tot.cantidad_ventas}")
+        if (turno != null) {
+            lineas.add("  Apertura: ${formatearNumero(turno.apertura)} CUP")
+            turno.cierre?.let { lineas.add("  Cierre: ${formatearNumero(it)} CUP") }
+            turno.diferencia?.let { lineas.add("  Diferencia: ${formatearNumero(it)} CUP") }
+        }
         lineas.add("")
-        lineas.add("RESUMEN DE COBROS")
-        lineas.add("  Apertura: ${formatearNumero(d.apertura)} CUP")
-        lineas.add("  Efectivo (ventas 100% efectivo): ${formatearNumero(d.totalEfectivo)} CUP")
-        lineas.add("  Transferencia: ${formatearNumero(d.totalTransferencia)} CUP")
-        lineas.add("  Mixto (total): ${formatearNumero(d.totalMixto)} CUP")
-        lineas.add("    - Mixto en efectivo: ${formatearNumero(d.totalMixtoEfectivo)} CUP")
-        lineas.add("    - Mixto en transferencia: ${formatearNumero(d.totalMixtoTransferencia)} CUP")
-        lineas.add("")
-        lineas.add("Efectivo esperado en caja: ${formatearNumero(d.apertura + efectivoEnCaja)} CUP")
-        lineas.add("Total general vendido: ${formatearNumero(d.totalEfectivo + d.totalTransferencia + d.totalMixto)} CUP")
+
+        // Totales por tarjeta
+        if (dia.totales_por_tarjeta.isNotEmpty()) {
+            lineas.add("TOTALES POR TARJETA")
+            dia.totales_por_tarjeta.forEach { t ->
+                lineas.add("  ${t.nombre}: ${formatearNumero(t.total)} CUP")
+            }
+            lineas.add("")
+        }
+
+        // Productos vendidos
+        if (dia.productos_vendidos.isNotEmpty()) {
+            lineas.add("PRODUCTOS VENDIDOS")
+            dia.productos_vendidos.forEach { p ->
+                lineas.add("  ${p.nombre}: ${formatearNumero(p.total_vendido)}")
+                lineas.add("    Stock actual: ${formatearNumero(p.total_actual)}")
+                lineas.add("    Agregado: ${formatearNumero(p.total_agregado)}")
+                lineas.add("    Merma: ${formatearNumero(p.total_merma)}")
+                lineas.add("    Inicial: ${formatearNumero(p.total_inicial)}")
+            }
+            lineas.add("")
+        }
+
+        // Productos nuevos
+        if (dia.productos_nuevos.isNotEmpty()) {
+            lineas.add("PRODUCTOS NUEVOS")
+            dia.productos_nuevos.forEach { p ->
+                lineas.add("  ${p.nombre} (${formatearNumero(p.stock)})")
+            }
+            lineas.add("")
+        }
+
+        // Productos modificados
+        if (dia.productos_modificados.isNotEmpty()) {
+            lineas.add("PRODUCTOS MODIFICADOS")
+            dia.productos_modificados.forEach { p ->
+                lineas.add("  ${p.nombre} (${formatearNumero(p.stock)})")
+            }
+            lineas.add("")
+        }
+
+        // Productos eliminados
+        if (dia.productos_eliminados.isNotEmpty()) {
+            lineas.add("PRODUCTOS ELIMINADOS")
+            dia.productos_eliminados.forEach { p ->
+                lineas.add("  ${p.nombre} (${formatearNumero(p.stock)})")
+            }
+            lineas.add("")
+        }
+
+        // Mermas
+        if (dia.mermas.isNotEmpty()) {
+            lineas.add("MERMAS")
+            dia.mermas.forEach { m ->
+                lineas.add("  ${m.producto_nombre}: ${formatearNumero(m.cantidad)} (${m.estado}) - ${m.motivo}")
+            }
+            lineas.add("")
+        }
+
+        // Devoluciones
+        if (dia.devueltos.isNotEmpty()) {
+            lineas.add("DEVOLUCIONES")
+            dia.devueltos.forEach { d ->
+                lineas.add("  ${d.producto_nombre}: ${formatearNumero(d.cantidad)} (${d.estado}) - ${d.metodo}")
+            }
+            lineas.add("")
+        }
+
+        // Ventas con datos de cliente (solo las que tienen tarjeta o datos de cliente)
+        val ventasConCliente = dia.ventas.filter { !it.cliente_nombre.isNullOrBlank() || !it.cliente_ci.isNullOrBlank() }
+        if (ventasConCliente.isNotEmpty()) {
+            lineas.add("PAGOS POR TARJETA")
+            ventasConCliente.forEach { v ->
+                lineas.add("  ${v.tarjeta_banco ?: "Tarjeta"} · ${v.tarjeta_numero ?: ""}")
+                lineas.add("    Producto: ${v.producto_nombre}")
+                lineas.add("    Total: ${formatearNumero(v.total)} CUP")
+                v.cliente_nombre?.let { lineas.add("    Cliente: $it") }
+                v.cliente_ci?.let { lineas.add("    CI: $it") }
+                v.cliente_tel?.let { lineas.add("    Tel: $it") }
+            }
+            lineas.add("")
+        }
+
         return lineas
     }
 
@@ -66,12 +127,6 @@ object ReporteExporter {
         if (valor == valor.toLong().toDouble()) valor.toLong().toString() else valor.toString()
 
     private fun carpetaExport(context: Context): File {
-        // OJO: se reutiliza la MISMA carpeta "csv/" que ya usa CsvExporter, no una
-        // carpeta nueva. res/xml/file_paths.xml solo tiene declarada esa ruta para
-        // el FileProvider; si se escribe en una carpeta distinta sin declararla ahí,
-        // FileProvider.getUriForFile() lanza IllegalArgumentException apenas se llama
-        // y la app se cierra sola (eso rompía PDF/TXT/Word: "Compartir" no falla
-        // porque no toca FileProvider, es solo texto plano).
         val carpeta = File(context.getExternalFilesDir(null), "csv")
         if (!carpeta.exists()) carpeta.mkdirs()
         return carpeta
@@ -88,23 +143,22 @@ object ReporteExporter {
     }
 
     // ---------------- TXT ----------------
-    fun exportarTxt(context: Context, datos: DatosCierreCaja) {
-        val archivo = File(carpetaExport(context), "cierre_caja_${datos.fecha}.txt")
-        archivo.writeText(generarLineas(datos).joinToString("\n"))
+    fun exportarTxt(context: Context, dia: InventarioDia) {
+        val archivo = File(carpetaExport(context), "inventario_${dia.fecha}.txt")
+        archivo.writeText(generarLineas(dia).joinToString("\n"))
         compartirArchivo(context, archivo, "text/plain")
     }
 
     // ---------------- PDF ----------------
-    fun exportarPdf(context: Context, datos: DatosCierreCaja) {
-        val lineas = generarLineas(datos)
+    fun exportarPdf(context: Context, dia: InventarioDia) {
+        val lineas = generarLineas(dia)
         val pdf = PdfDocument()
-        val paintTexto = Paint().apply { textSize = 11f }
-        val paintTitulo = Paint().apply { textSize = 15f; isFakeBoldText = true }
-        // Tamaño A4 en puntos (72 dpi): 595 x 842
+        val paintTexto = Paint().apply { textSize = 10f }
+        val paintTitulo = Paint().apply { textSize = 14f; isFakeBoldText = true }
         val anchoPagina = 595
         val altoPagina = 842
         val margen = 40f
-        val alturaLinea = 16f
+        val alturaLinea = 14f
 
         var numeroPagina = 1
         var pagina = pdf.startPage(PdfDocument.PageInfo.Builder(anchoPagina, altoPagina, numeroPagina).create())
@@ -124,22 +178,20 @@ object ReporteExporter {
         }
         pdf.finishPage(pagina)
 
-        val archivo = File(carpetaExport(context), "cierre_caja_${datos.fecha}.pdf")
+        val archivo = File(carpetaExport(context), "inventario_${dia.fecha}.pdf")
         FileOutputStream(archivo).use { pdf.writeTo(it) }
         pdf.close()
         compartirArchivo(context, archivo, "application/pdf")
     }
 
-    // ---------------- WORD (.docx mínimo, sin Apache POI) ----------------
-    fun exportarWord(context: Context, datos: DatosCierreCaja) {
-        val archivo = File(carpetaExport(context), "cierre_caja_${datos.fecha}.docx")
-        escribirDocx(archivo, generarLineas(datos))
+    // ---------------- WORD ----------------
+    fun exportarWord(context: Context, dia: InventarioDia) {
+        val archivo = File(carpetaExport(context), "inventario_${dia.fecha}.docx")
+        escribirDocx(archivo, generarLineas(dia))
         compartirArchivo(context, archivo, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
     }
 
     private fun escribirDocx(archivo: File, lineas: List<String>) {
-        // Un .docx válido es, por dentro, solo un .zip con estas 4 piezas mínimas.
-        // No hace falta ninguna librería (Apache POI, etc.) para esto tan simple.
         ZipOutputStream(FileOutputStream(archivo)).use { zip ->
             fun escribirEntrada(nombre: String, contenido: String) {
                 zip.putNextEntry(ZipEntry(nombre))
@@ -163,6 +215,15 @@ object ReporteExporter {
             "<w:body>$cuerpo</w:body></w:document>"
     }
 
+    // ---------------- COMPARTIR ----------------
+    fun compartirTexto(context: Context, dia: InventarioDia) {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, generarLineas(dia).joinToString("\n"))
+        }
+        context.startActivity(Intent.createChooser(intent, "Compartir inventario"))
+    }
+
     private const val CONTENT_TYPES_XML = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
         "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">" +
         "<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>" +
@@ -177,13 +238,4 @@ object ReporteExporter {
 
     private const val DOCUMENT_RELS_XML = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
         "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"></Relationships>"
-
-    // ---------------- COMPARTIR (texto plano directo, sin archivo) ----------------
-    fun compartirTexto(context: Context, datos: DatosCierreCaja) {
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, generarLineas(datos).joinToString("\n"))
-        }
-        context.startActivity(Intent.createChooser(intent, "Compartir cierre de caja"))
-    }
 }
