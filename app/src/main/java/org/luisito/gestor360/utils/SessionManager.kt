@@ -2,6 +2,9 @@ package org.luisito.gestor360.utils
 
 import android.content.Context
 import android.content.SharedPreferences
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import org.luisito.gestor360.security.EncryptedPrefs
 
 /**
@@ -23,6 +26,22 @@ import org.luisito.gestor360.security.EncryptedPrefs
  * del Keystore.
  */
 class SessionManager(context: Context) {
+
+    companion object {
+        /**
+         * Aviso EN VIVO (mismo proceso) de que la sesión fue revocada por el
+         * SyncManager (usuario desactivado o licencia no vigente detectada
+         * durante una sincronización). Es `companion` a propósito: cada
+         * pantalla instancia su propio SessionManager, pero todas deben
+         * enterarse del mismo evento sin depender de cuál instancia lo
+         * disparó. Si la app estaba cerrada/proceso muerto cuando ocurrió la
+         * revocación, este StateFlow no alcanza a avisar — para ese caso ver
+         * haySesionRevocadaPersistida(), que sí sobrevive reinicios.
+         */
+        private val _sesionRevocada = MutableStateFlow(false)
+        val sesionRevocada: StateFlow<Boolean> = _sesionRevocada.asStateFlow()
+    }
+
     private val prefs: SharedPreferences = EncryptedPrefs.abrir(context, "gestor360_session")
 
     /**
@@ -138,4 +157,30 @@ class SessionManager(context: Context) {
     fun limpiarLicenciaVerificada() {
         licenciaPrefs.edit().clear().apply()
     }
+
+    /**
+     * Llamado por SyncManager cuando, al sincronizar, detecta que el usuario
+     * ya no está activo o la licencia ya no es válida. Persiste en disco
+     * (para que sobreviva a que WorkManager haya corrido con la app cerrada)
+     * Y emite en `sesionRevocada` (para que, si la app está abierta en ese
+     * momento, MainActivity reaccione al instante sin esperar a reabrir).
+     */
+    fun marcarSesionRevocada() {
+        licenciaPrefs.edit().putBoolean("sesion_revocada", true).apply()
+        _sesionRevocada.value = true
+    }
+
+    /** Se llama tras procesar la revocación (forzar logout + limpiar caché de licencia). */
+    fun limpiarSesionRevocada() {
+        licenciaPrefs.edit().remove("sesion_revocada").apply()
+        _sesionRevocada.value = false
+    }
+
+    /**
+     * Chequeo persistido: cubre el caso en que la revocación ocurrió con la
+     * app cerrada (sync corrida por WorkManager en background/proceso
+     * nuevo). Se consulta al abrir la app, antes de decidir qué pantalla
+     * mostrar.
+     */
+    fun haySesionRevocadaPersistida(): Boolean = licenciaPrefs.getBoolean("sesion_revocada", false)
 }

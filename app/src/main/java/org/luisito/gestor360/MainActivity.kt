@@ -33,6 +33,7 @@ import org.luisito.gestor360.data.local.AppDatabase
 import org.luisito.gestor360.data.models.User
 import org.luisito.gestor360.data.models.Local
 import org.luisito.gestor360.data.repository.DeviceVerificationRepository
+import org.luisito.gestor360.data.repository.VerificacionEnCalienteResultado
 import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.data.sync.SyncWorker
 import org.luisito.gestor360.ui.components.AvatarUsuario
@@ -133,13 +134,45 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
     }
 
     LaunchedEffect(Unit) {
+        // Si una sincronización en background (app cerrada, WorkManager)
+        // detectó que este usuario/licencia ya no es válido, esto quedó
+        // persistido (ver SessionManager.marcarSesionRevocada()). Lo
+        // limpiamos acá ANTES de decidir qué pantalla mostrar, para no
+        // arrastrar una sesión ya cerrada por el sistema.
+        if (sessionManager.haySesionRevocadaPersistida()) {
+            sessionManager.clear()
+            sessionManager.limpiarLicenciaVerificada()
+            sessionManager.limpiarSesionRevocada()
+        }
+
         isLoggedIn = sessionManager.isLoggedIn()
         if (!isLoggedIn) {
             // Dispositivo ya verificado antes + licencia todavía vigente en
             // caché => directo al PIN, sin pasar por VerificarDispositivoScreen
             // ni depender de internet (ver DeviceVerificationRepository).
             val androidId = DeviceIdManager.getFormattedDeviceId(context)
-            usuarioParaPin = deviceVerificationRepository.intentarAccesoCacheado(androidId)
+            val cacheado = deviceVerificationRepository.intentarAccesoCacheado(androidId)
+
+            if (cacheado != null && NetworkMonitor.hayInternet(context)) {
+                // Hay caché válida Y hay internet ahora mismo: antes de
+                // confiar en la caché, una revisión relámpago contra
+                // Supabase. Esto tapa el hueco de un empleado desactivado
+                // que estuvo offline y, justo al volver la conexión,
+                // intenta entrar de nuevo por PIN sin que nadie lo revise.
+                // Si no hay internet, o el chequeo falla por cualquier
+                // motivo de red, se procede igual con la caché (ver
+                // VerificacionEnCalienteResultado.NoVerificado).
+                when (val resultado = deviceVerificationRepository.verificarEnCaliente(androidId)) {
+                    is VerificacionEnCalienteResultado.Bloqueado -> {
+                        sessionManager.limpiarLicenciaVerificada()
+                        accesoViewModel.mostrarBloqueoPorRevision(resultado.mensaje)
+                        usuarioParaPin = null
+                    }
+                    else -> usuarioParaPin = cacheado
+                }
+            } else {
+                usuarioParaPin = cacheado
+            }
         }
         isLoading = false
     }
@@ -158,6 +191,20 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
         usuarioParaPin = null
         isLoggedIn = false
         pantalla = PantallaInterna.Home
+    }
+
+    // Aviso EN VIVO de que el SyncManager revocó la sesión mientras la app
+    // estaba abierta (usuario desactivado o licencia inválida detectados
+    // durante una sincronización en curso). Sin esto, el empleado seguiría
+    // viendo el dashboard hasta que reabriera la app.
+    LaunchedEffect(Unit) {
+        SessionManager.sesionRevocada.collect { revocada ->
+            if (revocada && sessionManager.isLoggedIn()) {
+                sessionManager.limpiarLicenciaVerificada()
+                sessionManager.limpiarSesionRevocada()
+                cerrarSesion()
+            }
+        }
     }
 
     if (isLoggedIn) {

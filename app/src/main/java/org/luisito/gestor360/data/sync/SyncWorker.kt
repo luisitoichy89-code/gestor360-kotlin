@@ -6,13 +6,21 @@ import org.luisito.gestor360.utils.SessionManager
 import java.util.concurrent.TimeUnit
 
 class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
-
     override suspend fun doWork(): Result {
         val androidId = SessionManager(applicationContext).getAndroidId()
         if (androidId.isBlank()) return Result.success() // nadie ha iniciado sesión todavía
 
         val resultado = SyncManager(applicationContext).sincronizar(androidId)
         return when {
+            // Usuario desactivado o licencia no vigente: esto NO es un problema
+            // de red, es una decisión definitiva (ver SyncManager.sincronizar()).
+            // Reintentar o marcar failure() no cambiaría nada — WorkManager
+            // seguiría reintentando en vano contra algo que ya quedó resuelto
+            // (SessionManager.marcarSesionRevocada() + limpiarLicenciaVerificada()
+            // ya se encargaron de forzar la vuelta a VerificarDispositivoScreen
+            // la próxima vez que se abra la app). Se marca success() para que
+            // WorkManager no siga reintentando este trabajo puntual.
+            resultado.licenciaBloqueada -> Result.success()
             resultado.error == "Sin conexión" -> Result.retry()
             resultado.error != null -> Result.failure()
             else -> Result.success()

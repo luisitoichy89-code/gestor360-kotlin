@@ -10,17 +10,26 @@ import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.local.AppDatabase
 import org.luisito.gestor360.data.local.entities.ConflictoEntity
 import org.luisito.gestor360.data.repository.AprobacionStockRepository
+import org.luisito.gestor360.data.repository.DeviceVerificationRepository
 import org.luisito.gestor360.data.repository.MermaRepository
 import org.luisito.gestor360.data.repository.ProductRepository
 import org.luisito.gestor360.data.repository.TarjetaRepository
 import org.luisito.gestor360.data.repository.TurnoRepository
+import org.luisito.gestor360.data.repository.VerificacionEnCalienteResultado
 import org.luisito.gestor360.utils.SessionManager
 
-data class SyncResultado(val exitosas: Int, val fallidas: Int, val error: String? = null)
+/**
+ * `licenciaBloqueada`: true cuando NO se sincronizó nada porque, antes de
+ * tocar la cola, se detectó que el usuario ya no está activo o la licencia
+ * ya no es válida (ver SyncManager.sincronizar()). Útil si SyncWorker quiere
+ * avisar de esto en una notificación en vez de tratarlo como un fallo de red más.
+ */
+data class SyncResultado(val exitosas: Int, val fallidas: Int, val error: String? = null, val licenciaBloqueada: Boolean = false)
 
 class SyncManager(private val context: Context) {
     private val db = AppDatabase.obtener(context)
     private val session = SessionManager(context)
+    private val deviceVerificationRepository = DeviceVerificationRepository(context)
     private val productRepository = ProductRepository(context)
     private val tarjetaRepository = TarjetaRepository(context)
     private val mermaRepository = MermaRepository(context)
@@ -35,6 +44,23 @@ class SyncManager(private val context: Context) {
     suspend fun sincronizar(androidId: String): SyncResultado {
         if (androidId.isBlank()) return SyncResultado(0, 0, "Sin sesión activa")
         if (!NetworkMonitor.hayInternet(context)) return SyncResultado(0, 0, "Sin conexión")
+
+        // Antes de procesar CUALQUIER acción pendiente: si el usuario fue
+        // desactivado o la licencia dejó de ser válida mientras el
+        // dispositivo estuvo offline, no sincronizamos nada de lo pendiente
+        // (evita colar ventas falsas de un empleado ya echado) y marcamos la
+        // sesión como revocada para que la app vuelva a pedir verificación
+        // de dispositivo la próxima vez. Si no hay respuesta clara del
+        // servidor (sin internet real, error, timeout) esto NO bloquea —
+        // ver VerificacionEnCalienteResultado.NoVerificado.
+        when (val estado = deviceVerificationRepository.verificarEnCaliente(androidId)) {
+            is VerificacionEnCalienteResultado.Bloqueado -> {
+                session.marcarSesionRevocada()
+                session.limpiarLicenciaVerificada()
+                return SyncResultado(0, 0, estado.mensaje, licenciaBloqueada = true)
+            }
+            else -> {}
+        }
 
         repararAccionesLegacyCreacionProducto()
 

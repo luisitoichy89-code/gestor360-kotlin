@@ -9,6 +9,7 @@ import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.local.AppDatabase
 import org.luisito.gestor360.data.local.entities.UserEntity
 import org.luisito.gestor360.data.models.User
+import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.security.PinSecurity
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
@@ -22,6 +23,21 @@ sealed class VerificacionResultado {
     object LicenciaInactiva : VerificacionResultado()
     object SinConexionPrimerInicio : VerificacionResultado()
     data class Error(val mensaje: String) : VerificacionResultado()
+}
+
+/**
+ * Resultado de la revisión "en caliente" (ver verificarEnCaliente()). A
+ * diferencia de VerificacionResultado (que se usa en la pantalla de
+ * verificación completa), este solo tiene tres salidas posibles porque su
+ * único trabajo es decidir si el acceso cacheado sigue siendo válido.
+ */
+sealed class VerificacionEnCalienteResultado {
+    /** El servidor respondió y todo sigue en orden: usuario activo, licencia vigente. */
+    object Ok : VerificacionEnCalienteResultado()
+    /** El servidor respondió y dijo explícitamente que ya no hay acceso. */
+    data class Bloqueado(val mensaje: String) : VerificacionEnCalienteResultado()
+    /** No hay internet, o el request falló por cualquier motivo de red/servidor. No bloquea. */
+    object NoVerificado : VerificacionEnCalienteResultado()
 }
 
 @Serializable
@@ -94,6 +110,63 @@ class DeviceVerificationRepository(
             } else {
                 VerificacionResultado.SinConexionPrimerInicio
             }
+        }
+    }
+
+    /**
+     * Revisión "en caliente": el punto que faltaba para tapar el hueco de
+     * seguridad de un empleado desactivado que sigue offline. SOLO tiene
+     * sentido llamarla cuando ya existe acceso cacheado (ver
+     * intentarAccesoCacheado) y HAY internet — el llamador (MainActivity) es
+     * quien decide eso antes de invocarla.
+     *
+     * Si no hay internet, o el request falla por cualquier motivo de red o
+     * servidor, devuelve NoVerificado: NO bloquea nada, se sigue confiando
+     * en la caché tal cual funcionaba antes. Bloquea ÚNICAMENTE cuando el
+     * servidor respondió y dijo explícitamente que el usuario ya no está
+     * activo o la licencia ya no es válida/vigente.
+     */
+    suspend fun verificarEnCaliente(androidId: String): VerificacionEnCalienteResultado {
+        if (!NetworkMonitor.hayInternet(context)) return VerificacionEnCalienteResultado.NoVerificado
+        return try {
+            val usuarios = SupabaseClientProvider.client.postgrest.rpc(
+                "get_usuarios", buildJsonObject { put("p_android_id", androidId) }
+            ).decodeList<User>()
+            val usuario = usuarios.firstOrNull()
+                ?: return VerificacionEnCalienteResultado.Bloqueado(
+                    "Este dispositivo ya no está autorizado. Contacta al admin."
+                )
+            if (!usuario.activo) {
+                return VerificacionEnCalienteResultado.Bloqueado(
+                    "Tu usuario está desactivado. Contacta al admin del negocio."
+                )
+            }
+
+            val licencias = SupabaseClientProvider.client.postgrest.rpc(
+                "get_licencias", buildJsonObject { put("p_android_id", androidId) }
+            ).decodeList<LicenciaFila>()
+            val licencia = licencias.firstOrNull()
+                ?: return VerificacionEnCalienteResultado.Bloqueado(
+                    "La licencia del negocio no está activa. Contacta al admin."
+                )
+            if (!licencia.activo) {
+                return VerificacionEnCalienteResultado.Bloqueado(
+                    "La licencia del negocio no está activa. Contacta al admin."
+                )
+            }
+            val expiracion = LocalDate.parse(licencia.expiracion)
+            if (expiracion.isBefore(LocalDate.now())) {
+                return VerificacionEnCalienteResultado.Bloqueado(
+                    "La licencia del negocio venció. Debe renovarse para continuar."
+                )
+            }
+
+            // Aprovechamos para refrescar la fecha cacheada, por si la
+            // licencia se extendió o se acortó desde la última verificación.
+            sessionManager.guardarLicenciaVerificada(androidId, licencia.expiracion)
+            VerificacionEnCalienteResultado.Ok
+        } catch (e: Exception) {
+            VerificacionEnCalienteResultado.NoVerificado
         }
     }
 

@@ -95,6 +95,18 @@ class AccesoViewModel(
         }
     }
 
+    /**
+     * Usado por MainActivity cuando el acceso cacheado (offline-first) pasó
+     * la revisión "en caliente" (ver DeviceVerificationRepository.
+     * verificarEnCaliente()) y resultó Bloqueado: no se llegó a mostrar el
+     * PIN, así que no hay `verificarDispositivo()` de por medio. Esto solo
+     * pinta el mensaje de error en VerificarDispositivoScreen y deja el
+     * botón "Verificar dispositivo" visible para reintentar manualmente.
+     */
+    fun mostrarBloqueoPorRevision(mensaje: String) {
+        _uiState.value = AccesoUiState(mensajeError = mensaje)
+    }
+
     fun limpiarPinError() {
         _uiState.value = _uiState.value.copy(pinError = null)
     }
