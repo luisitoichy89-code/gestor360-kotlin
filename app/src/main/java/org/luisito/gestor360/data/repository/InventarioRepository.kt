@@ -42,13 +42,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             desdeRoom
         }
 
-        // OJO: antes este refresco corría en un coroutine desechable y su resultado
-        // se perdía por completo (solo quedaba guardado en la caché de Room, pero
-        // nadie volvía a leerlo ni a notificar a la UI). Por eso "productos vendidos"
-        // y el resto de los datos que solo calcula el servidor (turno, tarjetas,
-        // agregados, mermas) nunca aparecían en la primera carga: la pantalla se
-        // quedaba mostrando para siempre la versión local (solo con total_vendido).
-        // Ahora se propaga el resultado ya fusionado con lo local mediante el callback.
         if (NetworkMonitor.hayInternet(context)) {
             CoroutineScope(Dispatchers.IO).launch {
                 refrescarDesdeServidor(androidId, fecha).onSuccess { servidor ->
@@ -63,14 +56,8 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
 
     private suspend fun construirDesdeRoom(localId: Long, fecha: LocalDate): InventarioDia {
         val fechaStr = fecha.toString()
-
         val nombreUsuarioLocal = session.getNombre().takeIf { it.isNotBlank() }
 
-        // 'eliminados' (lo que se MUESTRA en la sección "productos eliminados")
-        // sigue filtrado al día; para el FALLBACK DE NOMBRE en ventas y
-        // productos vendidos se usa un mapa aparte sin filtrar por fecha
-        // (obtenerTodos), porque una venta puede ser de hoy pero el producto
-        // pudo haberse eliminado cualquier otro día.
         val eliminados = db.productoEliminadoCacheDao().obtenerPorFecha(localId, fechaStr)
             .map { e ->
                 ProductoEliminadoInfo(id = e.id, nombre = e.nombre, stock = e.stock, fecha = e.fecha, resuelto_por_nombre = null)
@@ -83,7 +70,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
 
         val ventasInfo = ventasHoy.map { it.toVentaInfo(localId, nombreUsuarioLocal, eliminadosPorId) }
 
-        val productosVendidos = fusionarProductosVendidos(emptyList(), ventasHoy, eliminadosPorId)
+        val productosVendidos = fusionarProductosVendidos(emptyList(), ventasHoy, localId, fechaStr, eliminadosPorId)
 
         val totales = TotalesVentas(
             efectivo = ventasHoy.sumOf { it.efectivo },
@@ -91,11 +78,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             cantidad_ventas = ventasHoy.size.toLong()
         )
 
-        // FIX: antes esta función nunca reconstruía "productos_nuevos" desde Room
-        // (solo "modificados"), así que en el path offline —que es el que domina
-        // en esta app— la sección de nuevos siempre quedaba vacía, y un producto
-        // recién creado con updatedAt distinto de createdAt el mismo día caía
-        // directo en "modificados" sin haber pasado nunca por "nuevos".
         val nuevos = db.productoDao().obtenerTodos(localId).filter { p ->
             p.createdAt?.startsWith(fechaStr) == true
         }.map { p ->
@@ -106,14 +88,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             )
         }
 
-        // FIX: antes se comparaba createdAt != updatedAt para decidir si un
-        // producto era "modificado". Esa comparación de timestamps exactos
-        // puede diferir por milisegundos aunque el producto jamás se haya
-        // editado (created_at y updated_at no siempre quedan idénticos al
-        // insertar), así que productos recién creados HOY terminaban
-        // apareciendo en "modificados". El SQL del servidor ya usa el
-        // criterio correcto (created_at::date <> p_fecha); se alinea acá:
-        // solo es "modificado" si se actualizó hoy Y no fue creado hoy.
         val modificados = db.productoDao().obtenerTodos(localId).filter { p ->
             p.updatedAt?.startsWith(fechaStr) == true && p.createdAt?.startsWith(fechaStr) != true
         }.map { p ->
@@ -180,7 +154,13 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         for (local in locales) {
             val existente = mapa[local.nombre]
             if (existente != null) {
-                mapa[local.nombre] = existente.copy(total_vendido = existente.total_vendido + local.total_vendido)
+                mapa[local.nombre] = existente.copy(
+                    total_vendido = existente.total_vendido + local.total_vendido,
+                    total_actual = if (local.total_actual > 0) local.total_actual else existente.total_actual,
+                    total_agregado = existente.total_agregado + local.total_agregado,
+                    total_merma = existente.total_merma + local.total_merma,
+                    total_inicial = if (local.total_inicial > 0) local.total_inicial else existente.total_inicial
+                )
             } else {
                 mapa[local.nombre] = local
             }
@@ -219,18 +199,33 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
     private suspend fun fusionarProductosVendidos(
         existentes: List<ProductoVendidoInfo>,
         pendientes: List<VentaEntity>,
+        localId: Long,
+        fechaStr: String,
         eliminadosPorId: Map<String, ProductoEliminadoInfo> = emptyMap()
     ): List<ProductoVendidoInfo> {
         val porNombre = existentes.associateBy { it.nombre }.toMutableMap()
-        val localId = pendientes.firstOrNull()?.localId ?: return existentes
+        
+        // Obtener todos los productos para stock actual
+        val todosProductos = db.productoDao().obtenerTodos(localId).associateBy { it.nombre }
+        
         for (venta in pendientes) {
             val nombre = venta.productoNombre
                 ?: db.productoDao().obtenerPorId(venta.productoId.toString(), localId)?.nombre
                 ?: eliminadosPorId[venta.productoId]?.nombre
                 ?: "Producto #${venta.productoId}"
+            
             val actual = porNombre[nombre] ?: ProductoVendidoInfo(nombre = nombre)
-            porNombre[nombre] = actual.copy(total_vendido = actual.total_vendido + venta.cantidad)
+            val producto = todosProductos[nombre]
+            
+            porNombre[nombre] = actual.copy(
+                total_vendido = actual.total_vendido + venta.cantidad,
+                total_actual = producto?.stock ?: actual.total_actual,
+                total_agregado = actual.total_agregado,
+                total_merma = actual.total_merma,
+                total_inicial = (producto?.stock ?: 0.0) + (actual.total_vendido + venta.cantidad)
+            )
         }
+        
         return porNombre.values.toList()
     }
 
