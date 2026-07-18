@@ -11,6 +11,7 @@ import org.luisito.gestor360.data.local.entities.UserEntity
 import org.luisito.gestor360.data.models.User
 import org.luisito.gestor360.security.PinSecurity
 import org.luisito.gestor360.utils.AppContextHolder
+import org.luisito.gestor360.utils.SessionManager
 import java.time.LocalDate
 
 sealed class VerificacionResultado {
@@ -30,6 +31,7 @@ class DeviceVerificationRepository(
     private val context: Context = AppContextHolder.context
 ) {
     private val db = AppDatabase.obtener(context)
+    private val sessionManager = SessionManager(context)
 
     suspend fun verificar(androidId: String): VerificacionResultado {
         return try {
@@ -51,6 +53,11 @@ class DeviceVerificationRepository(
                 val diasVencida = java.time.temporal.ChronoUnit.DAYS.between(expiracion, hoy)
                 return VerificacionResultado.LicenciaVencida(diasVencida)
             }
+
+            // Licencia vigente: guardamos hasta cuándo, para que la próxima vez
+            // (con o sin internet) la app pueda saltar esta verificación entera
+            // y entrar directo a pedir el PIN — ver intentarAccesoCacheado().
+            sessionManager.guardarLicenciaVerificada(androidId, licencia.expiracion)
 
             val entidadPrevia = db.userDao().getUserById(usuario.android_id ?: androidId)
             val (pinHash, pinSalt) = if (usuario.pin != null) {
@@ -95,5 +102,32 @@ class DeviceVerificationRepository(
         val hash = userLocal.pinHash ?: return false
         val salt = userLocal.pinSalt ?: return false
         return PinSecurity.verificar(pin, salt, hash)
+    }
+
+    /**
+     * Punto de entrada del "salto de verificación": se llama al abrir la app
+     * (antes de mostrar VerificarDispositivoScreen). Si este dispositivo ya
+     * se verificó antes y la licencia cacheada localmente todavía no venció,
+     * arma el User directo desde Room (sin tocar la red) y la app va directo
+     * al PIN. Devuelve null si nunca se verificó, si la licencia cacheada ya
+     * venció, o si por algún motivo no hay usuario local guardado — en
+     * cualquiera de esos casos se cae de nuevo en la verificación normal.
+     */
+    suspend fun intentarAccesoCacheado(androidId: String): User? {
+        val expiracionCache = sessionManager.getLicenciaVerificadaVigente(androidId) ?: return null
+        val vigente = try {
+            !LocalDate.parse(expiracionCache).isBefore(LocalDate.now())
+        } catch (e: Exception) {
+            false
+        }
+        if (!vigente) return null
+
+        val userLocal = db.userDao().getUserById(androidId) ?: return null
+        return User(
+            id = 0L, auth_id = userLocal.authId, cliente_id = "",
+            username = userLocal.username, nombre = userLocal.nombre,
+            rol = userLocal.rol, pin = null, android_id = userLocal.id,
+            local_id = userLocal.localId, activo = userLocal.activo
+        )
     }
 }

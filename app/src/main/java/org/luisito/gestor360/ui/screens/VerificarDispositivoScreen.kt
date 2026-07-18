@@ -91,6 +91,8 @@ fun VerificarDispositivoScreen(onDispositivoAutorizado: (User) -> Unit, viewMode
             Spacer(Modifier.height(16.dp))
             Text("Gestor360", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Text("Verificación de dispositivo requerida", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(4.dp))
+            org.luisito.gestor360.ui.components.ContactoSoporteWhatsApp()
             Spacer(Modifier.height(24.dp))
             NeuCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
                 Column(Modifier.padding(16.dp)) {

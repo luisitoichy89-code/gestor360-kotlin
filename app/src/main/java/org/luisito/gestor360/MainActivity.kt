@@ -32,6 +32,7 @@ import org.luisito.gestor360.data.local.FotoRepository
 import org.luisito.gestor360.data.local.AppDatabase
 import org.luisito.gestor360.data.models.User
 import org.luisito.gestor360.data.models.Local
+import org.luisito.gestor360.data.repository.DeviceVerificationRepository
 import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.data.sync.SyncWorker
 import org.luisito.gestor360.ui.components.AvatarUsuario
@@ -44,6 +45,7 @@ import org.luisito.gestor360.ui.theme.NeuCard
 import org.luisito.gestor360.ui.viewmodels.AccesoViewModel
 import org.luisito.gestor360.ui.viewmodels.LocalSeleccionViewModel
 import org.luisito.gestor360.utils.AppContextHolder
+import org.luisito.gestor360.utils.DeviceIdManager
 import org.luisito.gestor360.utils.SessionManager
 import org.luisito.gestor360.utils.ThemeManager
 
@@ -97,6 +99,7 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
     val context = androidx.compose.ui.platform.LocalContext.current
     val sessionManager = remember { SessionManager(context) }
     val fotoRepository = remember { FotoRepository(AppDatabase.obtener(context).userDao()) }
+    val deviceVerificationRepository = remember { DeviceVerificationRepository() }
     val scope = rememberCoroutineScope()
     val accesoViewModel: AccesoViewModel = viewModel()
     val localSeleccionViewModel: LocalSeleccionViewModel = viewModel()
@@ -131,6 +134,13 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
 
     LaunchedEffect(Unit) {
         isLoggedIn = sessionManager.isLoggedIn()
+        if (!isLoggedIn) {
+            // Dispositivo ya verificado antes + licencia todavía vigente en
+            // caché => directo al PIN, sin pasar por VerificarDispositivoScreen
+            // ni depender de internet (ver DeviceVerificationRepository).
+            val androidId = DeviceIdManager.getFormattedDeviceId(context)
+            usuarioParaPin = deviceVerificationRepository.intentarAccesoCacheado(androidId)
+        }
         isLoading = false
     }
 
@@ -180,7 +190,7 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
                 sessionManager.saveSession(userId = usuario.id, username = usuario.username, rol = usuario.rol, localId = usuario.local_id, clienteId = usuario.cliente_id, androidId = usuario.android_id ?: "", nombre = usuario.nombre)
                 isLoggedIn = true
             },
-            onCambiarDispositivo = { usuarioParaPin = null; accesoViewModel.reiniciar() },
+            onCambiarDispositivo = { usuarioParaPin = null; accesoViewModel.reiniciar(); sessionManager.limpiarLicenciaVerificada() },
             viewModel = accesoViewModel,
             fotoBytes = fotoUsuarioPin
         )

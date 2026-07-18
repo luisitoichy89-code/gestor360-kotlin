@@ -25,6 +25,17 @@ import org.luisito.gestor360.security.EncryptedPrefs
 class SessionManager(context: Context) {
     private val prefs: SharedPreferences = EncryptedPrefs.abrir(context, "gestor360_session")
 
+    /**
+     * Prefs APARTE de la sesión de login: acá vive solo la constancia de que
+     * este dispositivo + su licencia ya se verificaron contra el servidor, y
+     * hasta qué fecha es válida esa licencia. A propósito NO vive en `prefs`
+     * (la de arriba) para que clear()/cerrarSesion() NO la borre: que un
+     * vendedor cierre sesión no significa que el dispositivo deje de estar
+     * verificado. Solo se borra explícitamente desde "cambiar dispositivo"
+     * (ver limpiarLicenciaVerificada()).
+     */
+    private val licenciaPrefs: SharedPreferences = EncryptedPrefs.abrir(context, "gestor360_licencia_dispositivo")
+
     fun saveSession(
         userId: Long,
         username: String,
@@ -94,5 +105,37 @@ class SessionManager(context: Context) {
 
     fun clear() {
         prefs.edit().clear().apply()
+    }
+
+    /**
+     * Guarda que este androidId ya pasó la verificación de dispositivo +
+     * licencia, junto con la fecha de expiración de esa licencia. Mientras
+     * esa fecha no llegue, la app puede saltar la pantalla de verificación
+     * y entrar directo al PIN (con o sin internet) — pieza clave para poder
+     * operar offline hasta un año sin pedirle de nuevo la verificación al
+     * usuario cada vez que abre la app.
+     */
+    fun guardarLicenciaVerificada(androidId: String, expiracion: String) {
+        licenciaPrefs.edit()
+            .putString("android_id_verificado", androidId)
+            .putString("licencia_expiracion", expiracion)
+            .apply()
+    }
+
+    /**
+     * Fecha de expiración cacheada, solo si corresponde a ESTE mismo
+     * androidId (evita arrastrar una licencia vieja si el device id cambiara
+     * por algún motivo). Devuelve null si nunca se verificó o es de otro
+     * dispositivo.
+     */
+    fun getLicenciaVerificadaVigente(androidId: String): String? {
+        val guardado = licenciaPrefs.getString("android_id_verificado", null) ?: return null
+        if (guardado != androidId) return null
+        return licenciaPrefs.getString("licencia_expiracion", null)
+    }
+
+    /** Se llama al pedir "cambiar dispositivo": fuerza una verificación online nueva. */
+    fun limpiarLicenciaVerificada() {
+        licenciaPrefs.edit().clear().apply()
     }
 }

@@ -89,6 +89,8 @@ fun PinLoginScreen(
                     .padding(28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                org.luisito.gestor360.ui.components.ContactoSoporteWhatsApp()
+                Spacer(Modifier.height(8.dp))
                 val fotoUsuario = rememberFotoBitmap(fotoBytes)
                 Surface(
                     shape = CircleShape,
