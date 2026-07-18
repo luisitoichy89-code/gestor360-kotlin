@@ -78,6 +78,21 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             cantidad_ventas = ventasHoy.size.toLong()
         )
 
+        // FIX: antes esta función nunca reconstruía "productos_nuevos" desde Room
+        // (solo "modificados"), así que en el path offline —que es el que domina
+        // en esta app— la sección de nuevos siempre quedaba vacía, y un producto
+        // recién creado con updatedAt distinto de createdAt el mismo día caía
+        // directo en "modificados" sin haber pasado nunca por "nuevos".
+        val nuevos = db.productoDao().obtenerTodos(localId).filter { p ->
+            p.createdAt?.startsWith(fechaStr) == true
+        }.map { p ->
+            ProductoInfo(
+                id = p.id, nombre = p.nombre, precio = p.precio, stock = p.stock,
+                ubicacion = p.ubicacion, fecha = p.createdAt,
+                solicitado_por_nombre = null, resuelto_por_nombre = null
+            )
+        }
+
         val modificados = db.productoDao().obtenerTodos(localId).filter { p ->
             p.updatedAt?.startsWith(fechaStr) == true && p.createdAt != p.updatedAt
         }.map { p ->
@@ -113,6 +128,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             fecha = fechaStr,
             ventas = ventasInfo,
             productos_vendidos = productosVendidos,
+            productos_nuevos = nuevos,
             productos_modificados = modificados,
             productos_eliminados = eliminados,
             mermas = mermasLocales,
@@ -126,6 +142,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         return dia.copy(
             ventas = (dia.ventas + local.ventas).distinctBy { it.id },
             productos_vendidos = fusionarListasProductosVendidos(dia.productos_vendidos, local.productos_vendidos),
+            productos_nuevos = (dia.productos_nuevos + local.productos_nuevos).distinctBy { it.id },
             productos_modificados = (dia.productos_modificados + local.productos_modificados).distinctBy { it.id },
             productos_eliminados = (dia.productos_eliminados + local.productos_eliminados).distinctBy { it.id },
             devueltos = (dia.devueltos + local.devueltos).distinctBy { it.id },
