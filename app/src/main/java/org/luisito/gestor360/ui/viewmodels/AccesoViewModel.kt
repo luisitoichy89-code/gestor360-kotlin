@@ -31,6 +31,13 @@ class AccesoViewModel(
 
     private var androidIdActual: String = ""
 
+    // Evita que un doble-tap en "Acceder" dispare dos validaciones de PIN en
+    // paralelo: sin esto, dos taps casi simultáneos pueden pasar los dos la
+    // revisión de rateLimiter.estadoActual() ANTES de que el primero llegue
+    // a registrarse (ver validarPin), colándose intentos de más frente al
+    // límite de PinRateLimiter.
+    private var validandoPin = false
+
     fun verificarDispositivo(androidId: String) {
         androidIdActual = androidId
         viewModelScope.launch {
@@ -59,11 +66,36 @@ class AccesoViewModel(
     }
 
     /**
+     * Usado por MainActivity para la ruta de acceso CACHEADO
+     * (DeviceVerificationRepository.intentarAccesoCacheado): a diferencia de
+     * verificarDispositivo(), esa ruta nunca toca la red ni pasa por este
+     * ViewModel, así que usuarioVerificado se quedaba en null — y sin él,
+     * validarPin() rechazaba cualquier PIN, incluso el correcto, porque ni
+     * llegaba a compararlo (ver el guard `usuario == null` ahí abajo). Esto
+     * registra el usuario ya resuelto localmente para que validarPin() tenga
+     * con qué comparar, sin repetir ninguna verificación online.
+     */
+    fun establecerUsuarioCacheado(usuario: User) {
+        androidIdActual = usuario.android_id ?: androidIdActual
+        _uiState.value = _uiState.value.copy(
+            verificando = false,
+            usuarioVerificado = usuario,
+            mensajeError = null
+        )
+    }
+
+    /**
      * Valida el PIN contra el hash cacheado (nunca contra texto plano) y
      * aplica rate limiting persistente por usuario: si ya está bloqueado por
      * demasiados intentos fallidos, ni siquiera se llega a comparar el PIN.
      */
     fun validarPin(pin: String, onResultado: (Boolean) -> Unit) {
+        // Tap repetido mientras ya hay una validación en curso: se ignora en
+        // vez de arrancar una segunda corrutina en paralelo (ver comentario
+        // en la declaración de validandoPin). La corrutina en curso es la
+        // que manda; ella sola termina de resolver validando/pin en la UI.
+        if (validandoPin) return
+
         val usuario = _uiState.value.usuarioVerificado
         val key = usuario?.android_id ?: androidIdActual
         if (usuario == null || key.isBlank()) { onResultado(false); return }
@@ -78,20 +110,25 @@ class AccesoViewModel(
             return
         }
 
+        validandoPin = true
         viewModelScope.launch {
-            val correcto = repository.validarPinLocal(key, pin)
-            if (correcto) {
-                rateLimiter.registrarExito(key)
-                _uiState.value = _uiState.value.copy(pinError = null, pinBloqueado = false, pinBloqueadoSegundos = 0L)
-            } else {
-                val estado = rateLimiter.registrarFallo(key)
-                _uiState.value = _uiState.value.copy(
-                    pinError = if (estado.bloqueado) "Demasiados intentos. Espera ${estado.segundosRestantes}s." else "El PIN no es correcto. Intenta de nuevo.",
-                    pinBloqueado = estado.bloqueado,
-                    pinBloqueadoSegundos = estado.segundosRestantes
-                )
+            try {
+                val correcto = repository.validarPinLocal(key, pin)
+                if (correcto) {
+                    rateLimiter.registrarExito(key)
+                    _uiState.value = _uiState.value.copy(pinError = null, pinBloqueado = false, pinBloqueadoSegundos = 0L)
+                } else {
+                    val estado = rateLimiter.registrarFallo(key)
+                    _uiState.value = _uiState.value.copy(
+                        pinError = if (estado.bloqueado) "Demasiados intentos. Espera ${estado.segundosRestantes}s." else "El PIN no es correcto. Intenta de nuevo.",
+                        pinBloqueado = estado.bloqueado,
+                        pinBloqueadoSegundos = estado.segundosRestantes
+                    )
+                }
+                onResultado(correcto)
+            } finally {
+                validandoPin = false
             }
-            onResultado(correcto)
         }
     }
 

@@ -174,10 +174,14 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
                         accesoViewModel.mostrarBloqueoPorRevision(resultado.mensaje)
                         usuarioParaPin = null
                     }
-                    else -> usuarioParaPin = cacheado
+                    else -> {
+                        usuarioParaPin = cacheado
+                        accesoViewModel.establecerUsuarioCacheado(cacheado)
+                    }
                 }
             } else {
                 usuarioParaPin = cacheado
+                cacheado?.let { accesoViewModel.establecerUsuarioCacheado(it) }
             }
         }
         isLoading = false

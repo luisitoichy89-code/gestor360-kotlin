@@ -2,6 +2,9 @@ package org.luisito.gestor360.data.repository
 
 import android.content.Context
 import io.github.jan.supabase.postgrest.postgrest
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -77,7 +80,8 @@ class DeviceVerificationRepository(
 
             val entidadPrevia = db.userDao().getUserById(usuario.android_id ?: androidId)
             val (pinHash, pinSalt) = if (usuario.pin != null) {
-                val h = PinSecurity.hashearPinNuevo(usuario.pin)
+                // PBKDF2 con 120k iteraciones es trabajo de CPU, nunca en Main.
+                val h = withContext(Dispatchers.Default) { PinSecurity.hashearPinNuevo(usuario.pin) }
                 h.hash to h.salt
             } else {
                 entidadPrevia?.pinHash to entidadPrevia?.pinSalt
@@ -97,6 +101,8 @@ class DeviceVerificationRepository(
             ))
 
             VerificacionResultado.Autorizado(usuario)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             val userLocal = db.userDao().getUserById(androidId)
             if (userLocal != null) {
@@ -165,6 +171,8 @@ class DeviceVerificationRepository(
             // licencia se extendió o se acortó desde la última verificación.
             sessionManager.guardarLicenciaVerificada(androidId, licencia.expiracion)
             VerificacionEnCalienteResultado.Ok
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             VerificacionEnCalienteResultado.NoVerificado
         }
@@ -174,7 +182,8 @@ class DeviceVerificationRepository(
         val userLocal = db.userDao().getUserById(androidId) ?: return false
         val hash = userLocal.pinHash ?: return false
         val salt = userLocal.pinSalt ?: return false
-        return PinSecurity.verificar(pin, salt, hash)
+        // PBKDF2 con 120k iteraciones es trabajo de CPU: nunca en Main.
+        return withContext(Dispatchers.Default) { PinSecurity.verificar(pin, salt, hash) }
     }
 
     /**
