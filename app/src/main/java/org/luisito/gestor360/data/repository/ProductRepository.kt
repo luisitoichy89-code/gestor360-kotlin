@@ -55,12 +55,16 @@ class ProductRepository(
             val productos = SupabaseClientProvider.client.postgrest
                 .rpc("get_productos", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
                 .decodeList<Product>()
+            // FIX: se busca la fila anterior de cada producto ANTES de limpiar,
+            // para que toEntity() pueda conservar su createdAt/updatedAt real
+            // en vez de pisarlos con "ahora" en cada refresh (ver ProductoEntity.kt).
+            val anteriores = db.productoDao().obtenerTodos(localId).associateBy { it.id }
             // Antes de reinsertar lo confirmado por el servidor, se limpia solo
             // lo que ya estaba confirmado (pendienteSync = 0): así un producto
             // creado offline que todavía no sincronizó no desaparece de la lista
             // mientras se espera la confirmación.
             db.productoDao().limpiarSincronizadosDeLocal(localId)
-            db.productoDao().insertarTodos(productos.map { it.toEntity(localId, pendienteSync = false) })
+            db.productoDao().insertarTodos(productos.map { it.toEntity(localId, pendienteSync = false, anterior = anteriores[it.id]) })
             Result.success(productos)
         } catch (e: Exception) {
             Result.failure(e)
@@ -101,9 +105,15 @@ class ProductRepository(
     ): Result<Unit> {
         val localId = localIdActivo()
         val accionId = UUID.randomUUID().toString()
+        // FIX: el copy() no tocaba updatedAt, así que una edición real hecha
+        // acá nunca quedaba marcada como "modificada hoy" (ver ProductoEntity.kt
+        // / InventarioRepository "modificados", que depende de updatedAt).
         db.productoDao().obtenerPorId(id, localId)?.let {
             db.productoDao().insertarUno(
-                it.copy(nombre = nombre, precio = precio, stock = stock, ubicacion = ubicacion, categoria = categoria, pendienteSync = true)
+                it.copy(
+                    nombre = nombre, precio = precio, stock = stock, ubicacion = ubicacion, categoria = categoria,
+                    updatedAt = java.time.LocalDateTime.now().toString(), pendienteSync = true
+                )
             )
         }
         val payload = buildJsonObject {

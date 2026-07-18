@@ -396,12 +396,35 @@ private fun ProductoVendidoRow(p: ProductoVendidoInfo) {
 private fun PagoTarjetaRow(v: VentaInfo) {
     NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
-            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text("${v.tarjeta_banco ?: ""} · ${v.tarjeta_numero}", fontWeight = FontWeight.Bold)
-                Text("${formatearMonto(v.transferencia)} CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            // FIX: el Row no reservaba ancho para el monto — con un nombre de
+            // banco largo (ej. "METROPOLITANO · 6467870464678404") el Text del
+            // monto se comprimía hasta desaparecer. Ahora el nombre se trunca
+            // con ellipsis (weight+maxLines) y el monto queda con ancho propio,
+            // igual que en TarjetaResumenRow.
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    "${v.tarjeta_banco ?: ""} · ${v.tarjeta_numero}",
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp)
+                )
+                Text(
+                    "${formatearMonto(v.transferencia)} CUP",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    softWrap = false
+                )
             }
             if (!v.tarjeta_titular.isNullOrBlank()) Text("Titular de la cuenta: ${v.tarjeta_titular}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(4.dp))
+            // Datos del cliente unificados en el mismo bloque, sin el salto
+            // grande que antes generaba el desborde del monto de arriba.
+            Spacer(Modifier.height(6.dp))
             Text("Cliente: ${v.cliente_nombre?.takeIf { it.isNotBlank() } ?: "—"}", style = MaterialTheme.typography.bodySmall)
             Text("Teléfono: ${v.cliente_tel?.takeIf { it.isNotBlank() } ?: "—"}", style = MaterialTheme.typography.bodySmall)
             Text("CI: ${v.cliente_ci?.takeIf { it.isNotBlank() } ?: "—"}", style = MaterialTheme.typography.bodySmall)

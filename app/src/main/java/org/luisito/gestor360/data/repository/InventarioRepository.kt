@@ -64,13 +64,26 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
     private suspend fun construirDesdeRoom(localId: Long, fecha: LocalDate): InventarioDia {
         val fechaStr = fecha.toString()
 
+        val nombreUsuarioLocal = session.getNombre().takeIf { it.isNotBlank() }
+
+        // 'eliminados' (lo que se MUESTRA en la sección "productos eliminados")
+        // sigue filtrado al día; para el FALLBACK DE NOMBRE en ventas y
+        // productos vendidos se usa un mapa aparte sin filtrar por fecha
+        // (obtenerTodos), porque una venta puede ser de hoy pero el producto
+        // pudo haberse eliminado cualquier otro día.
+        val eliminados = db.productoEliminadoCacheDao().obtenerPorFecha(localId, fechaStr)
+            .map { e ->
+                ProductoEliminadoInfo(id = e.id, nombre = e.nombre, stock = e.stock, fecha = e.fecha, resuelto_por_nombre = null)
+            }
+        val eliminadosPorId = db.productoEliminadoCacheDao().obtenerTodos(localId)
+            .associate { e -> e.id to ProductoEliminadoInfo(id = e.id, nombre = e.nombre, stock = e.stock, fecha = e.fecha, resuelto_por_nombre = null) }
+
         val ventasHoy = db.ventaDao().obtenerTodas(localId)
             .filter { it.createdAt?.startsWith(fechaStr) == true }
 
-        val nombreUsuarioLocal = session.getNombre().takeIf { it.isNotBlank() }
-        val ventasInfo = ventasHoy.map { it.toVentaInfo(localId, nombreUsuarioLocal) }
+        val ventasInfo = ventasHoy.map { it.toVentaInfo(localId, nombreUsuarioLocal, eliminadosPorId) }
 
-        val productosVendidos = fusionarProductosVendidos(emptyList(), ventasHoy)
+        val productosVendidos = fusionarProductosVendidos(emptyList(), ventasHoy, eliminadosPorId)
 
         val totales = TotalesVentas(
             efectivo = ventasHoy.sumOf { it.efectivo },
@@ -93,8 +106,16 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             )
         }
 
+        // FIX: antes se comparaba createdAt != updatedAt para decidir si un
+        // producto era "modificado". Esa comparación de timestamps exactos
+        // puede diferir por milisegundos aunque el producto jamás se haya
+        // editado (created_at y updated_at no siempre quedan idénticos al
+        // insertar), así que productos recién creados HOY terminaban
+        // apareciendo en "modificados". El SQL del servidor ya usa el
+        // criterio correcto (created_at::date <> p_fecha); se alinea acá:
+        // solo es "modificado" si se actualizó hoy Y no fue creado hoy.
         val modificados = db.productoDao().obtenerTodos(localId).filter { p ->
-            p.updatedAt?.startsWith(fechaStr) == true && p.createdAt != p.updatedAt
+            p.updatedAt?.startsWith(fechaStr) == true && p.createdAt?.startsWith(fechaStr) != true
         }.map { p ->
             ProductoInfo(
                 id = p.id, nombre = p.nombre, precio = p.precio, stock = p.stock,
@@ -119,10 +140,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         } else emptyList()
 
         val mermasLocales = db.mermaDao().obtenerPendientes(localId).map { m -> MermaInfo(id = m.id, producto_nombre = m.productoNombre, cantidad = m.cantidad, motivo = m.motivo ?: "", estado = m.estado, solicitado_por_nombre = m.solicitadoPorNombre, resuelto_por_nombre = null, fecha = null) }
-        val eliminados = db.productoEliminadoCacheDao().obtenerPorFecha(localId, fechaStr)
-            .map { e ->
-                ProductoEliminadoInfo(id = e.id, nombre = e.nombre, stock = e.stock, fecha = e.fecha, resuelto_por_nombre = null)
-            }
 
         return InventarioDia(
             fecha = fechaStr,
@@ -171,9 +188,14 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         return mapa.values.toList()
     }
 
-    private suspend fun VentaEntity.toVentaInfo(localId: Long, nombreUsuarioLocal: String?): VentaInfo {
+    private suspend fun VentaEntity.toVentaInfo(
+        localId: Long,
+        nombreUsuarioLocal: String?,
+        eliminadosPorId: Map<String, ProductoEliminadoInfo>
+    ): VentaInfo {
         val productoNombreLocal = productoNombre
             ?: db.productoDao().obtenerPorId(productoId.toString(), localId)?.nombre
+            ?: eliminadosPorId[productoId]?.nombre
             ?: "Producto #$productoId"
         var tarjetaBanco: String? = null
         var tarjetaNumero: String? = null
@@ -196,13 +218,15 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
 
     private suspend fun fusionarProductosVendidos(
         existentes: List<ProductoVendidoInfo>,
-        pendientes: List<VentaEntity>
+        pendientes: List<VentaEntity>,
+        eliminadosPorId: Map<String, ProductoEliminadoInfo> = emptyMap()
     ): List<ProductoVendidoInfo> {
         val porNombre = existentes.associateBy { it.nombre }.toMutableMap()
         val localId = pendientes.firstOrNull()?.localId ?: return existentes
         for (venta in pendientes) {
             val nombre = venta.productoNombre
                 ?: db.productoDao().obtenerPorId(venta.productoId.toString(), localId)?.nombre
+                ?: eliminadosPorId[venta.productoId]?.nombre
                 ?: "Producto #${venta.productoId}"
             val actual = porNombre[nombre] ?: ProductoVendidoInfo(nombre = nombre)
             porNombre[nombre] = actual.copy(total_vendido = actual.total_vendido + venta.cantidad)

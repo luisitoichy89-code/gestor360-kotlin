@@ -37,10 +37,35 @@ fun ProductoEntity.toModel() = Product(
 )
 
 /** Para datos que vienen del servidor (siempre confirmados: pendienteSync = false). */
-fun Product.toEntity(localId: Long, pendienteSync: Boolean = false) = ProductoEntity(
-    id = id, nombre = nombre, precio = precio, stock = stock,
-    ubicacion = ubicacion, categoria = categoria, localId = localId,
-    createdAt = LocalDateTime.now().toString(),
-    updatedAt = LocalDateTime.now().toString(),
-    pendienteSync = pendienteSync
-)
+// FIX: antes esto pisaba SIEMPRE createdAt/updatedAt con LocalDateTime.now(),
+// incluso para productos que ya existían y solo se estaban refrescando desde
+// el servidor. Como refrescarDesdeServidor() corre seguido (cada vez que se
+// abre la lista de productos, por diseño), esto corrompía la fecha real en
+// cada sincronización — el catálogo entero terminaba pareciendo "creado/
+// editado hoy" según cuándo cayera el último refresh, lo que explica que
+// "productos nuevos"/"productos modificados" mostraran resultados erráticos
+// (a veces de más, a veces vacío).
+//
+// El modelo Product no trae created_at/updated_at reales del servidor (el
+// RPC get_productos no los expone), así que no hay un valor "verdadero" que
+// preservar del lado servidor. Se aproxima con el primer momento en que
+// ESTE dispositivo vio el producto localmente: si ya había una fila
+// cacheada para ese id (parámetro "anterior"), se conserva su createdAt tal
+// cual, y updatedAt solo se mueve a "ahora" si algún campo visible
+// (nombre/precio/stock/ubicación/categoría) realmente cambió respecto a esa
+// fila. Si es la primera vez que se ve el producto (anterior == null,
+// primera carga del dispositivo o producto recién creado), ambos quedan en
+// "ahora" — que es lo correcto en ese caso.
+fun Product.toEntity(localId: Long, pendienteSync: Boolean = false, anterior: ProductoEntity? = null): ProductoEntity {
+    val ahora = LocalDateTime.now().toString()
+    val cambioAlgunCampo = anterior == null ||
+        anterior.nombre != nombre || anterior.precio != precio || anterior.stock != stock ||
+        anterior.ubicacion != ubicacion || anterior.categoria != categoria
+    return ProductoEntity(
+        id = id, nombre = nombre, precio = precio, stock = stock,
+        ubicacion = ubicacion, categoria = categoria, localId = localId,
+        createdAt = anterior?.createdAt ?: ahora,
+        updatedAt = if (cambioAlgunCampo) ahora else (anterior?.updatedAt ?: ahora),
+        pendienteSync = pendienteSync
+    )
+}
