@@ -141,7 +141,6 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
         // arrastrar una sesión ya cerrada por el sistema.
         if (sessionManager.haySesionRevocadaPersistida()) {
             sessionManager.clear()
-            sessionManager.limpiarLicenciaVerificada()
             sessionManager.limpiarSesionRevocada()
         }
 
@@ -164,7 +163,14 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
                 // VerificacionEnCalienteResultado.NoVerificado).
                 when (val resultado = deviceVerificationRepository.verificarEnCaliente(androidId)) {
                     is VerificacionEnCalienteResultado.Bloqueado -> {
-                        sessionManager.limpiarLicenciaVerificada()
+                        // OJO: a propósito NO se llama a limpiarLicenciaVerificada()
+                        // acá. Borrar la caché de licencia por un bloqueo detectado
+                        // en caliente rompía el acceso offline (regla 3/4 del
+                        // diseño original): si esto fuera un falso positivo, o si
+                        // el usuario de verdad está bloqueado, el dispositivo debe
+                        // seguir pudiendo entrar offline con lo que ya tenía
+                        // cacheado. Lo único que bloqueamos es ESTE intento
+                        // puntual (con internet, el servidor dijo que no).
                         accesoViewModel.mostrarBloqueoPorRevision(resultado.mensaje)
                         usuarioParaPin = null
                     }
@@ -200,7 +206,6 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
     LaunchedEffect(Unit) {
         SessionManager.sesionRevocada.collect { revocada ->
             if (revocada && sessionManager.isLoggedIn()) {
-                sessionManager.limpiarLicenciaVerificada()
                 sessionManager.limpiarSesionRevocada()
                 cerrarSesion()
             }

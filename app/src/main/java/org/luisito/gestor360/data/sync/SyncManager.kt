@@ -55,8 +55,11 @@ class SyncManager(private val context: Context) {
         // ver VerificacionEnCalienteResultado.NoVerificado.
         when (val estado = deviceVerificationRepository.verificarEnCaliente(androidId)) {
             is VerificacionEnCalienteResultado.Bloqueado -> {
+                // Igual que en MainActivity: NO se limpia la caché de licencia acá.
+                // Bloqueamos ESTE sync y forzamos que la sesión se cierre (si la
+                // app está abierta, ver SessionManager.sesionRevocada), pero la
+                // caché que permite el acceso offline queda intacta.
                 session.marcarSesionRevocada()
-                session.limpiarLicenciaVerificada()
                 return SyncResultado(0, 0, estado.mensaje, licenciaBloqueada = true)
             }
             else -> {}
