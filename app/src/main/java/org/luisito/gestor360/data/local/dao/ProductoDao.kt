@@ -34,6 +34,24 @@ interface ProductoDao {
     @Query("DELETE FROM productos_cache WHERE pendienteSync = 0 AND localId = :localId")
     suspend fun limpiarSincronizadosDeLocal(localId: Long)
 
+    /**
+     * BLINDAJE: limpiarSincronizadosDeLocal() + insertarTodos() se llamaban como dos
+     * operaciones sueltas desde el repository. Si el proceso se cortaba (apagón, app
+     * matada por el sistema, corte de red a mitad del refresh) justo entre esas dos
+     * llamadas, el borrado ya había quedado escrito en disco pero la inserción no
+     * llegaba a correr: productos ya sincronizados desaparecían del caché local para
+     * siempre (hasta el próximo refresh exitoso). @Transaction hace que Room corra
+     * ambas queries dentro de una única transacción SQLite: si algo falla o el
+     * proceso muere a mitad de camino, ninguna de las dos queda aplicada y el caché
+     * previo se conserva intacto. No cambia qué se borra ni qué se inserta, solo
+     * las agrupa de forma atómica.
+     */
+    @Transaction
+    suspend fun reemplazarSincronizados(localId: Long, productos: List<ProductoEntity>) {
+        limpiarSincronizadosDeLocal(localId)
+        insertarTodos(productos)
+    }
+
     @Query("DELETE FROM productos_cache WHERE id = :id AND localId = :localId")
     suspend fun eliminar(id: String, localId: Long)
 

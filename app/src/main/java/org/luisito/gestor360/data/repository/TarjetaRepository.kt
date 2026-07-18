@@ -61,8 +61,10 @@ class TarjetaRepository(
             // lo que ya estaba confirmado (pendienteSync = 0): así una tarjeta
             // creada offline que todavía no sincronizó no desaparece de la
             // lista mientras se espera la confirmación.
-            db.tarjetaDao().limpiarSincronizadasDeLocal(localId)
-            db.tarjetaDao().insertarTodos(tarjetas.map { it.copy(pendienteSync = false) })
+            // BLINDAJE: limpiar + insertar ahora corre como una sola transacción
+            // atómica (reemplazarSincronizadas en TarjetaDao) para que un corte
+            // a mitad de camino no pierda tarjetas ya sincronizadas.
+            db.tarjetaDao().reemplazarSincronizadas(localId, tarjetas.map { it.copy(pendienteSync = false) })
             Result.success(tarjetas)
         } catch (e: Exception) {
             Result.failure(e)

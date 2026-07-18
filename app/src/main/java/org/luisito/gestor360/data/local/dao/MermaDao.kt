@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import org.luisito.gestor360.data.local.entities.MermaEntity
 
 /**
@@ -37,6 +38,19 @@ interface MermaDao {
      */
     @Query("DELETE FROM mermas_cache WHERE localId = :localId AND pendienteSync = 0")
     suspend fun limpiarSincronizadasDeLocal(localId: Long)
+
+    /**
+     * BLINDAJE: limpiarSincronizadasDeLocal() + insertarTodas() se llamaban sueltas
+     * desde MermaRepository.refrescarDesdeServidor(). Un corte a mitad de esas dos
+     * llamadas perdía mermas ya sincronizadas del caché local. @Transaction agrupa
+     * ambas queries en una sola transacción SQLite: todo o nada, el caché anterior
+     * queda intacto si algo falla a mitad de camino.
+     */
+    @Transaction
+    suspend fun reemplazarSincronizadas(localId: Long, mermas: List<MermaEntity>) {
+        limpiarSincronizadasDeLocal(localId)
+        insertarTodas(mermas)
+    }
 
     @Query("DELETE FROM mermas_cache WHERE id = :id AND localId = :localId")
     suspend fun eliminar(id: String, localId: Long)

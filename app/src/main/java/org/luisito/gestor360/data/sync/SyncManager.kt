@@ -1,6 +1,7 @@
 package org.luisito.gestor360.data.sync
 
 import android.content.Context
+import androidx.room.withTransaction
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
@@ -179,8 +180,18 @@ class SyncManager(private val context: Context) {
             kotlinx.coroutines.delay(PAUSA_ENTRE_LOTES_MS)
         }
 
-        for ((pid, lid) in eliminadosProductos) db.productoDao().eliminar(pid, lid)
-        for ((tid, lid) in eliminadosTarjetas) db.tarjetaDao().eliminar(tid, lid)
+        // BLINDAJE: aplicar los eliminados de este ciclo es un lote de borrados
+        // sueltos (uno por producto/tarjeta eliminados). Antes, si el proceso se
+        // cortaba a mitad de este bucle, algunos quedaban borrados localmente y
+        // otros no, un estado intermedio que dependía del próximo refresh para
+        // corregirse. db.withTransaction agrupa todo el lote en una sola
+        // transacción SQLite: o se borran todos, o no se borra ninguno (y quedan
+        // igual de correctos, porque el próximo refresh los va a traer o excluir
+        // según corresponda). No cambia qué se borra, solo lo hace atómico.
+        db.withTransaction {
+            for ((pid, lid) in eliminadosProductos) db.productoDao().eliminar(pid, lid)
+            for ((tid, lid) in eliminadosTarjetas) db.tarjetaDao().eliminar(tid, lid)
+        }
 
         val localIdActivo = session.getLocalId()
         if (localIdActivo != null) {
@@ -191,9 +202,20 @@ class SyncManager(private val context: Context) {
             aprobacionStockRepository.refrescarDesdeServidor(androidId)
         }
 
-        db.accionPendienteDao().limpiarSincronizadas()
-        db.ventaDao().limpiarSincronizadas()
-        db.turnoDao().limpiarCerrados()
+        // BLINDAJE: estas tres limpiezas ("acciones_pendientes" ya sincronizadas,
+        // ventas ya sincronizadas, turnos ya cerrados) se hacían como tres
+        // llamadas sueltas. Si el proceso se cortaba entre medio, el estado
+        // quedaba parcialmente limpio pero nunca inconsistente para lo que ya
+        // se sincronizó de verdad (esas filas solo estaban marcadas, no
+        // desaparecían de golpe) — igual, agruparlas en una sola transacción
+        // evita cualquier corte a mitad de camino entre las tres queries y dejar
+        // la cola en un estado ambiguo del que no hay forma de saber qué se
+        // alcanzó a limpiar y qué no.
+        db.withTransaction {
+            db.accionPendienteDao().limpiarSincronizadas()
+            db.ventaDao().limpiarSincronizadas()
+            db.turnoDao().limpiarCerrados()
+        }
         return SyncResultado(exitosas, fallidas, null)
     }
 

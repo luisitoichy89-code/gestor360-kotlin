@@ -30,6 +30,21 @@ interface VentaDao {
     @Query("DELETE FROM ventas_cache WHERE localId = :localId")
     suspend fun limpiarDeLocal(localId: Long)
 
+    /**
+     * BLINDAJE: limpiarDeLocal() + insertarTodas() se llamaban como dos operaciones
+     * sueltas desde SaleRepository.refrescarDesdeServidor(). Un corte de luz o de
+     * conexión justo entre el borrado y la reinserción dejaba ventas_cache vacía
+     * para ese local, perdiendo localmente ventas que ya estaban sincronizadas
+     * (hasta el próximo refresh exitoso). @Transaction agrupa ambas queries en una
+     * sola transacción SQLite: o se aplican las dos, o no se aplica ninguna y el
+     * caché anterior queda intacto. Mismo borrado, misma inserción, solo atómicos.
+     */
+    @Transaction
+    suspend fun reemplazarDeLocal(localId: Long, ventas: List<VentaEntity>) {
+        limpiarDeLocal(localId)
+        insertarTodas(ventas)
+    }
+
     @Query("DELETE FROM ventas_cache WHERE id = :id")
     suspend fun eliminar(id: String)
 }

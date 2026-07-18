@@ -114,8 +114,11 @@ class SaleRepository(
             val ventas = SupabaseClientProvider.client.postgrest
                 .rpc("get_ventas", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
                 .decodeList<Sale>()
-            db.ventaDao().limpiarDeLocal(localId)
-            db.ventaDao().insertarTodas(ventas.map { it.toEntity(localId, sincronizada = true) })
+            // BLINDAJE: limpiar + insertar ahora corre como una sola transacción
+            // atómica (reemplazarDeLocal en VentaDao) para que un corte de luz o
+            // de red a mitad de camino no deje ventas_cache vacía sin llegar a
+            // reinsertar las ventas ya sincronizadas.
+            db.ventaDao().reemplazarDeLocal(localId, ventas.map { it.toEntity(localId, sincronizada = true) })
             Result.success(ventas)
         } catch (e: Exception) {
             Result.failure(e)

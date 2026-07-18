@@ -63,8 +63,14 @@ class ProductRepository(
             // lo que ya estaba confirmado (pendienteSync = 0): así un producto
             // creado offline que todavía no sincronizó no desaparece de la lista
             // mientras se espera la confirmación.
-            db.productoDao().limpiarSincronizadosDeLocal(localId)
-            db.productoDao().insertarTodos(productos.map { it.toEntity(localId, pendienteSync = false, anterior = anteriores[it.id]) })
+            // BLINDAJE: limpiar + insertar ahora corre como una sola transacción
+            // atómica (reemplazarSincronizados en ProductoDao) para que un corte
+            // de luz o de red a mitad de camino no borre productos ya
+            // sincronizados sin llegar a reinsertarlos.
+            db.productoDao().reemplazarSincronizados(
+                localId,
+                productos.map { it.toEntity(localId, pendienteSync = false, anterior = anteriores[it.id]) }
+            )
             Result.success(productos)
         } catch (e: Exception) {
             Result.failure(e)

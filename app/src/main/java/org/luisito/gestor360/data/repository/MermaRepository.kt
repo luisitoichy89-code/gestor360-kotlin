@@ -78,8 +78,10 @@ class MermaRepository(
             // lo que ya estaba confirmado (pendienteSync = 0): así una merma
             // creada offline que todavía no sincronizó no desaparece de la
             // lista mientras se espera la confirmación.
-            db.mermaDao().limpiarSincronizadasDeLocal(localId)
-            db.mermaDao().insertarTodas(mermas.map { it.copy(pendienteSync = false) })
+            // BLINDAJE: limpiar + insertar ahora corre como una sola transacción
+            // atómica (reemplazarSincronizadas en MermaDao) para que un corte a
+            // mitad de camino no pierda mermas ya sincronizadas.
+            db.mermaDao().reemplazarSincronizadas(localId, mermas.map { it.copy(pendienteSync = false) })
             Result.success(mermas)
         } catch (e: Exception) {
             Result.failure(e)
