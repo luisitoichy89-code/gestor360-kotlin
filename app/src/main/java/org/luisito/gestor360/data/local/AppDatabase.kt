@@ -227,7 +227,7 @@ abstract class AppDatabase : RoomDatabase() {
                     .fallbackToDestructiveMigration()
                     .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                     .build().also { db ->
-                        db.query("PRAGMA auto_vacuum = FULL", null)
+                        runCatching { db.openHelper.writableDatabase.execSQL("PRAGMA auto_vacuum = FULL") }
                         INSTANCE = db
                     }
             }
