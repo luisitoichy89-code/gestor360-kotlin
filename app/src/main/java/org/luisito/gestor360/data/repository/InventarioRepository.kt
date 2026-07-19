@@ -6,6 +6,8 @@ import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.local.AppDatabase
 import org.luisito.gestor360.data.local.entities.VentaEntity
@@ -35,16 +37,12 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         val localId = localIdActivo()
         val fechaStr = fecha.toString()
 
-        // Si se pide un subconjunto de turnos (selección del admin en una fecha
-        // pasada), no usamos el caché "del día completo": siempre se pide al
-        // servidor filtrado por esos turnos.
         if (!turnoIds.isNullOrEmpty()) {
             return refrescarDesdeServidor(androidId, fecha, turnoIds)
         }
 
         val cacheado = db.inventarioCacheDao().obtener(localId, fechaStr)
 
-        // Si hay caché y no se fuerza refresh, devolver caché directo
         if (cacheado != null && !forzarRefresh) {
             if (NetworkMonitor.hayInternet(context)) {
                 CoroutineScope(Dispatchers.IO).launch {
@@ -55,13 +53,11 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             return Result.success(cacheado.toModel())
         }
 
-        // Si se fuerza refresh o no hay caché, ir al servidor
         if (NetworkMonitor.hayInternet(context)) {
             return refrescarDesdeServidor(androidId, fecha)
                 .onSuccess { onActualizadoDesdeServidor?.invoke(it) }
         }
 
-        // Sin internet: construir desde Room
         val desdeRoom = construirDesdeRoom(localId, fecha)
         return Result.success(desdeRoom)
     }
@@ -73,12 +69,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         return refrescarDesdeServidor(androidId, fecha)
     }
 
-    /**
-     * Turnos que hubo en una fecha (para que el admin elija cuáles ver en una
-     * fecha pasada). Requiere conexión: no tiene sentido offline porque son
-     * turnos de otros vendedores que este dispositivo nunca vio. Ver
-     * SUPABASE_CAMBIOS.md -> RPC get_turnos_dia.
-     */
     suspend fun getTurnosDelDia(androidId: String, fecha: LocalDate): Result<List<TurnoInfo>> {
         if (!NetworkMonitor.hayInternet(context)) {
             return Result.failure(IllegalStateException("Necesitas conexión para ver los turnos de otros días"))
@@ -234,12 +224,10 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 .rpc("get_inventario_dia", buildJsonObject {
                     put("p_android_id", androidId); put("p_local_id", localId); put("p_fecha", fecha.toString())
                     if (!turnoIds.isNullOrEmpty()) {
-                        put("p_turno_ids", kotlinx.serialization.json.buildJsonArray { turnoIds.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) } })
+                        put("p_turno_ids", buildJsonArray { turnoIds.forEach { add(JsonPrimitive(it)) } })
                     }
                 })
                 .decodeAs<InventarioDia>()
-            // Solo se cachea la vista "del día completo" (sin filtro de turnos);
-            // una selección parcial de turnos no debe pisar ese caché offline.
             if (turnoIds.isNullOrEmpty()) db.inventarioCacheDao().guardar(resultado.toEntity(localId, fecha.toString()))
             Result.success(resultado)
         } catch (e: Exception) {
@@ -248,21 +236,15 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         }
     }
 
-    /**
-     * Cierre de turno. La app solo puede pedirlo — quién puede hacerlo (solo
-     * admin) y que cierre en cascada los turnos de todos los vendedores del
-     * local lo valida y ejecuta el propio RPC en Supabase. Ver
-     * SUPABASE_CAMBIOS.md.
-     */
-    suspend fun cerrarTurno(androidId: String, turnoId: Long, cierre: Double): Result<Unit> {
+    suspend fun cerrarTurno(androidId: String, turnoId: Long, cierre: Double): Result<Long> {
         if (!NetworkMonitor.hayInternet(context)) {
             return Result.failure(IllegalStateException("Necesitas conexión para cerrar el turno"))
         }
         return try {
-            SupabaseClientProvider.client.postgrest.rpc("cerrar_turno", buildJsonObject {
+            val nuevoTurnoId = SupabaseClientProvider.client.postgrest.rpc("cerrar_turno", buildJsonObject {
                 put("p_android_id", androidId); put("p_local_id", localIdActivo()); put("p_turno_id", turnoId); put("p_cierre", cierre)
-            })
-            Result.success(Unit)
+            }).decodeAs<Long>()
+            Result.success(nuevoTurnoId)
         } catch (e: Exception) {
             Result.failure(e)
         }
