@@ -1,12 +1,9 @@
 package org.luisito.gestor360.data.repository
 
 import android.content.Context
+import android.util.Log
 import io.github.jan.supabase.postgrest.postgrest
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.luisito.gestor360.data.SupabaseClientProvider
@@ -23,11 +20,6 @@ import java.time.LocalDate
 class InventarioRepository(private val context: Context = AppContextHolder.context) {
     private val db = AppDatabase.obtener(context)
     private val session = SessionManager(context)
-
-    // Un solo scope reutilizado (en vez de crear uno nuevo por llamada) para
-    // poder cancelar el refresco anterior si llega uno nuevo antes de que
-    // termine — así una respuesta vieja nunca pisa a una más reciente.
-    private val refreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var refreshJob: Job? = null
 
     private fun localIdActivo(): Long =
@@ -36,6 +28,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
     suspend fun getInventarioDia(
         androidId: String,
         fecha: LocalDate,
+        forzarRefresh: Boolean = false,
         onActualizadoDesdeServidor: (suspend (InventarioDia) -> Unit)? = null
     ): Result<InventarioDia> {
         val localId = localIdActivo()
@@ -43,26 +36,33 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
 
         val cacheado = db.inventarioCacheDao().obtener(localId, fechaStr)
 
-        val base = if (cacheado != null) {
-            cacheado.toModel()
-        } else {
-            construirDesdeRoom(localId, fecha)
-        }
-
-        if (NetworkMonitor.hayInternet(context)) {
-            refreshJob?.cancel()
-            refreshJob = refreshScope.launch {
-                refrescarDesdeServidor(androidId, fecha)
-                    .onSuccess { servidor -> onActualizadoDesdeServidor?.invoke(servidor) }
-                    .onFailure {
-                        // Si el RPC falla, al menos actualizar con datos locales frescos
-                        val local = construirDesdeRoom(localId, fecha)
-                        onActualizadoDesdeServidor?.invoke(local)
-                    }
+        // Si hay caché y no se fuerza refresh, devolver caché directo
+        if (cacheado != null && !forzarRefresh) {
+            if (NetworkMonitor.hayInternet(context)) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    refrescarDesdeServidor(androidId, fecha)
+                        .onSuccess { servidor -> onActualizadoDesdeServidor?.invoke(servidor) }
+                }
             }
+            return Result.success(cacheado.toModel())
         }
 
-        return Result.success(base)
+        // Si se fuerza refresh o no hay caché, ir al servidor
+        if (NetworkMonitor.hayInternet(context)) {
+            return refrescarDesdeServidor(androidId, fecha)
+                .onSuccess { onActualizadoDesdeServidor?.invoke(it) }
+        }
+
+        // Sin internet: construir desde Room
+        val desdeRoom = construirDesdeRoom(localId, fecha)
+        return Result.success(desdeRoom)
+    }
+
+    suspend fun refrescar(androidId: String, fecha: LocalDate): Result<InventarioDia> {
+        if (!NetworkMonitor.hayInternet(context)) {
+            return Result.failure(IllegalStateException("Sin conexión"))
+        }
+        return refrescarDesdeServidor(androidId, fecha)
     }
 
     private suspend fun construirDesdeRoom(localId: Long, fecha: LocalDate): InventarioDia {
@@ -196,10 +196,8 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
     }
 
     suspend fun refrescarDesdeServidor(androidId: String, fecha: LocalDate): Result<InventarioDia> {
-        var localIdLog: Long? = null
+        val localId = localIdActivo()
         return try {
-            val localId = localIdActivo()
-            localIdLog = localId
             val resultado = SupabaseClientProvider.client.postgrest
                 .rpc("get_inventario_dia", buildJsonObject {
                     put("p_android_id", androidId); put("p_local_id", localId); put("p_fecha", fecha.toString())
@@ -208,7 +206,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             db.inventarioCacheDao().guardar(resultado.toEntity(localId, fecha.toString()))
             Result.success(resultado)
         } catch (e: Exception) {
-            android.util.Log.e("InventarioRepository", "refrescarDesdeServidor: falló RPC/decode para local=$localIdLog fecha=$fecha", e)
+            Log.e("InventarioRepo", "Error refrescando servidor para fecha=$fecha", e)
             Result.failure(e)
         }
     }
@@ -237,7 +235,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             db.inventarioCacheDao().guardar(resultado.toEntity(localId, fecha.toString()))
             Result.success(Unit)
         } catch (e: Exception) {
-            android.util.Log.e("InventarioRepository", "precargarLocal: falló RPC/decode para local=$localId fecha=$fecha", e)
             Result.failure(e)
         }
     }
