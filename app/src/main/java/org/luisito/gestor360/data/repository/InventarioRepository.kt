@@ -33,20 +33,21 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         val localId = localIdActivo()
         val fechaStr = fecha.toString()
 
+        // 1. Caché del servidor (datos completos: turno, totales, tarjetas, etc.)
         val cacheado = db.inventarioCacheDao().obtener(localId, fechaStr)
-        val desdeRoom = construirDesdeRoom(localId, fecha)
 
+        // 2. Si hay caché, usarlo. Si no, construir desde Room (datos locales básicos)
         val base = if (cacheado != null) {
-            completarDesdeRoom(cacheado.toModel(), localId, fecha)
+            cacheado.toModel()
         } else {
-            desdeRoom
+            construirDesdeRoom(localId, fecha)
         }
 
+        // 3. Refrescar del servidor en background si hay internet
         if (NetworkMonitor.hayInternet(context)) {
             CoroutineScope(Dispatchers.IO).launch {
                 refrescarDesdeServidor(androidId, fecha).onSuccess { servidor ->
-                    val actualizado = completarDesdeRoom(servidor, localId, fecha)
-                    onActualizadoDesdeServidor?.invoke(actualizado)
+                    onActualizadoDesdeServidor?.invoke(servidor)
                 }
             }
         }
@@ -70,7 +71,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
 
         val ventasInfo = ventasHoy.map { it.toVentaInfo(localId, nombreUsuarioLocal, eliminadosPorId) }
 
-        val productosVendidos = fusionarProductosVendidos(emptyList(), ventasHoy, localId, fechaStr, eliminadosPorId)
+        val productosVendidos = fusionarProductosVendidos(emptyList(), ventasHoy, localId, eliminadosPorId)
 
         val totales = TotalesVentas(
             efectivo = ventasHoy.sumOf { it.efectivo },
@@ -128,46 +129,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         )
     }
 
-    private suspend fun completarDesdeRoom(dia: InventarioDia, localId: Long, fecha: LocalDate): InventarioDia {
-        val local = construirDesdeRoom(localId, fecha)
-        return dia.copy(
-            ventas = (dia.ventas + local.ventas).distinctBy { it.id },
-            productos_vendidos = fusionarListasProductosVendidos(dia.productos_vendidos, local.productos_vendidos),
-            productos_nuevos = (dia.productos_nuevos + local.productos_nuevos).distinctBy { it.id },
-            productos_modificados = (dia.productos_modificados + local.productos_modificados).distinctBy { it.id },
-            productos_eliminados = (dia.productos_eliminados + local.productos_eliminados).distinctBy { it.id },
-            devueltos = (dia.devueltos + local.devueltos).distinctBy { it.id },
-            mermas = (dia.mermas + local.mermas).distinctBy { it.id },
-            totales_ventas = TotalesVentas(
-                efectivo = (dia.totales_ventas?.efectivo ?: 0.0) + (local.totales_ventas?.efectivo ?: 0.0),
-                transferencia = (dia.totales_ventas?.transferencia ?: 0.0) + (local.totales_ventas?.transferencia ?: 0.0),
-                cantidad_ventas = (dia.totales_ventas?.cantidad_ventas ?: 0) + (local.totales_ventas?.cantidad_ventas ?: 0)
-            )
-        )
-    }
-
-    private fun fusionarListasProductosVendidos(
-        servidor: List<ProductoVendidoInfo>,
-        locales: List<ProductoVendidoInfo>
-    ): List<ProductoVendidoInfo> {
-        val mapa = servidor.associateBy { it.nombre }.toMutableMap()
-        for (local in locales) {
-            val existente = mapa[local.nombre]
-            if (existente != null) {
-                mapa[local.nombre] = existente.copy(
-                    total_vendido = existente.total_vendido + local.total_vendido,
-                    total_actual = if (local.total_actual > 0) local.total_actual else existente.total_actual,
-                    total_agregado = existente.total_agregado + local.total_agregado,
-                    total_merma = existente.total_merma + local.total_merma,
-                    total_inicial = if (local.total_inicial > 0) local.total_inicial else existente.total_inicial
-                )
-            } else {
-                mapa[local.nombre] = local
-            }
-        }
-        return mapa.values.toList()
-    }
-
     private suspend fun VentaEntity.toVentaInfo(
         localId: Long,
         nombreUsuarioLocal: String?,
@@ -200,32 +161,27 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         existentes: List<ProductoVendidoInfo>,
         pendientes: List<VentaEntity>,
         localId: Long,
-        fechaStr: String,
         eliminadosPorId: Map<String, ProductoEliminadoInfo> = emptyMap()
     ): List<ProductoVendidoInfo> {
         val porNombre = existentes.associateBy { it.nombre }.toMutableMap()
-        
-        // Obtener todos los productos para stock actual
         val todosProductos = db.productoDao().obtenerTodos(localId).associateBy { it.nombre }
-        
+
         for (venta in pendientes) {
             val nombre = venta.productoNombre
                 ?: db.productoDao().obtenerPorId(venta.productoId.toString(), localId)?.nombre
                 ?: eliminadosPorId[venta.productoId]?.nombre
                 ?: "Producto #${venta.productoId}"
-            
+
             val actual = porNombre[nombre] ?: ProductoVendidoInfo(nombre = nombre)
             val producto = todosProductos[nombre]
-            
+
             porNombre[nombre] = actual.copy(
                 total_vendido = actual.total_vendido + venta.cantidad,
                 total_actual = producto?.stock ?: actual.total_actual,
-                total_agregado = actual.total_agregado,
-                total_merma = actual.total_merma,
                 total_inicial = (producto?.stock ?: 0.0) + (actual.total_vendido + venta.cantidad)
             )
         }
-        
+
         return porNombre.values.toList()
     }
 
