@@ -51,10 +51,10 @@ class AprobacionStockViewModel(
         }
     }
 
-    fun resolver(id: String, estado: String, aprobadoPor: Long) {
+    fun resolver(id: String, estado: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
-            repository.resolver(androidIdActual, id, estado, aprobadoPor)
+            repository.resolver(androidIdActual, id, estado)
                 .onSuccess { cargar(androidIdActual) }
                 .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo resolver la solicitud")) }
             _uiState.value = _uiState.value.copy(isSaving = false)
