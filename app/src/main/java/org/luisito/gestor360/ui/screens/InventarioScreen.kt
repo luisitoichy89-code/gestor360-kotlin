@@ -23,9 +23,6 @@ import org.luisito.gestor360.utils.ReporteExporter
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import org.luisito.gestor360.ui.theme.NeuCard
-import org.luisito.gestor360.ui.theme.NeuButton
-import org.luisito.gestor360.ui.theme.NeuOutlinedButton
-import org.luisito.gestor360.ui.theme.neuShadow
 
 private const val VENTAS_POR_PAGINA = 20
 
@@ -81,18 +78,9 @@ fun InventarioScreen(androidId: String, rol: String, onBack: (() -> Unit)? = nul
                             Spacer(Modifier.width(4.dp))
                         }
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "Inventario",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                            Text("Inventario", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    uiState.fecha.format(formatter),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Text(uiState.fecha.format(formatter), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 if (dia?.solo_lectura == true) {
                                     Spacer(Modifier.width(6.dp))
                                     Icon(Icons.Default.Lock, "Solo lectura", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(12.dp))
@@ -165,6 +153,10 @@ fun InventarioScreen(androidId: String, rol: String, onBack: (() -> Unit)? = nul
                         item { SeccionTitulo("Devueltos", Icons.Default.AssignmentReturn) }
                         if (dia.devueltos.isEmpty()) item { TextoVacioSeccion("Sin devoluciones este día") }
                         items(dia.devueltos, key = { "dv_${it.id}" }) { d -> DevueltoInfoRow(d) }
+
+                        item { SeccionTitulo("Mermas", Icons.Default.Warning) }
+                        if (dia.mermas.isEmpty()) item { TextoVacioSeccion("Sin mermas este día") }
+                        items(dia.mermas, key = { "me_${it.id}" }) { m -> MermaInfoRow(m) }
 
                         item { Spacer(Modifier.height(4.dp)); Divider(); Spacer(Modifier.height(4.dp)) }
                         item { SeccionTitulo("Detalle de ventas", Icons.Default.Receipt) }
@@ -297,6 +289,19 @@ private fun DevueltoInfoRow(d: DevueltoInfo) {
 }
 
 @Composable
+private fun MermaInfoRow(m: MermaInfo) {
+    NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            Text(m.producto_nombre, fontWeight = FontWeight.Bold)
+            Text("Cantidad: ${m.cantidad.toInt()}  ·  Estado: ${m.estado}", style = MaterialTheme.typography.bodySmall)
+            Text("Motivo: ${m.motivo}", style = MaterialTheme.typography.bodySmall)
+            m.solicitado_por_nombre?.let { Text("Solicitado por: $it", style = MaterialTheme.typography.labelSmall) }
+            m.resuelto_por_nombre?.let { Text("Resuelto por: $it", style = MaterialTheme.typography.labelSmall) }
+        }
+    }
+}
+
+@Composable
 private fun EstadoDevolucionChip(estado: String) {
     val (texto, color) = when (estado) {
         "aprobada_stock" -> "Vuelve a stock" to MaterialTheme.colorScheme.primary
@@ -346,23 +351,12 @@ private fun TarjetaResumenRow(t: TarjetaResumen) {
     NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f, fill = false)) {
-                Text(
-                    t.nombre,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                )
+                Text(t.nombre, fontWeight = FontWeight.Bold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 Text(t.numero, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (!t.titular.isNullOrBlank()) Text(t.titular, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.width(12.dp))
-            Text(
-                "${formatearMonto(t.total)} CUP",
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                maxLines = 1,
-                softWrap = false
-            )
+            Text("${formatearMonto(t.total)} CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, maxLines = 1, softWrap = false)
         }
     }
 }
@@ -386,25 +380,9 @@ private fun ProductoVendidoRow(p: ProductoVendidoInfo) {
 private fun PagoTarjetaRow(v: VentaInfo) {
     NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    "${v.tarjeta_banco ?: ""} · ${v.tarjeta_numero}",
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp)
-                )
-                Text(
-                    "${formatearMonto(v.transferencia)} CUP",
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    softWrap = false
-                )
+            Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
+                Text("${v.tarjeta_banco ?: ""} · ${v.tarjeta_numero}", fontWeight = FontWeight.Bold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp))
+                Text("${formatearMonto(v.transferencia)} CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, maxLines = 1, softWrap = false)
             }
             if (!v.tarjeta_titular.isNullOrBlank()) Text("Titular de la cuenta: ${v.tarjeta_titular}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(6.dp))
