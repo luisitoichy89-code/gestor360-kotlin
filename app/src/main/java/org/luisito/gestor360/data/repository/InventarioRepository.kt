@@ -4,6 +4,8 @@ import android.content.Context
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -21,6 +23,12 @@ import java.time.LocalDate
 class InventarioRepository(private val context: Context = AppContextHolder.context) {
     private val db = AppDatabase.obtener(context)
     private val session = SessionManager(context)
+
+    // Un solo scope reutilizado (en vez de crear uno nuevo por llamada) para
+    // poder cancelar el refresco anterior si llega uno nuevo antes de que
+    // termine — así una respuesta vieja nunca pisa a una más reciente.
+    private val refreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var refreshJob: Job? = null
 
     private fun localIdActivo(): Long =
         session.getLocalId() ?: throw IllegalStateException("No hay un local activo seleccionado")
@@ -42,7 +50,8 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         }
 
         if (NetworkMonitor.hayInternet(context)) {
-            CoroutineScope(Dispatchers.IO).launch {
+            refreshJob?.cancel()
+            refreshJob = refreshScope.launch {
                 refrescarDesdeServidor(androidId, fecha)
                     .onSuccess { servidor -> onActualizadoDesdeServidor?.invoke(servidor) }
                     .onFailure {
