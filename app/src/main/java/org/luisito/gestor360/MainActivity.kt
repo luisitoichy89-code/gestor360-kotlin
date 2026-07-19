@@ -69,6 +69,7 @@ private sealed class PantallaInterna {
     object Inventario : PantallaInterna()
     object Devolucion : PantallaInterna()
     object Conflictos : PantallaInterna()
+    object MisVentas : PantallaInterna()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -134,11 +135,6 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
     }
 
     LaunchedEffect(Unit) {
-        // Si una sincronización en background (app cerrada, WorkManager)
-        // detectó que este usuario/licencia ya no es válido, esto quedó
-        // persistido (ver SessionManager.marcarSesionRevocada()). Lo
-        // limpiamos acá ANTES de decidir qué pantalla mostrar, para no
-        // arrastrar una sesión ya cerrada por el sistema.
         if (sessionManager.haySesionRevocadaPersistida()) {
             sessionManager.clear()
             sessionManager.limpiarSesionRevocada()
@@ -146,31 +142,12 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
 
         isLoggedIn = sessionManager.isLoggedIn()
         if (!isLoggedIn) {
-            // Dispositivo ya verificado antes + licencia todavía vigente en
-            // caché => directo al PIN, sin pasar por VerificarDispositivoScreen
-            // ni depender de internet (ver DeviceVerificationRepository).
             val androidId = DeviceIdManager.getFormattedDeviceId(context)
             val cacheado = deviceVerificationRepository.intentarAccesoCacheado(androidId)
 
             if (cacheado != null && NetworkMonitor.hayInternet(context)) {
-                // Hay caché válida Y hay internet ahora mismo: antes de
-                // confiar en la caché, una revisión relámpago contra
-                // Supabase. Esto tapa el hueco de un empleado desactivado
-                // que estuvo offline y, justo al volver la conexión,
-                // intenta entrar de nuevo por PIN sin que nadie lo revise.
-                // Si no hay internet, o el chequeo falla por cualquier
-                // motivo de red, se procede igual con la caché (ver
-                // VerificacionEnCalienteResultado.NoVerificado).
                 when (val resultado = deviceVerificationRepository.verificarEnCaliente(androidId)) {
                     is VerificacionEnCalienteResultado.Bloqueado -> {
-                        // OJO: a propósito NO se llama a limpiarLicenciaVerificada()
-                        // acá. Borrar la caché de licencia por un bloqueo detectado
-                        // en caliente rompía el acceso offline (regla 3/4 del
-                        // diseño original): si esto fuera un falso positivo, o si
-                        // el usuario de verdad está bloqueado, el dispositivo debe
-                        // seguir pudiendo entrar offline con lo que ya tenía
-                        // cacheado. Lo único que bloqueamos es ESTE intento
-                        // puntual (con internet, el servidor dijo que no).
                         accesoViewModel.mostrarBloqueoPorRevision(resultado.mensaje)
                         usuarioParaPin = null
                     }
@@ -203,10 +180,6 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
         pantalla = PantallaInterna.Home
     }
 
-    // Aviso EN VIVO de que el SyncManager revocó la sesión mientras la app
-    // estaba abierta (usuario desactivado o licencia inválida detectados
-    // durante una sincronización en curso). Sin esto, el empleado seguiría
-    // viendo el dashboard hasta que reabriera la app.
     LaunchedEffect(Unit) {
         SessionManager.sesionRevocada.collect { revocada ->
             if (revocada && sessionManager.isLoggedIn()) {
@@ -234,98 +207,92 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-    when {
-        isLoading -> {}
-        !isLoggedIn && usuarioParaPin == null -> VerificarDispositivoScreen(
-            onDispositivoAutorizado = { usuario -> usuarioParaPin = usuario },
-            viewModel = accesoViewModel
-        )
-        !isLoggedIn && usuarioParaPin != null -> PinLoginScreen(
-            usuario = usuarioParaPin!!,
-            onLoginExitoso = { usuario ->
-                sessionManager.saveSession(userId = usuario.id, username = usuario.username, rol = usuario.rol, localId = usuario.local_id, clienteId = usuario.cliente_id, androidId = usuario.android_id ?: "", nombre = usuario.nombre)
-                isLoggedIn = true
-            },
-            onCambiarDispositivo = { usuarioParaPin = null; accesoViewModel.reiniciar(); sessionManager.limpiarLicenciaVerificada() },
-            viewModel = accesoViewModel,
-            fotoBytes = fotoUsuarioPin
-        )
-        else -> {
-            val rol = sessionManager.getRol()
-            val androidId = sessionManager.getAndroidId()
-            val esAdmin = rol == "admin"
+        when {
+            isLoading -> {}
+            !isLoggedIn && usuarioParaPin == null -> VerificarDispositivoScreen(
+                onDispositivoAutorizado = { usuario -> usuarioParaPin = usuario },
+                viewModel = accesoViewModel
+            )
+            !isLoggedIn && usuarioParaPin != null -> PinLoginScreen(
+                usuario = usuarioParaPin!!,
+                onLoginExitoso = { usuario ->
+                    sessionManager.saveSession(userId = usuario.id, username = usuario.username, rol = usuario.rol, localId = usuario.local_id, clienteId = usuario.cliente_id, androidId = usuario.android_id ?: "", nombre = usuario.nombre)
+                    isLoggedIn = true
+                },
+                onCambiarDispositivo = { usuarioParaPin = null; accesoViewModel.reiniciar(); sessionManager.limpiarLicenciaVerificada() },
+                viewModel = accesoViewModel,
+                fotoBytes = fotoUsuarioPin
+            )
+            else -> {
+                val rol = sessionManager.getRol()
+                val androidId = sessionManager.getAndroidId()
+                val esAdmin = rol == "admin"
 
-            AnimatedContent(
-                targetState = pantalla,
-                label = "navegacion_principal",
-                transitionSpec = { fadeIn(animationSpec = androidx.compose.animation.core.tween(350)) togetherWith fadeOut(animationSpec = androidx.compose.animation.core.tween(300)) }
-            ) { pantallaActual ->
-                when (pantallaActual) {
-                    is PantallaInterna.Home -> Column(modifier = Modifier.statusBarsPadding()) {
-                        SyncStatusBar(androidId = androidId, onVerConflictos = { pantalla = PantallaInterna.Conflictos })
-                        InicioTopBar(
-                            username = sessionManager.getNombre().ifEmpty { sessionManager.getUsername() },
-                            esAdmin = esAdmin,
-                            androidId = androidId,
-                            localSeleccionViewModel = localSeleccionViewModel,
-                            onLocalCambiado = { local -> localRecienCambiado = local },
-                            onLogout = { cerrarSesion() },
-                            fotoUsuario = fotoUsuarioLogueado,
-                            onFotoSeleccionada = { bytes -> onFotoDashboardSeleccionada(bytes) },
-                            onFotoError = {
-                                scope.launch { snackbarHostState.showSnackbar("No se pudo cargar esa foto. Probá con otra imagen.") }
-                            },
-                            temaOscuro = temaOscuro,
-                            onCambiarTema = onCambiarTema
-                        )
-                        DashboardScreen(
-                            userRol = rol,
-                            username = sessionManager.getNombre().ifEmpty { sessionManager.getUsername() },
-                            androidId = androidId,
-                            onNavigate = { ruta ->
-                                pantalla = when (ruta) {
-                                    "ventas" -> PantallaInterna.Ventas
-                                    "productos" -> PantallaInterna.Productos
-                                    "inventario" -> PantallaInterna.Inventario
-                                    "tarjetas" -> if (esAdmin) PantallaInterna.Tarjetas else PantallaInterna.Home
-                                    "aprobaciones" -> if (esAdmin) PantallaInterna.Aprobaciones else PantallaInterna.Home
-                                    "devolucion" -> if (esAdmin) PantallaInterna.Devolucion else PantallaInterna.Home
-                                    else -> PantallaInterna.Home
-                                }
-                            },
-                            onLogout = { cerrarSesion() }
-                        )
+                AnimatedContent(
+                    targetState = pantalla,
+                    label = "navegacion_principal",
+                    transitionSpec = { fadeIn(animationSpec = androidx.compose.animation.core.tween(350)) togetherWith fadeOut(animationSpec = androidx.compose.animation.core.tween(300)) }
+                ) { pantallaActual ->
+                    when (pantallaActual) {
+                        is PantallaInterna.Home -> Column(modifier = Modifier.statusBarsPadding()) {
+                            SyncStatusBar(androidId = androidId, onVerConflictos = { pantalla = PantallaInterna.Conflictos })
+                            InicioTopBar(
+                                username = sessionManager.getNombre().ifEmpty { sessionManager.getUsername() },
+                                esAdmin = esAdmin,
+                                androidId = androidId,
+                                localSeleccionViewModel = localSeleccionViewModel,
+                                onLocalCambiado = { local -> localRecienCambiado = local },
+                                onLogout = { cerrarSesion() },
+                                fotoUsuario = fotoUsuarioLogueado,
+                                onFotoSeleccionada = { bytes -> onFotoDashboardSeleccionada(bytes) },
+                                onFotoError = {
+                                    scope.launch { snackbarHostState.showSnackbar("No se pudo cargar esa foto. Probá con otra imagen.") }
+                                },
+                                temaOscuro = temaOscuro,
+                                onCambiarTema = onCambiarTema
+                            )
+                            DashboardScreen(
+                                userRol = rol,
+                                username = sessionManager.getNombre().ifEmpty { sessionManager.getUsername() },
+                                androidId = androidId,
+                                onNavigate = { ruta ->
+                                    pantalla = when (ruta) {
+                                        "ventas" -> PantallaInterna.Ventas
+                                        "misventas" -> PantallaInterna.MisVentas
+                                        "productos" -> PantallaInterna.Productos
+                                        "inventario" -> PantallaInterna.Inventario
+                                        "tarjetas" -> if (esAdmin) PantallaInterna.Tarjetas else PantallaInterna.Home
+                                        "aprobaciones" -> if (esAdmin) PantallaInterna.Aprobaciones else PantallaInterna.Home
+                                        "devolucion" -> if (esAdmin) PantallaInterna.Devolucion else PantallaInterna.Home
+                                        else -> PantallaInterna.Home
+                                    }
+                                },
+                                onLogout = { cerrarSesion() }
+                            )
+                        }
+                        is PantallaInterna.Ventas -> VentasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }, onIrACarrito = { pantalla = PantallaInterna.Carrito })
+                        is PantallaInterna.Carrito -> CarritoScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Ventas }, onVentaConfirmada = { pantalla = PantallaInterna.Ventas })
+                        is PantallaInterna.Productos -> ProductosScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home })
+                        is PantallaInterna.Inventario -> InventarioScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home })
+                        is PantallaInterna.Tarjetas -> if (esAdmin) TarjetasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
+                        is PantallaInterna.Aprobaciones -> if (esAdmin) AprobacionesScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
+                        is PantallaInterna.Devolucion -> if (esAdmin) DevolucionScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
+                        is PantallaInterna.Conflictos -> ConflictosScreen(onBack = { pantalla = PantallaInterna.Home })
+                        is PantallaInterna.MisVentas -> MisVentasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
                     }
-                    is PantallaInterna.Ventas -> VentasScreen(
-                        androidId = androidId,
-                        onBack = { pantalla = PantallaInterna.Home },
-                        onIrACarrito = { pantalla = PantallaInterna.Carrito }
-                    )
-                    is PantallaInterna.Carrito -> CarritoScreen(
-                        androidId = androidId,
-                        onBack = { pantalla = PantallaInterna.Ventas },
-                        onVentaConfirmada = { pantalla = PantallaInterna.Ventas }
-                    )
-                    is PantallaInterna.Productos -> ProductosScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home })
-                    is PantallaInterna.Inventario -> InventarioScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home })
-                    is PantallaInterna.Tarjetas -> if (esAdmin) TarjetasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
-                    is PantallaInterna.Aprobaciones -> if (esAdmin) AprobacionesScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
-                    is PantallaInterna.Devolucion -> if (esAdmin) DevolucionScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
-                    is PantallaInterna.Conflictos -> ConflictosScreen(onBack = { pantalla = PantallaInterna.Home })
                 }
             }
         }
-    }
-    SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
-            val feedbackVM = remember { FeedbackViewModel() }
-            CompositionLocalProvider(LocalFeedback provides feedbackVM) {
-                val feedbackState by feedbackVM.state.collectAsState()
-                FeedbackBar(
-                    mensaje = feedbackState.mensaje,
-                    tipo = feedbackState.tipo,
-                    onDismiss = { feedbackVM.limpiar() }
-                )
-            }
+        SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
+        val feedbackVM = remember { FeedbackViewModel() }
+        CompositionLocalProvider(LocalFeedback provides feedbackVM) {
+            val feedbackState by feedbackVM.state.collectAsState()
+            FeedbackBar(
+                mensaje = feedbackState.mensaje,
+                tipo = feedbackState.tipo,
+                onDismiss = { feedbackVM.limpiar() }
+            )
+        }
     }
 }
 
@@ -353,44 +320,20 @@ private fun InicioTopBar(
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 if (fotoUsuario == null) {
-                    Text(
-                        "Añadir foto",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
+                    Text("Añadir foto", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
-                AvatarUsuario(
-                    fotoBytes = fotoUsuario,
-                    size = 40.dp,
-                    editable = true,
-                    onFotoSeleccionada = onFotoSeleccionada,
-                    onError = onFotoError
-                )
+                AvatarUsuario(fotoBytes = fotoUsuario, size = 40.dp, editable = true, onFotoSeleccionada = onFotoSeleccionada, onError = onFotoError)
             }
             Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                username,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1
-            )
-
+            Text(username, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
             Spacer(modifier = Modifier.width(10.dp))
             BotonTema(temaOscuro = temaOscuro, onClick = onCambiarTema)
-
             if (esAdmin) {
                 Spacer(modifier = Modifier.width(12.dp))
-                SelectorDeLocalInline(
-                    androidId = androidId,
-                    viewModel = localSeleccionViewModel,
-                    onLocalCambiado = onLocalCambiado,
-                    modifier = Modifier.weight(1f)
-                )
+                SelectorDeLocalInline(androidId = androidId, viewModel = localSeleccionViewModel, onLocalCambiado = onLocalCambiado, modifier = Modifier.weight(1f))
             } else {
                 Spacer(modifier = Modifier.weight(1f))
             }
-
             IconButton(onClick = onLogout) {
                 Icon(Icons.Default.Logout, contentDescription = "Cerrar sesión", tint = MaterialTheme.colorScheme.onSurface)
             }
@@ -399,69 +342,36 @@ private fun InicioTopBar(
 }
 
 @Composable
-private fun SelectorDeLocalInline(
-    androidId: String,
-    viewModel: LocalSeleccionViewModel,
-    onLocalCambiado: (Local) -> Unit,
-    modifier: Modifier = Modifier
-) {
+private fun SelectorDeLocalInline(androidId: String, viewModel: LocalSeleccionViewModel, onLocalCambiado: (Local) -> Unit, modifier: Modifier = Modifier) {
     val uiState by viewModel.uiState.collectAsState()
     var menuAbierto by remember { mutableStateOf(false) }
     var localAConfirmar by remember { mutableStateOf<Local?>(null) }
-
     LaunchedEffect(androidId) { viewModel.cargar(androidId) }
-
     if (uiState.locales.size > 1) {
         Box(modifier = modifier) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .clickable { menuAbierto = true }
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable { menuAbierto = true }.padding(horizontal = 8.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(Icons.Default.Storefront, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    uiState.localSeleccionado?.nombre ?: "Selecciona un local",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f)
-                )
+                Text(uiState.localSeleccionado?.nombre ?: "Selecciona un local", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium, maxLines = 1, modifier = Modifier.weight(1f))
                 Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             DropdownMenu(expanded = menuAbierto, onDismissRequest = { menuAbierto = false }) {
                 uiState.locales.forEach { local ->
-                    DropdownMenuItem(
-                        text = { Text(local.nombre) },
-                        onClick = {
-                            localAConfirmar = local
-                            menuAbierto = false
-                        }
-                    )
+                    DropdownMenuItem(text = { Text(local.nombre) }, onClick = { localAConfirmar = local; menuAbierto = false })
                 }
             }
         }
     }
-
     if (localAConfirmar != null) {
         AlertDialog(
             onDismissRequest = { localAConfirmar = null },
             title = { Text("Cambiar de local") },
             text = { Text("¿Cambiar a ${localAConfirmar!!.nombre}?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    val local = localAConfirmar!!
-                    viewModel.seleccionar(local)
-                    onLocalCambiado(local)
-                    localAConfirmar = null
-                }) { Text("Aceptar") }
-            },
-            dismissButton = {
-                TextButton(onClick = { localAConfirmar = null }) { Text("Cancelar") }
-            }
+            confirmButton = { TextButton(onClick = { val local = localAConfirmar!!; viewModel.seleccionar(local); onLocalCambiado(local); localAConfirmar = null }) { Text("Aceptar") } },
+            dismissButton = { TextButton(onClick = { localAConfirmar = null }) { Text("Cancelar") } }
         )
     }
 }

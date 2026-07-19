@@ -37,6 +37,7 @@ fun DashboardScreen(
 
     val secciones = buildList {
         add(SeccionDashboard("Ventas", Icons.Default.PointOfSale, "ventas", Azul))
+        add(SeccionDashboard("Mis Ventas", Icons.Default.ShoppingCart, "misventas", Azul))
         add(SeccionDashboard("Productos", Icons.Default.Inventory2, "productos", Morado))
         add(SeccionDashboard("Inventario", Icons.Default.ReceiptLong, "inventario", Azul))
         if (esAdmin) {
@@ -75,9 +76,6 @@ fun DashboardScreen(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                            // Insignia con tinte de color plano (sin neumórfico):
-                            // look moderno tipo "stat card" en vez del círculo
-                            // hundido de antes.
                             Box(
                                 modifier = Modifier
                                     .size(56.dp)
