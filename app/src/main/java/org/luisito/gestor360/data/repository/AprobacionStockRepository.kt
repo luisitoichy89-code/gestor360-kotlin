@@ -20,11 +20,6 @@ import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 import java.util.UUID
 
-/**
- * id: UUID generado en el dispositivo (igual que Producto/Tarjeta/Merma/
- * Devolucion), ya no bigserial+idTemporal negativo. Ver solicitarProducto/
- * solicitarAumento.
- */
 @Serializable
 data class AprobacionStock(
     val id: String? = null,
@@ -44,19 +39,6 @@ data class AprobacionStock(
     val created_at: String? = null
 )
 
-/**
- * "Solicitud de Ingreso" (producto nuevo / aumento de stock) + anular venta.
- *
- * Offline-first, calcado a Producto/Tarjeta/Merma/Devolucion:
- * getPendientes lee primero el caché de aprobaciones_cache (ver
- * AprobacionStockCacheEntity) y refresca en background si hay internet.
- * solicitarProducto/solicitarAumento: el vendedor propone offline — UUID
- * generado en el dispositivo como id definitivo (p_id) + p_accion_id para
- * idempotencia contra acciones_procesadas, encolado en acciones_pendientes
- * igual que crear_producto/crear_tarjeta/crear_merma/solicitar_devolucion.
- * Resolver (aprobar/rechazar) sigue requiriendo conexión sí o sí: mueve stock
- * real del lado del servidor, mismo criterio que Merma/Devolucion.resolver.
- */
 class AprobacionStockRepository(private val context: Context = AppContextHolder.context) {
     private val db = AppDatabase.obtener(context)
     private val session = SessionManager(context)
@@ -83,7 +65,6 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
         }
     }
 
-    /** Trae la verdad del servidor (ya filtrada por local_id) y reemplaza el caché de ese local. */
     suspend fun refrescarDesdeServidor(androidId: String): Result<List<AprobacionStock>> {
         val localId = localIdActivo()
         return try {
@@ -98,7 +79,6 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
         }
     }
 
-    /** Precarga las aprobaciones pendientes de UN local específico, sin depender del local activo en sesión. */
     suspend fun precargarLocal(androidId: String, localId: Long): Result<Unit> {
         return try {
             val response = SupabaseClientProvider.client.postgrest
@@ -111,9 +91,7 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
         }
     }
 
-    /** El vendedor propone offline: queda visible como pendiente de inmediato. UUID generado en el dispositivo (p_id). */
     suspend fun solicitarProducto(androidId: String, nombre: String, precio: Double, cantidad: Double): Result<Unit> {
-        // Verificar si ya hay una solicitud pendiente para este nombre
         val yaPendiente = db.accionPendienteDao().obtenerPendientes()
             .filter { it.tipo == "solicitar_producto" }
             .any { it.payloadJson.contains("\"p_nombre\":\"$nombre\"") }
@@ -138,9 +116,7 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
         return Result.success(Unit)
     }
 
-    /** El vendedor propone offline: queda visible como pendiente de inmediato, igual que Merma/Devolucion.solicitar. */
     suspend fun solicitarAumento(androidId: String, productoId: String, productoNombre: String, cantidad: Double): Result<Unit> {
-        // Verificar si ya hay una solicitud pendiente para este producto
         val yaPendiente = db.accionPendienteDao().obtenerPendientes()
             .filter { it.tipo == "solicitar_aumento_stock" }
             .any { it.payloadJson.contains("\"p_producto_id\":\"$productoId\"") }
@@ -175,14 +151,15 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
         } catch (e: Exception) { Result.failure(e) }
     }
 
-    suspend fun resolver(androidId: String, id: String, estado: String, aprobadoPor: Long): Result<Unit> {
+    suspend fun resolver(androidId: String, id: String, estado: String): Result<Unit> {
         if (!NetworkMonitor.hayInternet(context)) {
             return Result.failure(IllegalStateException("Necesitas conexión para resolver una aprobación"))
         }
         return try {
+            val accionId = UUID.randomUUID().toString()
             SupabaseClientProvider.client.postgrest.rpc("resolver_aprobacion", buildJsonObject {
                 put("p_android_id", androidId); put("p_local_id", localIdActivo())
-                put("p_id", id); put("p_estado", estado); put("p_aprobado_por", aprobadoPor)
+                put("p_id", id); put("p_estado", estado); put("p_accion_id", accionId)
             })
             refrescarDesdeServidor(androidId)
             Result.success(Unit)
