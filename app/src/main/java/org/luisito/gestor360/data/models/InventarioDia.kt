@@ -116,5 +116,7 @@ data class ProductoVendidoInfo(
 data class TotalesVentas(
     val efectivo: Double = 0.0,
     val transferencia: Double = 0.0,
+    val tarjeta: Double = 0.0,
+    val total: Double = 0.0,
     val cantidad_ventas: Long = 0
 )

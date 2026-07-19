@@ -197,6 +197,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             db.inventarioCacheDao().guardar(resultado.toEntity(localId, fecha.toString()))
             Result.success(resultado)
         } catch (e: Exception) {
+            android.util.Log.e("InventarioRepository", "refrescarDesdeServidor: falló RPC/decode para local=$localId fecha=$fecha", e)
             Result.failure(e)
         }
     }
@@ -225,6 +226,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             db.inventarioCacheDao().guardar(resultado.toEntity(localId, fecha.toString()))
             Result.success(Unit)
         } catch (e: Exception) {
+            android.util.Log.e("InventarioRepository", "precargarLocal: falló RPC/decode para local=$localId fecha=$fecha", e)
             Result.failure(e)
         }
     }
