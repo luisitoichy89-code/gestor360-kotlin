@@ -33,22 +33,23 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         val localId = localIdActivo()
         val fechaStr = fecha.toString()
 
-        // 1. Caché del servidor (datos completos: turno, totales, tarjetas, etc.)
         val cacheado = db.inventarioCacheDao().obtener(localId, fechaStr)
 
-        // 2. Si hay caché, usarlo. Si no, construir desde Room (datos locales básicos)
         val base = if (cacheado != null) {
             cacheado.toModel()
         } else {
             construirDesdeRoom(localId, fecha)
         }
 
-        // 3. Refrescar del servidor en background si hay internet
         if (NetworkMonitor.hayInternet(context)) {
             CoroutineScope(Dispatchers.IO).launch {
-                refrescarDesdeServidor(androidId, fecha).onSuccess { servidor ->
-                    onActualizadoDesdeServidor?.invoke(servidor)
-                }
+                refrescarDesdeServidor(androidId, fecha)
+                    .onSuccess { servidor -> onActualizadoDesdeServidor?.invoke(servidor) }
+                    .onFailure {
+                        // Si el RPC falla, al menos actualizar con datos locales frescos
+                        val local = construirDesdeRoom(localId, fecha)
+                        onActualizadoDesdeServidor?.invoke(local)
+                    }
             }
         }
 
