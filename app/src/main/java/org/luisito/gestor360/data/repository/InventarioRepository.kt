@@ -187,8 +187,10 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
     }
 
     suspend fun refrescarDesdeServidor(androidId: String, fecha: LocalDate): Result<InventarioDia> {
+        var localIdLog: Long? = null
         return try {
             val localId = localIdActivo()
+            localIdLog = localId
             val resultado = SupabaseClientProvider.client.postgrest
                 .rpc("get_inventario_dia", buildJsonObject {
                     put("p_android_id", androidId); put("p_local_id", localId); put("p_fecha", fecha.toString())
@@ -197,7 +199,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             db.inventarioCacheDao().guardar(resultado.toEntity(localId, fecha.toString()))
             Result.success(resultado)
         } catch (e: Exception) {
-            android.util.Log.e("InventarioRepository", "refrescarDesdeServidor: falló RPC/decode para local=$localId fecha=$fecha", e)
+            android.util.Log.e("InventarioRepository", "refrescarDesdeServidor: falló RPC/decode para local=$localIdLog fecha=$fecha", e)
             Result.failure(e)
         }
     }
