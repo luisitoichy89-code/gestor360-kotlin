@@ -61,7 +61,9 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
 
         val sorted = ventasTurno.sortedByDescending { it.createdAt }
         val agrupadas = sorted.map { v ->
-            val nombreProducto = v.productoNombre ?: "Producto"
+            val nombreProducto = v.productoNombre
+                ?: db.productoDao().obtenerPorId(v.productoId.toString(), localId)?.nombre
+                ?: "Producto #${v.productoId}"
             val nombreTarjeta = if (v.tarjetaId != null) {
                 db.tarjetaDao().obtenerPorId(v.tarjetaId, localId)?.nombre
             } else null

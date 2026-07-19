@@ -278,7 +278,7 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
                         is PantallaInterna.Aprobaciones -> if (esAdmin) AprobacionesScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
                         is PantallaInterna.Devolucion -> if (esAdmin) DevolucionScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
                         is PantallaInterna.Conflictos -> ConflictosScreen(onBack = { pantalla = PantallaInterna.Home })
-                        is PantallaInterna.MisVentas -> MisVentasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home })
+                        is PantallaInterna.MisVentas -> MisVentasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Inventario })
                     }
                 }
             }
