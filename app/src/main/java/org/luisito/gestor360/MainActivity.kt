@@ -330,50 +330,10 @@ private fun InicioTopBar(
             Text(username, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
             Spacer(modifier = Modifier.width(10.dp))
             BotonTema(temaOscuro = temaOscuro, onClick = onCambiarTema)
-            if (esAdmin) {
-                Spacer(modifier = Modifier.width(12.dp))
-                SelectorDeLocalInline(androidId = androidId, viewModel = localSeleccionViewModel, onLocalCambiado = onLocalCambiado, modifier = Modifier.weight(1f))
-            } else {
-                Spacer(modifier = Modifier.weight(1f))
-            }
+            Spacer(modifier = Modifier.weight(1f))
             IconButton(onClick = onLogout) {
                 Icon(Icons.Default.Logout, contentDescription = "Cerrar sesión", tint = MaterialTheme.colorScheme.onSurface)
             }
         }
-    }
-}
-
-@Composable
-private fun SelectorDeLocalInline(androidId: String, viewModel: LocalSeleccionViewModel, onLocalCambiado: (Local) -> Unit, modifier: Modifier = Modifier) {
-    val uiState by viewModel.uiState.collectAsState()
-    var menuAbierto by remember { mutableStateOf(false) }
-    var localAConfirmar by remember { mutableStateOf<Local?>(null) }
-    LaunchedEffect(androidId) { viewModel.cargar(androidId) }
-    if (uiState.locales.size > 1) {
-        Box(modifier = modifier) {
-            Row(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable { menuAbierto = true }.padding(horizontal = 8.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Default.Storefront, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(uiState.localSeleccionado?.nombre ?: "Selecciona un local", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium, maxLines = 1, modifier = Modifier.weight(1f))
-                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            DropdownMenu(expanded = menuAbierto, onDismissRequest = { menuAbierto = false }) {
-                uiState.locales.forEach { local ->
-                    DropdownMenuItem(text = { Text(local.nombre) }, onClick = { localAConfirmar = local; menuAbierto = false })
-                }
-            }
-        }
-    }
-    if (localAConfirmar != null) {
-        AlertDialog(
-            onDismissRequest = { localAConfirmar = null },
-            title = { Text("Cambiar de local") },
-            text = { Text("¿Cambiar a ${localAConfirmar!!.nombre}?") },
-            confirmButton = { TextButton(onClick = { val local = localAConfirmar!!; viewModel.seleccionar(local); onLocalCambiado(local); localAConfirmar = null }) { Text("Aceptar") } },
-            dismissButton = { TextButton(onClick = { localAConfirmar = null }) { Text("Cancelar") } }
-        )
     }
 }

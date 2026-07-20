@@ -73,7 +73,14 @@ class SessionManager(context: Context) {
             .putString("android_id", androidId)
             .putString("nombre", nombre ?: username)
             .apply()
-        setLocalId(localId)
+        // Solo se asigna el local por defecto del usuario si este dispositivo
+        // todavía no tiene ninguno elegido (primer login en el equipo). Si ya
+        // había un local activo (por ejemplo, el admin dejó este tablet en
+        // "Local 2"), se respeta: cerrar sesión y volver a entrar NO debe
+        // regresar al local por defecto del usuario en el servidor.
+        if (getLocalId() == null) {
+            setLocalId(localId)
+        }
     }
 
     fun isLoggedIn(): Boolean = prefs.getBoolean("is_logged_in", false)
@@ -92,14 +99,22 @@ class SessionManager(context: Context) {
      * todos los locales terminaran compartiendo datos): si no hay local_id
      * seleccionado, esto es null y el llamador debe manejarlo explícitamente
      * (por ejemplo, mostrando el selector de local).
+     *
+     * IMPORTANTE: vive en `licenciaPrefs`, NO en `prefs`, a propósito — mismo
+     * motivo que la licencia de dispositivo de más abajo. El local activo es
+     * una propiedad del DISPOSITIVO físico (en qué local está esta tablet),
+     * no de la sesión de un usuario particular. Si viviera en `prefs`,
+     * clear()/cerrarSesion() lo borraría cada vez que alguien cierra sesión,
+     * y el admin tendría que volver a elegir "local 2" cada vez que
+     * reingresa — que era justo el bug reportado.
      */
     fun getLocalId(): Long? {
-        val valor = prefs.getLong("local_id", -1L)
+        val valor = licenciaPrefs.getLong("local_id", -1L)
         return if (valor == -1L) null else valor
     }
 
     fun setLocalId(localId: Long?) {
-        prefs.edit().apply {
+        licenciaPrefs.edit().apply {
             if (localId == null) remove("local_id") else putLong("local_id", localId)
         }.apply()
     }

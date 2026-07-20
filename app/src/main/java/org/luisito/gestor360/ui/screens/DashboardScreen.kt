@@ -21,9 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
 import org.luisito.gestor360.data.models.Local
-import org.luisito.gestor360.data.sync.SyncWorker
 import org.luisito.gestor360.ui.theme.Azul
 import org.luisito.gestor360.ui.theme.Morado
 import org.luisito.gestor360.ui.theme.TarjetaCarpeta
@@ -32,8 +30,6 @@ import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 
 private data class SeccionDashboard(val titulo: String, val icono: ImageVector, val ruta: String, val color: Color)
-
-private val VerdeActualizar = Color(0xFF2E7D32)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,8 +44,6 @@ fun DashboardScreen(
 ) {
     val esAdmin = userRol == "admin"
     val context = AppContextHolder.context
-    val scope = rememberCoroutineScope()
-    var actualizando by remember { mutableStateOf(false) }
     val sessionManager = remember { SessionManager(context) }
 
     val secciones = buildList {
@@ -151,31 +145,6 @@ fun DashboardScreen(
                         }
                     }
                 }
-            }
-        }
-
-        // Botón "Actualizar todo" pegado abajo
-        Button(
-            onClick = {
-                actualizando = true
-                scope.launch {
-                    SyncWorker.sincronizarAhora(context)
-                    actualizando = false
-                }
-            },
-            modifier = Modifier.fillMaxWidth().height(48.dp),
-            shape = RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomStart = 0.dp, bottomEnd = 0.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = VerdeActualizar),
-            enabled = !actualizando
-        ) {
-            if (actualizando) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
-                Spacer(Modifier.width(8.dp))
-                Text("Actualizando...", color = Color.White, fontWeight = FontWeight.Bold)
-            } else {
-                Icon(Icons.Default.Refresh, null, tint = Color.White, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Actualizar todo", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
     }
