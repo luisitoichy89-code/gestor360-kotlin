@@ -34,7 +34,7 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
     val context = AppContextHolder.context
     val db = remember { AppDatabase.obtener(context) }
     val session = remember { SessionManager(context) }
-    
+
     var ventas by remember { mutableStateOf<List<VentaAgrupada>>(emptyList()) }
     var totalEfectivo by remember { mutableStateOf(0.0) }
     var totalTransferencia by remember { mutableStateOf(0.0) }
@@ -42,21 +42,21 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
     var isRefreshing by remember { mutableStateOf(false) }
     var trigger by remember { mutableStateOf(0) }
 
-    // Siempre lee de Room (caché local): funciona sin internet. El botón de
-    // refrescar solo vuelve a consultar esa misma base local por si hubo
-    // ventas nuevas mientras la pantalla estaba abierta.
     suspend fun cargarDesdeRoom() {
         val localId = session.getLocalId() ?: return
+        val userId = session.getUserId().takeIf { it > 0 }
         val turnoActivo = db.turnoDao().obtenerActivo(localId)
 
         val todasVentas = db.ventaDao().obtenerTodas(localId)
+        val ventasDelUsuario = if (userId != null) todasVentas.filter { it.usuarioId == userId } else todasVentas
+
         val ventasTurno = if (turnoActivo != null) {
             val aperturaStr = turnoActivo.createdAt
             ventasDelUsuario.filter { v ->
                 v.createdAt != null && aperturaStr != null && v.createdAt >= aperturaStr
             }
         } else {
-            todasVentas
+            ventasDelUsuario
         }
 
         val sorted = ventasTurno.sortedByDescending { it.createdAt }
@@ -137,13 +137,13 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
                         }
                     }
                 }
-                
+
                 if (ventas.isEmpty()) {
                     item {
                         Text("Sin ventas en este turno", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                
+
                 items(ventas, key = { it.id }) { venta ->
                     NeuCard(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
                         Row(
