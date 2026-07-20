@@ -139,7 +139,7 @@ private fun ProductoCard(producto: Product, esAdmin: Boolean, onEditar: () -> Un
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProductoFormDialog(producto: Product?, esAdmin: Boolean, categoriasExistentes: List<String>, productosExistentes: List<Product>, isSaving: Boolean, onDismiss: () -> Unit, onGuardar: (nombre: String, precio: Double, stock: Double, ubicacion: String, categoria: String) -> Unit) {
-    var nombre by remember { mutableStateOf(producto?.nombre ?: "") }; var precioTexto by remember { mutableStateOf(producto?.precio?.toString() ?: "") }; var stockTexto by remember { mutableStateOf(producto?.stock?.toString() ?: "") }; var ubicacion by remember { mutableStateOf(producto?.ubicacion ?: "") }; var categoria by remember { mutableStateOf(producto?.categoria ?: "") }; var menuCategoriaAbierto by remember { mutableStateOf(false) }
+    var nombre by remember { mutableStateOf(producto?.nombre ?: "") }; var precioTexto by remember { mutableStateOf((producto?.precio?.toInt()?.toString() ?: "")) }; var stockTexto by remember { mutableStateOf((producto?.stock?.toInt()?.toString() ?: "")) }; var ubicacion by remember { mutableStateOf(producto?.ubicacion ?: "") }; var categoria by remember { mutableStateOf(producto?.categoria ?: "") }; var menuCategoriaAbierto by remember { mutableStateOf(false) }
     val precio = precioTexto.toDoubleOrNull(); val stock = stockTexto.toDoubleOrNull()
     val nombreDuplicado = remember(nombre, productosExistentes, producto) {
         val nombreNormalizado = nombre.trim()

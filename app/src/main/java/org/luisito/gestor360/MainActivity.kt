@@ -267,7 +267,9 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
                                         else -> PantallaInterna.Home
                                     }
                                 },
-                                onLogout = { cerrarSesion() }
+                                onLogout = { cerrarSesion() },
+                                localSeleccionViewModel = localSeleccionViewModel,
+                                onLocalCambiado = { local -> localRecienCambiado = local }
                             )
                         }
                         is PantallaInterna.Ventas -> VentasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }, onIrACarrito = { pantalla = PantallaInterna.Carrito })
