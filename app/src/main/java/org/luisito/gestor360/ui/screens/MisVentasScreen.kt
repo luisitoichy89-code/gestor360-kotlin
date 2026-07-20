@@ -52,7 +52,7 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
         val todasVentas = db.ventaDao().obtenerTodas(localId)
         val ventasTurno = if (turnoActivo != null) {
             val aperturaStr = turnoActivo.createdAt
-            todasVentas.filter { v ->
+            ventasDelUsuario.filter { v ->
                 v.createdAt != null && aperturaStr != null && v.createdAt >= aperturaStr
             }
         } else {
