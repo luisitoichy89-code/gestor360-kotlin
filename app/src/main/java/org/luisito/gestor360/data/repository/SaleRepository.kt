@@ -56,6 +56,7 @@ class SaleRepository(
 
                 productRepository.descontarStockLocal(item.productId, item.cantidad)
                 val ventaLocal = Sale(
+                    turno_id = db.turnoDao().obtenerActivo(localId)?.id,
                     id = id, producto_id = item.productId, producto_nombre = item.nombre,
                     cantidad = item.cantidad, total = item.subtotal,
                     metodo = metodo, efectivo = efectivoItem, transferencia = transferenciaItem, local_id = localId,

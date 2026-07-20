@@ -41,6 +41,7 @@ data class Sale(
     // para que acepten/devuelvan uuid ahí también; hasta entonces, vender con
     // tarjeta puede seguir fallando en tiempo de ejecución contra esos RPC viejos.
     val tarjeta_id: String? = null,
+    val turno_id: Long? = null,
     val created_at: String? = null,
     val updated_at: String? = null
 )

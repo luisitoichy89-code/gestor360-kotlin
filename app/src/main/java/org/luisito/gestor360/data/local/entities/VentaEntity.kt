@@ -22,7 +22,8 @@ data class VentaEntity(
     val clienteNombre: String?,
     val tarjetaId: String?,
     val createdAt: String?,
-    val sincronizada: Boolean = true
+    val sincronizada: Boolean = true,
+    val turnoId: Long? = null
 )
 
 fun VentaEntity.toModel() = Sale(
