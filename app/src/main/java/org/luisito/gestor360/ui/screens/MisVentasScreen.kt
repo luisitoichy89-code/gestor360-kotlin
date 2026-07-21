@@ -16,6 +16,7 @@ import org.luisito.gestor360.data.local.AppDatabase
 import org.luisito.gestor360.ui.theme.NeuCard
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
+import java.time.LocalDate
 
 data class VentaAgrupada(
     val id: String,
@@ -34,6 +35,7 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
     val context = AppContextHolder.context
     val db = remember { AppDatabase.obtener(context) }
     val session = remember { SessionManager(context) }
+    val hoy = remember { LocalDate.now().toString() }
 
     var ventas by remember { mutableStateOf<List<VentaAgrupada>>(emptyList()) }
     var totalEfectivo by remember { mutableStateOf(0.0) }
@@ -45,21 +47,12 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
     suspend fun cargarDesdeRoom() {
         val localId = session.getLocalId() ?: return
         val userId = session.getUserId().takeIf { it > 0 }
-        val turnoActivo = db.turnoDao().obtenerActivo(localId)
 
         val todasVentas = db.ventaDao().obtenerTodas(localId)
-        val ventasDelUsuario = if (userId != null) todasVentas.filter { it.usuarioId == userId } else todasVentas
+        val ventasHoy = todasVentas.filter { it.createdAt?.startsWith(hoy) == true }
+        val ventasDelUsuario = if (userId != null) ventasHoy.filter { it.usuarioId == userId } else ventasHoy
 
-        val ventasTurno = if (turnoActivo != null) {
-            val aperturaStr = turnoActivo.createdAt
-            ventasDelUsuario.filter { v ->
-                v.createdAt != null && aperturaStr != null && v.createdAt >= aperturaStr
-            }
-        } else {
-            ventasDelUsuario
-        }
-
-        val sorted = ventasTurno.sortedByDescending { it.createdAt }
+        val sorted = ventasDelUsuario.sortedByDescending { it.createdAt }
         val agrupadas = sorted.map { v ->
             val nombreProducto = v.productoNombre
                 ?: db.productoDao().obtenerPorId(v.productoId.toString(), localId)?.nombre
@@ -81,8 +74,8 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
         }
 
         ventas = agrupadas
-        totalEfectivo = ventasTurno.sumOf { it.efectivo }
-        totalTransferencia = ventasTurno.sumOf { it.transferencia }
+        totalEfectivo = ventasDelUsuario.sumOf { it.efectivo }
+        totalTransferencia = ventasDelUsuario.sumOf { it.transferencia }
     }
 
     LaunchedEffect(androidId, trigger) {
@@ -118,7 +111,7 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
                 item {
                     NeuCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp)) {
-                            Text("Totales del turno", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                            Text("Totales del día", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                             Spacer(Modifier.height(8.dp))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("Efectivo:")
@@ -140,7 +133,7 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
 
                 if (ventas.isEmpty()) {
                     item {
-                        Text("Sin ventas en este turno", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Sin ventas hoy", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 

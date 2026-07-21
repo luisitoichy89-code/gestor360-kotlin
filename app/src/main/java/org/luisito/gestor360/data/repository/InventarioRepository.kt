@@ -320,6 +320,10 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             val nuevoTurnoId = SupabaseClientProvider.client.postgrest.rpc("cerrar_turno", buildJsonObject {
                 put("p_android_id", androidId); put("p_local_id", localIdActivo()); put("p_turno_id", turnoId); put("p_cierre", cierre)
             }).decodeAs<Long>()
+            db.turnoDao().insertar(org.luisito.gestor360.data.local.entities.TurnoEntity(
+                id = nuevoTurnoId, localId = localIdActivo(), usuarioId = null, apertura = 0.0,
+                cierre = null, diferencia = null, createdAt = java.time.LocalDateTime.now().toString()
+            ))
             Result.success(nuevoTurnoId)
         } catch (e: Exception) {
             Result.failure(e)
