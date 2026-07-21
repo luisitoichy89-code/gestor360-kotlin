@@ -27,22 +27,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
     private fun localIdActivo(): Long =
         session.getLocalId() ?: throw IllegalStateException("No hay un local activo seleccionado")
 
-    /**
-     * NUEVO (Fase 1 turnos): filtra una lista usando turno_id cuando está
-     * disponible, en vez de comparar el string de fecha con el timestamp de
-     * cada registro. Reemplaza el mecanismo frágil anterior solo para la
-     * reconstrucción offline (construirDesdeRoom) — la versión "online" de
-     * esta lógica vive del lado de Supabase en get_inventario_dia.
-     *
-     * - Si el usuario seleccionó turnos explícitamente (turnoIdsExplicitos),
-     *   se respeta esa selección tal cual.
-     * - Si es HOY y hay un turno activo cacheado localmente, se filtra por
-     *   ese turno_id. Los registros sin turno_id (creados antes de esta
-     *   migración) se incluyen igual si además coinciden por fecha, para no
-     *   hacerlos desaparecer de golpe del inventario offline.
-     * - En cualquier otro caso (día pasado sin selección explícita, o sin
-     *   turno activo cacheado) se cae al filtro por fecha de siempre.
-     */
     private fun <T> filtrarPorTurno(
         items: List<T>,
         turnoIdDe: (T) -> Long?,
@@ -54,10 +38,8 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
     ): List<T> = when {
         !turnoIdsExplicitos.isNullOrEmpty() ->
             items.filter { val t = turnoIdDe(it); t != null && t in turnoIdsExplicitos }
-
         esHoy && turnoActivoId != null ->
             items.filter { turnoIdDe(it) == turnoActivoId || (turnoIdDe(it) == null && fechaDe(it)?.startsWith(fechaStr) == true) }
-
         else ->
             items.filter { fechaDe(it)?.startsWith(fechaStr) == true }
     }
@@ -131,9 +113,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         val esHoy = fecha == LocalDate.now()
         val nombreUsuarioLocal = session.getNombre().takeIf { it.isNotBlank() }
 
-        // Turno activo cacheado localmente (si existe) — reemplaza el uso de
-        // comparación de fecha para decidir qué registros son "del turno de
-        // hoy" mientras la app está offline.
         val turnoActivo = if (esHoy) db.turnoDao().obtenerActivo(localId) else null
         val turnoActivoId = turnoActivo?.id
 
@@ -202,10 +181,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             }
         } else emptyList()
 
-        // Las mermas pendientes no tienen campo de fecha en MermaEntity, así
-        // que fuera del caso "hoy con turno activo" no hay filtro posible
-        // offline y se listan todas las pendientes, igual que antes de esta
-        // migración.
         val mermasPendientesTodas = db.mermaDao().obtenerPendientes(localId)
         val mermasFiltradas = if (esHoy && turnoActivoId != null) {
             mermasPendientesTodas.filter { it.turnoId == turnoActivoId || it.turnoId == null }
@@ -320,10 +295,15 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             val nuevoTurnoId = SupabaseClientProvider.client.postgrest.rpc("cerrar_turno", buildJsonObject {
                 put("p_android_id", androidId); put("p_local_id", localIdActivo()); put("p_turno_id", turnoId); put("p_cierre", cierre)
             }).decodeAs<Long>()
-            db.turnoDao().insertar(org.luisito.gestor360.data.local.entities.TurnoEntity(
-                id = nuevoTurnoId, localId = localIdActivo(), usuarioId = null, apertura = 0.0,
-                cierre = null, diferencia = null, createdAt = java.time.LocalDateTime.now().toString()
-            ))
+            db.turnoDao().cerrarYRegistrarNuevo(
+                turnoAnteriorId = turnoId,
+                cierreAnterior = cierre,
+                localId = localIdActivo(),
+                nuevo = org.luisito.gestor360.data.local.entities.TurnoEntity(
+                    id = nuevoTurnoId, localId = localIdActivo(), usuarioId = null, apertura = 0.0,
+                    cierre = null, diferencia = null, createdAt = java.time.LocalDateTime.now().toString()
+                )
+            )
             Result.success(nuevoTurnoId)
         } catch (e: Exception) {
             Result.failure(e)
