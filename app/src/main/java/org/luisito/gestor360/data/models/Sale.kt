@@ -41,9 +41,12 @@ data class Sale(
     // para que acepten/devuelvan uuid ahí también; hasta entonces, vender con
     // tarjeta puede seguir fallando en tiempo de ejecución contra esos RPC viejos.
     val tarjeta_id: String? = null,
-    val turno_id: Long? = null,
     val created_at: String? = null,
-    val updated_at: String? = null
+    val updated_at: String? = null,
+    // NUEVO: turno al que pertenece la venta (ver migracion_turno_id.sql).
+    // "get_ventas" tiene que devolver esta columna para que llegue acá;
+    // mientras no se actualice ese RPC, siempre viene null.
+    val turno_id: Long? = null
 )
 
 enum class MetodoPago(val valor: String, val etiqueta: String) {

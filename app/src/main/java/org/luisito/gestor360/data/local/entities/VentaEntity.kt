@@ -23,6 +23,10 @@ data class VentaEntity(
     val tarjetaId: String?,
     val createdAt: String?,
     val sincronizada: Boolean = true,
+    // NUEVO: turno al que pertenece esta venta. Reemplaza la inferencia por
+    // comparación de timestamps que usaba InventarioRepository. Nullable
+    // porque las ventas ya existentes (creadas antes de esta migración)
+    // no tienen forma de saber a qué turno pertenecieron.
     val turnoId: Long? = null
 )
 
@@ -31,12 +35,12 @@ fun VentaEntity.toModel() = Sale(
     cantidad = cantidad, total = total, metodo = metodo,
     efectivo = efectivo, transferencia = transferencia, usuario_id = usuarioId, local_id = localId,
     cliente_ci = clienteCi, cliente_tel = clienteTel, cliente_nombre = clienteNombre,
-    tarjeta_id = tarjetaId, created_at = createdAt
+    tarjeta_id = tarjetaId, created_at = createdAt, turno_id = turnoId
 )
 
 fun Sale.toEntity(localId: Long, sincronizada: Boolean = true) = VentaEntity(
     id = id ?: "local_${UUID.randomUUID()}", productoId = producto_id, productoNombre = producto_nombre,
     cantidad = cantidad, total = total, metodo = metodo, efectivo = efectivo, transferencia = transferencia,
     usuarioId = usuario_id, localId = localId, clienteCi = cliente_ci, clienteTel = cliente_tel, clienteNombre = cliente_nombre,
-    tarjetaId = tarjeta_id, createdAt = created_at, sincronizada = sincronizada
+    tarjetaId = tarjeta_id, createdAt = created_at, sincronizada = sincronizada, turnoId = turno_id
 )

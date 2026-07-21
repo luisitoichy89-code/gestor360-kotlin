@@ -60,6 +60,11 @@ data class MermaEntity(
 
     val estado: String = "pendiente", // pendiente | aprobada | rechazada
 
+    // NUEVO: turno al que pertenece esta merma (ver migracion_turno_id.sql).
+    // Nullable: mermas ya existentes antes de la migración no lo tienen.
+    @SerialName("turno_id")
+    val turnoId: Long? = null,
+
     @Transient
     val pendienteSync: Boolean = true
 )

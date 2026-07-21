@@ -187,13 +187,25 @@ val MIGRATION_13_14 = object : Migration(13, 14) {
     }
 }
 
-
+/**
+ * NUEVO (Fase 1 de inventario/turnos): agrega la columna turnoId a las
+ * tablas de caché que ahora la necesitan del lado servidor (ver
+ * migracion_turno_id.sql). Solo ALTER TABLE ... ADD COLUMN, sin recrear
+ * tablas ni tocar datos existentes — quedan con turnoId = NULL, igual que
+ * sus contrapartes en Supabase.
+ *
+ * devoluciones_cache NO se toca: guarda un JSON completo por local (ver
+ * DevolucionCacheEntity), no columnas individuales, así que el nuevo campo
+ * turno_id de Devolucion (ver Devolucion.kt) no requiere cambio de esquema.
+ */
 val MIGRATION_14_15 = object : Migration(14, 15) {
     override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL("ALTER TABLE ventas_cache ADD COLUMN turnoId INTEGER DEFAULT NULL")
-        db.execSQL("ALTER TABLE mermas_cache ADD COLUMN turnoId INTEGER DEFAULT NULL")
+        db.execSQL("ALTER TABLE ventas_cache ADD COLUMN turnoId INTEGER")
+        db.execSQL("ALTER TABLE mermas_cache ADD COLUMN turnoId INTEGER")
+        db.execSQL("ALTER TABLE productos_eliminados_cache ADD COLUMN turnoId INTEGER")
     }
 }
+
 @Database(
     entities = [
         ProductoEntity::class, AccionPendienteEntity::class, TarjetaEntity::class, VentaEntity::class, ConflictoEntity::class,
