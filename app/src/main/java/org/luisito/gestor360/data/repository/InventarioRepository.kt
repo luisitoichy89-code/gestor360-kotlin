@@ -2,6 +2,7 @@ package org.luisito.gestor360.data.repository
 
 import android.content.Context
 import android.util.Log
+import androidx.room.withTransaction
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.buildJsonObject

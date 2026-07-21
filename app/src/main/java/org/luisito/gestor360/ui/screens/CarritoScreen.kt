@@ -236,7 +236,7 @@ fun CarritoScreen(
             onDismiss = { paso = PasoCheckout.Ninguno; metodoVisual = false }
         ) { ci, tel, nombre, tarjeta ->
             val metodo = if (metodoVisual) "transfer_visual" else "transfer"
-            viewModel.confirmarVenta(metodo, 0.0, uiState.totalCarrito, 0L, SaleRepository.DatosCliente(ci, tel, nombre, tarjeta?.let { "${it.nombre} · ${it.numeroCuenta}" }, tarjeta?.id))
+            viewModel.confirmarVenta(metodo, 0.0, uiState.totalCarrito, 0L, SaleRepository.DatosCliente(ci, tel, nombre, tarjeta?.id))
             paso = PasoCheckout.Ninguno
             metodoVisual = false
         }
@@ -288,7 +288,7 @@ fun CarritoScreen(
             ) { ci, tel, nombre, tarjeta ->
                 val metodo = if (metodoVisual) "mixed_visual" else "mixed"
                 datosMixto = datosMixto.copy(ci = ci, tel = tel, nombre = nombre, tarjeta = tarjeta)
-                viewModel.confirmarVenta(metodo, datosMixto.efectivo, restante, 0L, SaleRepository.DatosCliente(ci, tel, nombre, tarjeta?.let { "${it.nombre} · ${it.numeroCuenta}" }, tarjeta?.id))
+                viewModel.confirmarVenta(metodo, datosMixto.efectivo, restante, 0L, SaleRepository.DatosCliente(ci, tel, nombre, tarjeta?.id))
                 paso = PasoCheckout.Ninguno
                 datosMixto = DatosMixto()
                 metodoVisual = false
@@ -326,7 +326,7 @@ fun CarritoScreen(
                         onConfirmar = {
                             viewModel.confirmarVenta(
                                 "mixed", datosMixto.efectivo, restante, 0L,
-                                SaleRepository.DatosCliente(datosMixto.ci, datosMixto.tel, datosMixto.nombre, datosMixto.tarjeta?.let { "${it.nombre} · ${it.numeroCuenta}" }, datosMixto.tarjeta?.id)
+                                SaleRepository.DatosCliente(datosMixto.ci, datosMixto.tel, datosMixto.nombre, datosMixto.tarjeta?.id)
                             )
                             paso = PasoCheckout.Ninguno
                             datosMixto = DatosMixto()

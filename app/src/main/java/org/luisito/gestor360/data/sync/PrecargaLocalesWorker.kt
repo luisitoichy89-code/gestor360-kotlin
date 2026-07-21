@@ -78,7 +78,7 @@ class PrecargaLocalesWorker(
         val forzar = inputData.getBoolean("forzar", false)
         val localRepo = LocalRepository()
         val productRepo = ProductRepository(applicationContext)
-        val saleRepo = SaleRepository(applicationContext, productRepo)
+        val saleRepo = SaleRepository(applicationContext)
         val inventarioRepo = InventarioRepository(applicationContext)
         val turnoRepo = TurnoRepository(applicationContext)
         val tarjetaRepo = TarjetaRepository(applicationContext)
