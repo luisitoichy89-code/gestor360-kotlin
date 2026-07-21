@@ -295,15 +295,17 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             val nuevoTurnoId = SupabaseClientProvider.client.postgrest.rpc("cerrar_turno", buildJsonObject {
                 put("p_android_id", androidId); put("p_local_id", localIdActivo()); put("p_turno_id", turnoId); put("p_cierre", cierre)
             }).decodeAs<Long>()
-            db.turnoDao().cerrarYRegistrarNuevo(
-                turnoAnteriorId = turnoId,
-                cierreAnterior = cierre,
-                localId = localIdActivo(),
-                nuevo = org.luisito.gestor360.data.local.entities.TurnoEntity(
-                    id = nuevoTurnoId, localId = localIdActivo(), usuarioId = null, apertura = 0.0,
-                    cierre = null, diferencia = null, createdAt = java.time.LocalDateTime.now().toString()
+            val localId = localIdActivo()
+            // Transacción atómica explícita: cierra el viejo + inserta el nuevo
+            db.withTransaction {
+                db.turnoDao().cerrar(turnoId, cierre, 0.0, localId)
+                db.turnoDao().insertar(
+                    org.luisito.gestor360.data.local.entities.TurnoEntity(
+                        id = nuevoTurnoId, localId = localId, usuarioId = null, apertura = 0.0,
+                        cierre = null, diferencia = null, createdAt = java.time.LocalDateTime.now().toString()
+                    )
                 )
-            )
+            }
             Result.success(nuevoTurnoId)
         } catch (e: Exception) {
             Result.failure(e)
