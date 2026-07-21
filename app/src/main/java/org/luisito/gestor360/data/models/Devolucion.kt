@@ -25,11 +25,5 @@ data class Devolucion(
     val resuelto_por_nombre: String? = null,
     val local_id: Long? = null,
     val created_at: String? = null,
-    val resuelto_at: String? = null,
-    // NUEVO: turno al que pertenece la devolución (ver migracion_turno_id.sql).
-    // DevolucionCacheEntity guarda esta clase serializada tal cual como JSON
-    // (ver DevolucionCacheEntity.kt), así que basta con agregar el campo acá
-    // — no hace falta tocar el cache entity ni su migración de Room. JSON
-    // viejo sin este campo decodifica igual gracias al default = null.
-    val turno_id: Long? = null
+    val resuelto_at: String? = null
 )

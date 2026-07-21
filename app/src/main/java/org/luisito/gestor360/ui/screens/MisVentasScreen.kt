@@ -16,7 +16,6 @@ import org.luisito.gestor360.data.local.AppDatabase
 import org.luisito.gestor360.ui.theme.NeuCard
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
-import java.time.LocalDate
 
 data class VentaAgrupada(
     val id: String,
@@ -35,8 +34,7 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
     val context = AppContextHolder.context
     val db = remember { AppDatabase.obtener(context) }
     val session = remember { SessionManager(context) }
-    val hoy = remember { LocalDate.now().toString() }
-
+    
     var ventas by remember { mutableStateOf<List<VentaAgrupada>>(emptyList()) }
     var totalEfectivo by remember { mutableStateOf(0.0) }
     var totalTransferencia by remember { mutableStateOf(0.0) }
@@ -44,22 +42,34 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
     var isRefreshing by remember { mutableStateOf(false) }
     var trigger by remember { mutableStateOf(0) }
 
+    // Siempre lee de Room (caché local): funciona sin internet. El botón de
+    // refrescar solo vuelve a consultar esa misma base local por si hubo
+    // ventas nuevas mientras la pantalla estaba abierta.
     suspend fun cargarDesdeRoom() {
         val localId = session.getLocalId() ?: return
-        val userId = session.getUserId().takeIf { it > 0 }
-
+        val usuarioId = session.getUserId()
         val turnoActivo = db.turnoDao().obtenerActivo(localId)
+        val turnoActivoId = turnoActivo?.id
+        val aperturaStr = turnoActivo?.createdAt
+
         val todasVentas = db.ventaDao().obtenerTodas(localId)
-        val ventasHoy = if (turnoActivo != null) {
+            // "Mis Ventas" es individual: cada vendedor tiene que ver SOLO lo
+            // suyo, es la única forma de saber cuánto vendió cada uno. Antes
+            // esto no filtraba por usuario y mezclaba las ventas de todo el
+            // local.
+            .filter { it.usuarioId == usuarioId }
+        val ventasTurno = if (turnoActivoId != null) {
             todasVentas.filter { v ->
-                v.turnoId == turnoActivo.id || (v.turnoId == null && v.createdAt?.startsWith(hoy) == true)
+                when {
+                    v.turnoId != null -> v.turnoId == turnoActivoId // venta con turno real estampado: exacto
+                    else -> v.createdAt != null && aperturaStr != null && v.createdAt >= aperturaStr // venta vieja sin turnoId: fallback por hora, igual que antes
+                }
             }
         } else {
-            todasVentas.filter { it.createdAt?.startsWith(hoy) == true }
+            todasVentas
         }
-        val ventasDelUsuario = if (userId != null) ventasHoy.filter { it.usuarioId == userId } else ventasHoy
 
-        val sorted = ventasDelUsuario.sortedByDescending { it.createdAt }
+        val sorted = ventasTurno.sortedByDescending { it.createdAt }
         val agrupadas = sorted.map { v ->
             val nombreProducto = v.productoNombre
                 ?: db.productoDao().obtenerPorId(v.productoId.toString(), localId)?.nombre
@@ -81,8 +91,8 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
         }
 
         ventas = agrupadas
-        totalEfectivo = ventasDelUsuario.sumOf { it.efectivo }
-        totalTransferencia = ventasDelUsuario.sumOf { it.transferencia }
+        totalEfectivo = ventasTurno.sumOf { it.efectivo }
+        totalTransferencia = ventasTurno.sumOf { it.transferencia }
     }
 
     LaunchedEffect(androidId, trigger) {
@@ -118,7 +128,7 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
                 item {
                     NeuCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp)) {
-                            Text("Totales del día", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                            Text("Totales del turno", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                             Spacer(Modifier.height(8.dp))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("Efectivo:")
@@ -137,13 +147,13 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
                         }
                     }
                 }
-
+                
                 if (ventas.isEmpty()) {
                     item {
-                        Text("Sin ventas hoy", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Sin ventas en este turno", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-
+                
                 items(ventas, key = { it.id }) { venta ->
                     NeuCard(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
                         Row(
