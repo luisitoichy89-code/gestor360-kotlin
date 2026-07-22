@@ -52,6 +52,7 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
         val usuarioId = session.getUserId()
 
         val todasVentas = db.ventaDao().obtenerTodas(localId)
+            .filter { it.turnoId == turnoActivoId }
             .filter { it.usuarioId == usuarioId }
 
         val sorted = todasVentas.sortedByDescending { it.createdAt }
