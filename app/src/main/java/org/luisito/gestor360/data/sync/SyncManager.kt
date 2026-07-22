@@ -213,7 +213,7 @@ class SyncManager(private val context: Context) {
         // alcanzó a limpiar y qué no.
         db.withTransaction {
             db.accionPendienteDao().limpiarSincronizadas()
-            db.ventaDao().limpiarSincronizadas(localId)
+            db.ventaDao().limpiarSincronizadas(localIdActivo!!)
             db.turnoDao().limpiarCerrados()
         }
         return SyncResultado(exitosas, fallidas, null)
