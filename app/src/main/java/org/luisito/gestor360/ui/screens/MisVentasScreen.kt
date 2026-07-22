@@ -45,18 +45,28 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
     var isRefreshing by remember { mutableStateOf(false) }
     var trigger by remember { mutableStateOf(0) }
 
-    // Mis Ventas es independiente: solo ventas del vendedor, sin filtrar por turno.
-    // Offline y online funcionan igual. Solo depende de Room.
+    // Misma lógica que construirDesdeRoom en InventarioRepository:
+    // 100% Room, filtra por turno activo si existe, si no por fecha de hoy.
     suspend fun cargarDesdeRoom() {
         val localId = session.getLocalId() ?: return
         val usuarioId = session.getUserId()
-        val turnoActivoId = db.turnoDao().obtenerActivo(localId)?.id
+        val hoy = java.time.LocalDate.now().toString()
 
-        val todasVentas = db.ventaDao().obtenerTodas(localId)
-            .filter { it.turnoId == turnoActivoId }
+        val turnoActivo = db.turnoDao().obtenerActivo(localId)
+        val turnoActivoId = turnoActivo?.id
+        val turnoDesde = turnoActivo?.createdAt
+
+        val ventasFiltradas = db.ventaDao().obtenerTodas(localId)
             .filter { it.usuarioId == usuarioId }
+            .filter { venta ->
+                when {
+                    turnoActivoId != null && venta.turnoId != null -> venta.turnoId == turnoActivoId
+                    turnoActivoId != null && venta.turnoId == null -> turnoDesde == null || (venta.createdAt != null && venta.createdAt!! >= turnoDesde)
+                    else -> venta.createdAt?.startsWith(hoy) == true
+                }
+            }
 
-        val sorted = todasVentas.sortedByDescending { it.createdAt }
+        val sorted = ventasFiltradas.sortedByDescending { it.createdAt }
 
         val agrupadas = sorted.map { v ->
             val nombreProducto = v.productoNombre
@@ -79,18 +89,17 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
         }
 
         ventas = agrupadas
-        totalEfectivo = todasVentas.sumOf { it.efectivo }
-        totalTransferencia = todasVentas.sumOf { it.transferencia }
+        totalEfectivo = ventasFiltradas.sumOf { it.efectivo }
+        totalTransferencia = ventasFiltradas.sumOf { it.transferencia }
     }
 
     LaunchedEffect(androidId, trigger) {
         if (trigger == 0) isLoading = true else isRefreshing = true
 
-        // Si hay internet, marcamos sincronizadas las ventas que ya están en el servidor.
-        // No borra ni reemplaza nada, solo actualiza el flag sincronizada.
+        // Solo marca sincronizadas, no reemplaza nada. No afecta el filtro offline.
         if (NetworkMonitor.hayInternet(context)) {
             saleRepository.refrescarDesdeServidor(androidId)
-                .onFailure { e -> android.util.Log.e("MisVentasScreen", "No se pudo reconciliar con el servidor, se muestra lo local", e) }
+                .onFailure { e -> android.util.Log.e("MisVentasScreen", "No se pudo reconciliar con el servidor", e) }
         }
 
         cargarDesdeRoom()
@@ -124,7 +133,7 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
                 item {
                     NeuCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp)) {
-                            Text("Totales", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                            Text("Totales del turno", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                             Spacer(Modifier.height(8.dp))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("Efectivo:")
@@ -146,7 +155,7 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
 
                 if (ventas.isEmpty()) {
                     item {
-                        Text("Sin ventas registradas", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Sin ventas en este turno", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
