@@ -21,6 +21,8 @@ import org.luisito.gestor360.data.local.dao.UserDao
 import org.luisito.gestor360.data.local.dao.VentaDao
 import org.luisito.gestor360.data.local.entities.AccionPendienteEntity
 import org.luisito.gestor360.data.local.entities.AprobacionStockCacheEntity
+import org.luisito.gestor360.data.local.entities.MisVentasCacheEntity
+import org.luisito.gestor360.data.local.dao.MisVentasCacheDao
 import org.luisito.gestor360.data.local.entities.ConflictoEntity
 import org.luisito.gestor360.data.local.entities.DevolucionCacheEntity
 import org.luisito.gestor360.data.local.entities.InventarioCacheEntity
