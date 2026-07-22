@@ -50,6 +50,7 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
     suspend fun cargarDesdeRoom() {
         val localId = session.getLocalId() ?: return
         val usuarioId = session.getUserId()
+        val turnoActivoId = db.turnoDao().obtenerActivo(localId)?.id
 
         val todasVentas = db.ventaDao().obtenerTodas(localId)
             .filter { it.turnoId == turnoActivoId }
