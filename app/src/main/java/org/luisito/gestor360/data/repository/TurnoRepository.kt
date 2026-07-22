@@ -59,11 +59,6 @@ class TurnoRepository(
         }
     }
 
-    // NOTA: ya no existe "abrirTurno" acá. El turno se abre solo, del lado del
-    // servidor, con la primera acción del día en este local (ver
-    // fn_asegurar_turno_abierto en el SQL). La única acción manual que queda
-    // es cerrarTurno, más abajo.
-
     /**
      * Cerrar turno necesita el total de efectivo vendido para calcular la
      * diferencia, y eso requiere las ventas ya sincronizadas del servidor —
@@ -84,6 +79,21 @@ class TurnoRepository(
             Result.failure(e)
         }
     }
+
+    suspend fun getTurnos(androidId: String): Result<List<Turno>> {
+        val localId = localIdActivo()
+        return try {
+            val turnos = SupabaseClientProvider.client.postgrest
+                .rpc("get_turnos", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
+                .decodeList<Turno>()
+            Result.success(turnos)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /** Precarga el turno activo de UN local específico, sin depender del local activo en sesión. */
+    suspend fun precargarLocal(androidId: String, localId: Long): Result<Unit> {
         return try {
             val turno = SupabaseClientProvider.client.postgrest
                 .rpc("obtener_turno_activo", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
