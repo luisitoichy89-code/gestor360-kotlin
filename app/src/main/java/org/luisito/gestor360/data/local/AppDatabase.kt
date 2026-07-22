@@ -187,6 +187,31 @@ val MIGRATION_13_14 = object : Migration(13, 14) {
     }
 }
 
+val MIGRATION_15_16 = object : Migration(15, 16) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS mis_ventas_cache (
+                id TEXT PRIMARY KEY NOT NULL,
+                localId INTEGER NOT NULL,
+                usuarioId INTEGER NOT NULL,
+                productoId TEXT NOT NULL,
+                productoNombre TEXT,
+                cantidad REAL NOT NULL,
+                total REAL NOT NULL,
+                metodo TEXT NOT NULL,
+                efectivo REAL NOT NULL,
+                transferencia REAL NOT NULL,
+                tarjetaId TEXT,
+                turnoId INTEGER,
+                createdAt TEXT,
+                sincronizada INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_mis_ventas_local_usuario ON mis_ventas_cache(localId, usuarioId)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_mis_ventas_turno ON mis_ventas_cache(turnoId)")
+    }
+}
+
 val MIGRATION_14_15 = object : Migration(14, 15) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Simple ADD COLUMN alcanza acá (columna nueva, nullable, sin
@@ -203,9 +228,9 @@ val MIGRATION_14_15 = object : Migration(14, 15) {
         ProductoEliminadoCacheEntity::class,
         TurnoEntity::class, MermaEntity::class,
         UserEntity::class, LocalEntity::class, InventarioCacheEntity::class, DevolucionCacheEntity::class,
-        AprobacionStockCacheEntity::class
+        AprobacionStockCacheEntity::class, MisVentasCacheEntity::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -222,6 +247,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun inventarioCacheDao(): InventarioCacheDao
     abstract fun devolucionCacheDao(): DevolucionCacheDao
     abstract fun aprobacionStockCacheDao(): AprobacionStockCacheDao
+    abstract fun misVentasCacheDao(): MisVentasCacheDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -233,7 +259,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "gestor360.db"
                 )
-                    .addMigrations(MIGRACION_8_9, MIGRACION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
+                    .addMigrations(MIGRACION_8_9, MIGRACION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16)
                     .fallbackToDestructiveMigration()
                     .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                     .build().also { db ->

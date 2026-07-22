@@ -13,8 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.luisito.gestor360.data.local.AppDatabase
-import org.luisito.gestor360.data.sync.NetworkMonitor
-import org.luisito.gestor360.data.repository.SaleRepository
 import org.luisito.gestor360.ui.theme.NeuCard
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
@@ -36,7 +34,6 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
     val context = AppContextHolder.context
     val db = remember { AppDatabase.obtener(context) }
     val session = remember { SessionManager(context) }
-    val saleRepository = remember { SaleRepository(context) }
 
     var ventas by remember { mutableStateOf<List<VentaAgrupada>>(emptyList()) }
     var totalEfectivo by remember { mutableStateOf(0.0) }
@@ -45,33 +42,22 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
     var isRefreshing by remember { mutableStateOf(false) }
     var trigger by remember { mutableStateOf(0) }
 
-    // Misma lógica que construirDesdeRoom en InventarioRepository:
-    // 100% Room, filtra por turno activo si existe, si no por fecha de hoy.
-    suspend fun cargarDesdeRoom() {
+    // 100% independiente: usa su propia tabla mis_ventas_cache.
+    // Solo muestra ventas del vendedor en el turno activo.
+    suspend fun cargarMisVentas() {
         val localId = session.getLocalId() ?: return
-        val usuarioId = session.getUserId()
-        val hoy = java.time.LocalDate.now().toString()
+        val usuarioId = session.getUserId() ?: return
 
-        val turnoActivo = db.turnoDao().obtenerActivo(localId)
-        val turnoActivoId = turnoActivo?.id
-        val turnoDesde = turnoActivo?.createdAt
+        val turnoActivoId = db.turnoDao().obtenerActivo(localId)?.id
 
-        val ventasFiltradas = db.ventaDao().obtenerTodas(localId)
-            .filter { it.usuarioId == usuarioId }
-            .filter { venta ->
-                when {
-                    turnoActivoId != null && venta.turnoId != null -> venta.turnoId == turnoActivoId
-                    turnoActivoId != null && venta.turnoId == null -> turnoDesde == null || (venta.createdAt != null && venta.createdAt!! >= turnoDesde)
-                    else -> venta.createdAt?.startsWith(hoy) == true
-                }
-            }
+        // Limpiar ventas de turnos viejos automáticamente
+        if (turnoActivoId != null) {
+            db.misVentasCacheDao().limpiarTurnosViejos(localId, usuarioId, turnoActivoId)
+        }
 
-        val sorted = ventasFiltradas.sortedByDescending { it.createdAt }
+        val misVentas = db.misVentasCacheDao().obtenerMisVentas(localId, usuarioId)
 
-        val agrupadas = sorted.map { v ->
-            val nombreProducto = v.productoNombre
-                ?: db.productoDao().obtenerPorId(v.productoId.toString(), localId)?.nombre
-                ?: "Producto #${v.productoId}"
+        val agrupadas = misVentas.map { v ->
             val nombreTarjeta = if (v.tarjetaId != null) {
                 db.tarjetaDao().obtenerPorId(v.tarjetaId, localId)?.nombre
             } else null
@@ -79,7 +65,7 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
             VentaAgrupada(
                 id = v.id,
                 hora = v.createdAt?.substring(11, 16) ?: "--:--",
-                productos = "${nombreProducto} x${v.cantidad.toInt()}",
+                productos = "${v.productoNombre ?: "Producto"} x${v.cantidad.toInt()}",
                 total = v.total,
                 metodo = v.metodo,
                 efectivo = v.efectivo,
@@ -89,20 +75,13 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
         }
 
         ventas = agrupadas
-        totalEfectivo = ventasFiltradas.sumOf { it.efectivo }
-        totalTransferencia = ventasFiltradas.sumOf { it.transferencia }
+        totalEfectivo = misVentas.sumOf { it.efectivo }
+        totalTransferencia = misVentas.sumOf { it.transferencia }
     }
 
     LaunchedEffect(androidId, trigger) {
         if (trigger == 0) isLoading = true else isRefreshing = true
-
-        // Solo marca sincronizadas, no reemplaza nada. No afecta el filtro offline.
-        if (NetworkMonitor.hayInternet(context)) {
-            saleRepository.refrescarDesdeServidor(androidId)
-                .onFailure { e -> android.util.Log.e("MisVentasScreen", "No se pudo reconciliar con el servidor", e) }
-        }
-
-        cargarDesdeRoom()
+        cargarMisVentas()
         isLoading = false
         isRefreshing = false
     }
