@@ -13,6 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.luisito.gestor360.data.local.AppDatabase
+import org.luisito.gestor360.data.repository.SaleRepository
+import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.ui.theme.NeuCard
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
@@ -34,6 +36,7 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
     val context = AppContextHolder.context
     val db = remember { AppDatabase.obtener(context) }
     val session = remember { SessionManager(context) }
+    val saleRepository = remember { SaleRepository(context) }
     
     var ventas by remember { mutableStateOf<List<VentaAgrupada>>(emptyList()) }
     var totalEfectivo by remember { mutableStateOf(0.0) }
@@ -42,9 +45,9 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
     var isRefreshing by remember { mutableStateOf(false) }
     var trigger by remember { mutableStateOf(0) }
 
-    // Siempre lee de Room (caché local): funciona sin internet. El botón de
-    // refrescar solo vuelve a consultar esa misma base local por si hubo
-    // ventas nuevas mientras la pantalla estaba abierta.
+    // La lectura en sí sigue siendo 100% Room (funciona sin internet): esto
+    // no cambia. Lo que sí cambia es qué hay en Room antes de leerlo — ver
+    // el LaunchedEffect de abajo.
     suspend fun cargarDesdeRoom() {
         val localId = session.getLocalId() ?: return
         val usuarioId = session.getUserId()
@@ -97,6 +100,18 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
 
     LaunchedEffect(androidId, trigger) {
         if (trigger == 0) isLoading = true else isRefreshing = true
+        // NUEVO: antes de leer Room, si hay internet, reconciliar
+        // ventas_cache con el servidor. SaleRepository.refrescarDesdeServidor
+        // ya reemplaza ventas_cache de forma atómica con lo que devuelve
+        // get_ventas — así "Mis Ventas" deja de depender 100% de que este
+        // dispositivo tenga grabado localmente todo lo vendido en el turno
+        // (reinstalación, local recién seleccionado, alguna venta que no
+        // llegó a escribirse). Si esto falla (o no hay internet) se sigue
+        // exactamente igual que antes: cargarDesdeRoom() con lo que ya haya.
+        if (NetworkMonitor.hayInternet(context)) {
+            saleRepository.refrescarDesdeServidor(androidId)
+                .onFailure { e -> android.util.Log.e("MisVentasScreen", "No se pudo reconciliar con el servidor, se muestra lo local", e) }
+        }
         cargarDesdeRoom()
         isLoading = false
         isRefreshing = false

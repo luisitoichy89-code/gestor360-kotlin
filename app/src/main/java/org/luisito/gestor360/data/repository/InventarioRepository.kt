@@ -12,6 +12,7 @@ import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.local.AppDatabase
 import org.luisito.gestor360.data.local.entities.VentaEntity
 import org.luisito.gestor360.data.local.entities.TurnoEntity
+import org.luisito.gestor360.data.local.entities.InventarioCacheEntity
 import org.luisito.gestor360.data.local.entities.toEntity
 import org.luisito.gestor360.data.local.entities.toModel
 import org.luisito.gestor360.data.models.*
@@ -37,12 +38,25 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
     ): Result<InventarioDia> {
         val localId = localIdActivo()
         val fechaStr = fecha.toString()
+        // Se busca antes de decidir la rama (antes se pedía más abajo, solo
+        // para la rama sin turnoIds) porque ahora ambas ramas la necesitan
+        // como base para el fallback offline forzado de más abajo.
+        val cacheado = db.inventarioCacheDao().obtener(localId, fechaStr)
 
         if (!turnoIds.isNullOrEmpty()) {
+            if (forzarRefresh && !NetworkMonitor.hayInternet(context)) {
+                // Antes esta rama iba SIEMPRE directo al servidor sin mirar
+                // conectividad: sin internet, refrescarDesdeServidor tiraba
+                // excepción → Result.failure → InventarioScreen reemplazaba
+                // toda la pantalla por el mensaje de error (ver auditoría,
+                // Causa raíz A). Con turnoIds explícito no hay forma de
+                // honrar ESE filtro puntual sin servidor, así que se degrada
+                // a lo mejor disponible localmente: última copia confiable +
+                // ventas de este dispositivo aún no sincronizadas.
+                return Result.success(resolverOfflineForzado(cacheado, localId, fecha))
+            }
             return refrescarDesdeServidor(androidId, fecha, turnoIds)
         }
-
-        val cacheado = db.inventarioCacheDao().obtener(localId, fechaStr)
 
         if (cacheado != null && !forzarRefresh) {
             if (NetworkMonitor.hayInternet(context)) {
@@ -55,12 +69,79 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         }
 
         if (NetworkMonitor.hayInternet(context)) {
+            // Con forzarRefresh = true esto ya no es una mejora silenciosa en
+            // segundo plano: se espera la respuesta real del servidor antes
+            // de devolver algo (isLoading queda en true mientras tanto, ver
+            // InventarioViewModel.cargarFecha), así el botón Refrescar
+            // efectivamente actualiza todos los datos de forma visible en
+            // vez de devolver la caché de inmediato y refrescar "a
+            // escondidas" (ver auditoría, Causa raíz C).
             return refrescarDesdeServidor(androidId, fecha)
                 .onSuccess { onActualizadoDesdeServidor?.invoke(it) }
         }
 
-        val desdeRoom = construirDesdeRoom(localId, fecha)
-        return Result.success(desdeRoom)
+        // Sin conexión y sin nada más que intentar contra el servidor. Antes
+        // esto llamaba siempre construirDesdeRoom() sin importar si ya había
+        // una caché de una sincronización anterior (ver auditoría, Causa
+        // raíz B) — con forzarRefresh = true eso tiraba a la basura toda la
+        // riqueza de la última copia confiable del servidor (nombres/roles
+        // de otros vendedores, turno exacto, aprobaciones) para reconstruir
+        // un InventarioDia más pobre desde cero. resolverOfflineForzado()
+        // usa esa caché como base cuando existe y solo le suma lo que
+        // realmente puede faltarle: las ventas de ESTE dispositivo con
+        // sincronizada = false. Sin ninguna caché previa (dispositivo nuevo,
+        // 100% offline) construirDesdeRoom() sigue siendo el único material
+        // posible, igual que antes.
+        return Result.success(resolverOfflineForzado(cacheado, localId, fecha))
+    }
+
+    /**
+     * Punto único del fallback offline con forzarRefresh = true: reusa la
+     * última caché del servidor si existe (fusionándole las ventas locales
+     * pendientes de sincronizar) o, en su defecto, construye desde Room.
+     */
+    private suspend fun resolverOfflineForzado(cacheado: InventarioCacheEntity?, localId: Long, fecha: LocalDate): InventarioDia =
+        if (cacheado != null) fusionarConVentasPendientes(cacheado.toModel(), localId, fecha)
+        else construirDesdeRoom(localId, fecha)
+
+    /**
+     * Le suma a un InventarioDia ya calculado (de caché o de servidor) las
+     * ventas hechas en este dispositivo que todavía no confirmaron con
+     * Supabase. VentaEntity.sincronizada ya existía en el proyecto, pero
+     * nada en este archivo lo leía — la caché de inventario se trataba
+     * siempre como una foto fija, nunca como algo a completar con lo
+     * pendiente local.
+     *
+     * El chequeo de duplicados por id importa: InventarioRepository y
+     * SaleRepository sincronizan la tabla ventas_cache por caminos
+     * separados (esta clase nunca llama ventaDao().marcarSincronizada ni
+     * reemplazarDeLocal), así que una venta puede figurar ya en `base`
+     * porque el servidor la confirmó, mientras localmente sigue marcada
+     * sincronizada = false hasta que ese otro camino la alcance. Sin el
+     * filtro, esa venta se contaría dos veces.
+     */
+    private suspend fun fusionarConVentasPendientes(base: InventarioDia, localId: Long, fecha: LocalDate): InventarioDia {
+        val fechaStr = fecha.toString()
+        val idsConocidos = base.ventas.map { it.id }.toSet()
+        val pendientes = db.ventaDao().obtenerTodas(localId)
+            .filter { !it.sincronizada && it.createdAt?.startsWith(fechaStr) == true && it.id !in idsConocidos }
+        if (pendientes.isEmpty()) return base
+
+        val nombreUsuarioLocal = session.getNombre().takeIf { it.isNotBlank() }
+        val eliminadosPorId = db.productoEliminadoCacheDao().obtenerTodos(localId)
+            .associate { e -> e.id to ProductoEliminadoInfo(id = e.id, nombre = e.nombre, stock = e.stock, fecha = e.fecha, resuelto_por_nombre = null) }
+
+        val ventasNuevasInfo = pendientes.map { it.toVentaInfo(localId, nombreUsuarioLocal, eliminadosPorId) }
+
+        return base.copy(
+            ventas = base.ventas + ventasNuevasInfo,
+            productos_vendidos = fusionarProductosVendidos(base.productos_vendidos, pendientes, localId, eliminadosPorId),
+            totales_ventas = base.totales_ventas.copy(
+                efectivo = base.totales_ventas.efectivo + pendientes.sumOf { it.efectivo },
+                transferencia = base.totales_ventas.transferencia + pendientes.sumOf { it.transferencia },
+                cantidad_ventas = base.totales_ventas.cantidad_ventas + pendientes.size
+            )
+        )
     }
 
     suspend fun refrescar(androidId: String, fecha: LocalDate): Result<InventarioDia> {
