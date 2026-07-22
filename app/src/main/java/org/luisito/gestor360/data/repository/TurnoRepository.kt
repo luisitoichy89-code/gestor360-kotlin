@@ -69,36 +69,21 @@ class TurnoRepository(
      * diferencia, y eso requiere las ventas ya sincronizadas del servidor —
      * por eso, a diferencia de abrir_turno, esto SÍ requiere conexión.
      */
-    suspend fun cerrarTurno(androidId: String, turnoId: Long, cierre: Double): Result<Unit> {
+    suspend fun cerrarTurno(androidId: String, turnoId: Long, cierre: Double): Result<Long> {
         if (!NetworkMonitor.hayInternet(context)) {
             return Result.failure(IllegalStateException("Necesitas conexión para cerrar el turno (hay que confirmar el total vendido con el servidor)"))
         }
         val localId = localIdActivo()
         return try {
             val params = buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId); put("p_turno_id", turnoId); put("p_cierre", cierre) }
-            SupabaseClientProvider.client.postgrest.rpc("cerrar_turno", params)
-            db.turnoDao().cerrar(turnoId, cierre, 0.0, localId) // la diferencia real se corrige al refrescar desde el servidor
+            val nuevoTurnoId = SupabaseClientProvider.client.postgrest.rpc("cerrar_turno", params).decodeAs<Long>()
+            db.turnoDao().cerrar(turnoId, cierre, 0.0, localId)
             refrescarDesdeServidor(androidId)
-            Result.success(Unit)
+            Result.success(nuevoTurnoId)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
-
-    suspend fun getTurnos(androidId: String): Result<List<Turno>> {
-        val localId = localIdActivo()
-        return try {
-            val turnos = SupabaseClientProvider.client.postgrest
-                .rpc("get_turnos", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
-                .decodeList<Turno>()
-            Result.success(turnos)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    /** Precarga el turno activo de UN local específico, sin depender del local activo en sesión. */
-    suspend fun precargarLocal(androidId: String, localId: Long): Result<Unit> {
         return try {
             val turno = SupabaseClientProvider.client.postgrest
                 .rpc("obtener_turno_activo", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
