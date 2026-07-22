@@ -13,8 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.luisito.gestor360.data.local.AppDatabase
-import org.luisito.gestor360.data.repository.SaleRepository
 import org.luisito.gestor360.data.sync.NetworkMonitor
+import org.luisito.gestor360.data.repository.SaleRepository
 import org.luisito.gestor360.ui.theme.NeuCard
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
@@ -37,7 +37,7 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
     val db = remember { AppDatabase.obtener(context) }
     val session = remember { SessionManager(context) }
     val saleRepository = remember { SaleRepository(context) }
-    
+
     var ventas by remember { mutableStateOf<List<VentaAgrupada>>(emptyList()) }
     var totalEfectivo by remember { mutableStateOf(0.0) }
     var totalTransferencia by remember { mutableStateOf(0.0) }
@@ -45,34 +45,17 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
     var isRefreshing by remember { mutableStateOf(false) }
     var trigger by remember { mutableStateOf(0) }
 
-    // La lectura en sí sigue siendo 100% Room (funciona sin internet): esto
-    // no cambia. Lo que sí cambia es qué hay en Room antes de leerlo — ver
-    // el LaunchedEffect de abajo.
+    // Mis Ventas es independiente: solo ventas del vendedor, sin filtrar por turno.
+    // Offline y online funcionan igual. Solo depende de Room.
     suspend fun cargarDesdeRoom() {
         val localId = session.getLocalId() ?: return
         val usuarioId = session.getUserId()
-        val turnoActivo = db.turnoDao().obtenerActivo(localId)
-        val turnoActivoId = turnoActivo?.id
-        val aperturaStr = turnoActivo?.createdAt
 
         val todasVentas = db.ventaDao().obtenerTodas(localId)
-            // "Mis Ventas" es individual: cada vendedor tiene que ver SOLO lo
-            // suyo, es la única forma de saber cuánto vendió cada uno. Antes
-            // esto no filtraba por usuario y mezclaba las ventas de todo el
-            // local.
             .filter { it.usuarioId == usuarioId }
-        val ventasTurno = if (turnoActivoId != null) {
-            todasVentas.filter { v ->
-                when {
-                    v.turnoId != null -> v.turnoId == turnoActivoId // venta con turno real estampado: exacto
-                    else -> v.createdAt != null && aperturaStr != null && v.createdAt >= aperturaStr // venta vieja sin turnoId: fallback por hora, igual que antes
-                }
-            }
-        } else {
-            todasVentas
-        }
 
-        val sorted = ventasTurno.sortedByDescending { it.createdAt }
+        val sorted = todasVentas.sortedByDescending { it.createdAt }
+
         val agrupadas = sorted.map { v ->
             val nombreProducto = v.productoNombre
                 ?: db.productoDao().obtenerPorId(v.productoId.toString(), localId)?.nombre
@@ -94,24 +77,20 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
         }
 
         ventas = agrupadas
-        totalEfectivo = ventasTurno.sumOf { it.efectivo }
-        totalTransferencia = ventasTurno.sumOf { it.transferencia }
+        totalEfectivo = todasVentas.sumOf { it.efectivo }
+        totalTransferencia = todasVentas.sumOf { it.transferencia }
     }
 
     LaunchedEffect(androidId, trigger) {
         if (trigger == 0) isLoading = true else isRefreshing = true
-        // NUEVO: antes de leer Room, si hay internet, reconciliar
-        // ventas_cache con el servidor. SaleRepository.refrescarDesdeServidor
-        // ya reemplaza ventas_cache de forma atómica con lo que devuelve
-        // get_ventas — así "Mis Ventas" deja de depender 100% de que este
-        // dispositivo tenga grabado localmente todo lo vendido en el turno
-        // (reinstalación, local recién seleccionado, alguna venta que no
-        // llegó a escribirse). Si esto falla (o no hay internet) se sigue
-        // exactamente igual que antes: cargarDesdeRoom() con lo que ya haya.
+
+        // Si hay internet, marcamos sincronizadas las ventas que ya están en el servidor.
+        // No borra ni reemplaza nada, solo actualiza el flag sincronizada.
         if (NetworkMonitor.hayInternet(context)) {
             saleRepository.refrescarDesdeServidor(androidId)
                 .onFailure { e -> android.util.Log.e("MisVentasScreen", "No se pudo reconciliar con el servidor, se muestra lo local", e) }
         }
+
         cargarDesdeRoom()
         isLoading = false
         isRefreshing = false
@@ -143,7 +122,7 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
                 item {
                     NeuCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp)) {
-                            Text("Totales del turno", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                            Text("Totales", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                             Spacer(Modifier.height(8.dp))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("Efectivo:")
@@ -162,13 +141,13 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
                         }
                     }
                 }
-                
+
                 if (ventas.isEmpty()) {
                     item {
-                        Text("Sin ventas en este turno", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Sin ventas registradas", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                
+
                 items(ventas, key = { it.id }) { venta ->
                     NeuCard(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
                         Row(
