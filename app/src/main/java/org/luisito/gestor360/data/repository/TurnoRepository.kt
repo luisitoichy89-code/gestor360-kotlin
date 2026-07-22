@@ -14,7 +14,7 @@ import org.luisito.gestor360.data.sync.SyncWorker
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 
-/** RPC: abrir_turno, obtener_turno_activo, cerrar_turno, get_turnos. Offline-first, filtrado por local_id. */
+/** RPC: abrir_turno, obtener_turno_abierto, cerrar_turno, get_turnos. Offline-first, filtrado por local_id. */
 class TurnoRepository(
     private val context: Context = AppContextHolder.context,
 ) {
@@ -45,7 +45,7 @@ class TurnoRepository(
         val localId = localIdActivo()
         return try {
             val turno = SupabaseClientProvider.client.postgrest
-                .rpc("obtener_turno_activo", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
+                .rpc("obtener_turno_abierto", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
                 .decodeList<Turno>()
                 .firstOrNull()
             if (turno != null) {
@@ -96,7 +96,7 @@ class TurnoRepository(
     suspend fun precargarLocal(androidId: String, localId: Long): Result<Unit> {
         return try {
             val turno = SupabaseClientProvider.client.postgrest
-                .rpc("obtener_turno_activo", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
+                .rpc("obtener_turno_abierto", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
                 .decodeList<Turno>()
                 .firstOrNull()
             if (turno != null) {
