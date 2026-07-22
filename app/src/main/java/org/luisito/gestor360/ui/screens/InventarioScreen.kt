@@ -90,7 +90,7 @@ fun InventarioScreen(
                         // Cerrar turno: SOLO admin. Reinicia a cero el turno de
                         // todos los vendedores del local (ver SUPABASE_CAMBIOS.md),
                         // por eso queda protegido con confirmación + PIN.
-                        if (esAdmin && dia?.turno != null && dia.turno.cierre == null && uiState.esHoy && !dia.solo_lectura) { IconButton(onClick = { pasoCierreTurno = PasoCierreTurno.CONFIRMAR }) { Icon(Icons.Default.LockOpen, "Cerrar turno", tint = MaterialTheme.colorScheme.error) } }
+                        if (esAdmin && uiState.esHoy && dia?.solo_lectura != true) { IconButton(onClick = { pasoCierreTurno = PasoCierreTurno.CONFIRMAR }) { Icon(Icons.Default.LockOpen, "Cerrar turno", tint = MaterialTheme.colorScheme.error) } }
                         IconButton(onClick = { mostrarDatePicker = true }) { Icon(Icons.Default.CalendarMonth, "Elegir día", tint = MaterialTheme.colorScheme.onSurface) }
                         IconButton(onClick = { viewModel.refrescar() }) { Icon(Icons.Default.Refresh, null, tint = MaterialTheme.colorScheme.onSurface) }
                         if (dia != null && ventasNoAnuladas.isNotEmpty()) {
