@@ -31,8 +31,7 @@ private const val VENTAS_POR_PAGINA = 20
 
 private data class TarjetaResumen(val nombre: String, val numero: String, val titular: String?, val total: Double)
 
-/** Pasos del cierre de turno protegido: confirmar -> PIN de admin -> monto contado. */
-private enum class PasoCierreTurno { NINGUNO, CONFIRMAR, PIN, MONTO }
+private enum class PasoCierreTurno { NINGUNO, CONFIRMAR, PENDIENTES, PIN, MONTO }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,9 +86,6 @@ fun InventarioScreen(
                                 if (dia?.solo_lectura == true) { Spacer(Modifier.width(6.dp)); Icon(Icons.Default.Lock, "Solo lectura", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(12.dp)) }
                             }
                         }
-                        // Cerrar turno: SOLO admin. Reinicia a cero el turno de
-                        // todos los vendedores del local (ver SUPABASE_CAMBIOS.md),
-                        // por eso queda protegido con confirmación + PIN.
                         if (esAdmin && uiState.esHoy && dia?.solo_lectura != true) { IconButton(onClick = { pasoCierreTurno = PasoCierreTurno.CONFIRMAR }) { Icon(Icons.Default.LockOpen, "Cerrar turno", tint = MaterialTheme.colorScheme.error) } }
                         IconButton(onClick = { mostrarDatePicker = true }) { Icon(Icons.Default.CalendarMonth, "Elegir día", tint = MaterialTheme.colorScheme.onSurface) }
                         IconButton(onClick = { viewModel.refrescar() }) { Icon(Icons.Default.Refresh, null, tint = MaterialTheme.colorScheme.onSurface) }
@@ -107,8 +103,6 @@ fun InventarioScreen(
                         }
                     }
                 }
-                // Botón fijo: siempre visible arriba, no se mueve aunque el
-                // contenido de abajo haga scroll (está fuera del LazyColumn).
                 Button(
                     onClick = onVerVentasRealizadas,
                     shape = RoundedCornerShape(14.dp),
@@ -131,9 +125,7 @@ fun InventarioScreen(
                 else -> {
                     val dia = dia!!
                     LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        
-                        // Selector de turnos de un día pasado (solo admin): elegir
-                        // uno, varios, o "Todos", cada uno con su palomita ✓.
+
                         if (esAdmin && !uiState.esHoy && uiState.turnosDelDia.isNotEmpty()) {
                             item { SeccionTitulo("Turnos de este día", Icons.Default.Groups) }
                             item {
@@ -163,28 +155,36 @@ fun InventarioScreen(
                         item { SeccionTitulo("Tarjeta", Icons.Default.CreditCard) }
                         if (tarjetasResumen.isEmpty()) item { TextoVacioSeccion("Sin cobros por tarjeta este día") }
                         items(tarjetasResumen, key = { "tj_${it.nombre}_${it.numero}" }) { t -> TarjetaResumenRow(t) }
+
                         item { SeccionTitulo("Productos vendidos", Icons.Default.PointOfSale) }
                         if (dia.productos_vendidos.isEmpty()) item { TextoVacioSeccion("Sin ventas este día") }
                         items(dia.productos_vendidos, key = { "pv_${it.nombre}" }) { p -> ProductoVendidoRow(p) }
+
                         item { SeccionTitulo("Pagos por tarjetas", Icons.Default.CreditCard) }
                         if (pagosPorTarjeta.isEmpty()) item { TextoVacioSeccion("Sin pagos por tarjeta este día") }
                         items(pagosPorTarjeta, key = { "pg_${it.id}" }) { v -> PagoTarjetaRow(v) }
+
                         item { SeccionTitulo("Productos nuevos ingresados", Icons.Default.AddBox) }
                         if (dia.productos_nuevos.isEmpty()) item { TextoVacioSeccion("Sin productos nuevos este día") }
                         items(dia.productos_nuevos, key = { "pn_${it.id}" }) { p -> ProductoNuevoRow(p) }
+
                         item { Spacer(Modifier.height(4.dp)); Divider(); Spacer(Modifier.height(4.dp)) }
                         item { SeccionTitulo("Productos modificados", Icons.Default.Edit) }
                         if (dia.productos_modificados.isEmpty()) item { TextoVacioSeccion("Sin productos modificados este día") }
                         items(dia.productos_modificados, key = { "pm_${it.id}" }) { p -> ProductoInfoRow(p) }
+
                         item { SeccionTitulo("Productos eliminados", Icons.Default.Delete) }
                         if (dia.productos_eliminados.isEmpty()) item { TextoVacioSeccion("Sin productos eliminados este día") }
                         items(dia.productos_eliminados, key = { "pe_${it.id}" }) { p -> ProductoEliminadoRow(p) }
+
                         item { SeccionTitulo("Devueltos", Icons.Default.AssignmentReturn) }
                         if (dia.devueltos.isEmpty()) item { TextoVacioSeccion("Sin devoluciones este día") }
                         items(dia.devueltos, key = { "dv_${it.id}" }) { d -> DevueltoInfoRow(d) }
+
                         item { SeccionTitulo("Mermas", Icons.Default.Warning) }
                         if (dia.mermas.isEmpty()) item { TextoVacioSeccion("Sin mermas este día") }
                         items(dia.mermas, key = { "me_${it.id}" }) { m -> MermaInfoRow(m) }
+
                         item { Spacer(Modifier.height(4.dp)); Divider(); Spacer(Modifier.height(4.dp)) }
                         item { SeccionTitulo("Detalle de ventas", Icons.Default.Receipt) }
                         if (ventasNoAnuladas.isEmpty()) item { TextoVacioSeccion("Sin ventas este día") }
@@ -197,17 +197,30 @@ fun InventarioScreen(
         }
     }
 
+    // Diálogo de confirmación inicial
     if (pasoCierreTurno == PasoCierreTurno.CONFIRMAR) {
         AlertDialog(
             onDismissRequest = { pasoCierreTurno = PasoCierreTurno.NINGUNO },
-            icon = { Icon(Icons.Default.WarningAmber, null, tint = MaterialTheme.colorScheme.error) },
+            shape = RoundedCornerShape(18.dp),
             title = { Text("¿Cerrar turno de todo el local?") },
-            text = { Text("Esto reinicia a cero el inventario y las ventas de TODOS los vendedores de este local, no solo el tuyo. Úsalo solo cuando ya hayas recogido el dinero de todos.") },
-            confirmButton = { TextButton(onClick = { pasoCierreTurno = PasoCierreTurno.PIN }) { Text("Continuar", color = MaterialTheme.colorScheme.error) } },
+            text = { Text("Se reiniciará a cero el inventario de todos los vendedores del local. Las ventas del turno cerrado se podrán ver seleccionando la fecha en el calendario.") },
+            confirmButton = { TextButton(onClick = { pasoCierreTurno = PasoCierreTurno.PENDIENTES }) { Text("Continuar", color = MaterialTheme.colorScheme.error) } },
             dismissButton = { TextButton(onClick = { pasoCierreTurno = PasoCierreTurno.NINGUNO }) { Text("Cancelar") } }
         )
     }
 
+    // Diálogo de pendientes: bloquea si hay solicitudes sin resolver
+    if (pasoCierreTurno == PasoCierreTurno.PENDIENTES) {
+        AlertDialog(
+            onDismissRequest = { pasoCierreTurno = PasoCierreTurno.NINGUNO },
+            shape = RoundedCornerShape(18.dp),
+            title = { Text("Solicitudes pendientes", fontWeight = FontWeight.Bold) },
+            text = { Text("Hay solicitudes de aumento de stock, mermas, devoluciones o ingreso de productos sin resolver.\n\nDebe aprobarlas o rechazarlas antes de cerrar el turno para que queden registradas en el turno correcto.") },
+            confirmButton = { TextButton(onClick = { pasoCierreTurno = PasoCierreTurno.NINGUNO }) { Text("Entendido") } }
+        )
+    }
+
+    // Diálogo de PIN
     if (pasoCierreTurno == PasoCierreTurno.PIN) {
         ConfirmarPinDialog(
             accesoViewModel = accesoViewModel,
@@ -216,33 +229,22 @@ fun InventarioScreen(
         )
     }
 
+    // Diálogo de monto
     if (pasoCierreTurno == PasoCierreTurno.MONTO && dia != null) {
-        val turno = dia.turno
+        val efectivoEsperado = dia.totales_ventas.efectivo + dia.totales_ventas.transferencia
         CerrarTurnoDialog(
-            (turno?.apertura ?: 0.0) + dia.totalEsperadoEnCaja(),
-            uiState.isSaving,
-            { pasoCierreTurno = PasoCierreTurno.NINGUNO }
+            efectivoEsperado = efectivoEsperado,
+            isSaving = uiState.isSaving,
+            onDismiss = { pasoCierreTurno = PasoCierreTurno.NINGUNO }
         ) { viewModel.cerrarTurno(it); pasoCierreTurno = PasoCierreTurno.NINGUNO }
     }
 
     if (mostrarDatePicker) {
-        val hoy = LocalDate.now()
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = uiState.fecha.atStartOfDay(java.time.ZoneId.of("UTC")).toInstant().toEpochMilli(),
-            selectableDates = object : SelectableDates { override fun isSelectableDate(utcTimeMillis: Long): Boolean = !java.time.Instant.ofEpochMilli(utcTimeMillis).atZone(java.time.ZoneId.of("UTC")).toLocalDate().isAfter(hoy) }
-        )
-        DatePickerDialog(onDismissRequest = { mostrarDatePicker = false }, confirmButton = { TextButton(onClick = { datePickerState.selectedDateMillis?.let { millis -> val fecha = java.time.Instant.ofEpochMilli(millis).atZone(java.time.ZoneId.of("UTC")).toLocalDate(); if (fecha == hoy || esAdmin) viewModel.seleccionarFecha(fecha) }; mostrarDatePicker = false }) { Text("Ver este día") } }, dismissButton = { TextButton(onClick = { mostrarDatePicker = false }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }) { DatePicker(state = datePickerState) }
+        val datePickerState = rememberDatePickerState()
+        DatePickerDialog(onDismissRequest = { mostrarDatePicker = false }, confirmButton = { TextButton(onClick = { datePickerState.selectedDateMillis?.let { millis -> val fecha = java.time.Instant.ofEpochMilli(millis).atZone(java.time.ZoneId.of("UTC")).toLocalDate(); if (fecha == LocalDate.now() || esAdmin) viewModel.seleccionarFecha(fecha) }; mostrarDatePicker = false }) { Text("Ver este día") } }, dismissButton = { TextButton(onClick = { mostrarDatePicker = false }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }) { DatePicker(state = datePickerState) }
     }
 }
 
-private fun InventarioDia.totalEsperadoEnCaja(): Double = totales_ventas.efectivo
-
-@Composable private fun SeccionTitulo(texto: String, icono: androidx.compose.ui.graphics.vector.ImageVector) { Row(verticalAlignment = Alignment.CenterVertically) { Icon(icono, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(6.dp)); Text(texto.uppercase(), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold) } }
-@Composable private fun TextoVacioSeccion(texto: String) { Text(texto, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-@Composable private fun EstadoError(mensaje: String, onRetry: () -> Unit) { Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) { Text(mensaje, color = MaterialTheme.colorScheme.error); Spacer(Modifier.height(8.dp)); TextButton(onClick = onRetry) { Text("Reintentar") } } }
-@Composable private fun EstadoVacio(mensaje: String) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(mensaje, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
-@Composable private fun ProductoNuevoRow(p: ProductoInfo) { NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) { Text(p.nombre, fontWeight = FontWeight.Bold); Spacer(Modifier.height(4.dp)); Text("Stock: ${p.stock.toInt()}  ·  Precio: ${formatearMonto(p.precio)} CUP", style = MaterialTheme.typography.bodySmall); p.solicitado_por_nombre?.let { Text("Solicitado por: $it", style = MaterialTheme.typography.labelSmall) }; p.resuelto_por_nombre?.let { Text("Aprobado por: $it", style = MaterialTheme.typography.labelSmall) } } } }
-@Composable private fun ProductoInfoRow(p: ProductoInfo) { NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) { Text(p.nombre, fontWeight = FontWeight.Bold); Text("Stock: ${p.stock.toInt()}  ·  Precio: ${formatearMonto(p.precio)} CUP", style = MaterialTheme.typography.bodySmall) } } }
 @Composable private fun ProductoEliminadoRow(p: ProductoEliminadoInfo) { NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) { Text(p.nombre, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer); Text("Stock al eliminar: ${p.stock.toInt()}", style = MaterialTheme.typography.bodySmall); p.resuelto_por_nombre?.let { Text("Eliminado por: $it", style = MaterialTheme.typography.labelSmall) } } } }
 @Composable private fun DevueltoInfoRow(d: DevueltoInfo) { NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) { Text(d.producto_nombre, fontWeight = FontWeight.Bold); Text("Cantidad: ${d.cantidad.toInt()}  ·  Método: ${d.metodo}", style = MaterialTheme.typography.bodySmall); EstadoDevolucionChip(d.estado) } } }
 @Composable private fun MermaInfoRow(m: MermaInfo) { NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) { Text(m.producto_nombre, fontWeight = FontWeight.Bold); Text("Cantidad: ${m.cantidad.toInt()}  ·  Estado: ${m.estado}", style = MaterialTheme.typography.bodySmall); Text("Motivo: ${m.motivo}", style = MaterialTheme.typography.bodySmall); m.solicitado_por_nombre?.let { Text("Solicitado por: $it", style = MaterialTheme.typography.labelSmall) }; m.resuelto_por_nombre?.let { Text("Resuelto por: $it", style = MaterialTheme.typography.labelSmall) } } } }
@@ -255,19 +257,12 @@ private fun InventarioDia.totalEsperadoEnCaja(): Double = totales_ventas.efectiv
 @Composable private fun PagoTarjetaRow(v: VentaInfo) { NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) { Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) { Text("${v.tarjeta_banco ?: ""} · ${v.tarjeta_numero}", fontWeight = FontWeight.Bold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp)); Text("${formatearMonto(v.transferencia)} CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, maxLines = 1, softWrap = false) }; if (!v.tarjeta_titular.isNullOrBlank()) Text("Titular de la cuenta: ${v.tarjeta_titular}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.height(6.dp)); Text("Cliente: ${v.cliente_nombre?.takeIf { it.isNotBlank() } ?: "—"}", style = MaterialTheme.typography.bodySmall); Text("Teléfono: ${v.cliente_tel?.takeIf { it.isNotBlank() } ?: "—"}", style = MaterialTheme.typography.bodySmall); Text("CI: ${v.cliente_ci?.takeIf { it.isNotBlank() } ?: "—"}", style = MaterialTheme.typography.bodySmall) } } }
 @Composable private fun CerrarTurnoDialog(efectivoEsperado: Double, isSaving: Boolean, onDismiss: () -> Unit, onCerrar: (Double) -> Unit) { var monto by remember { mutableStateOf("") }; AlertDialog(onDismissRequest = onDismiss, shape = RoundedCornerShape(18.dp), title = { Text("Cerrar turno", fontWeight = FontWeight.Bold) }, text = { Column { NeuCard(shape = RoundedCornerShape(14.dp), containerColor = MaterialTheme.colorScheme.primaryContainer) { Text("Esperado: ${formatearMonto(efectivoEsperado)} CUP", Modifier.padding(12.dp), fontWeight = FontWeight.Bold) }; Spacer(Modifier.height(12.dp)); OutlinedTextField(monto, { monto = it }, label = { Text("Efectivo contado") }, singleLine = true, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) } }, confirmButton = { TextButton(enabled = (monto.toDoubleOrNull() ?: -1.0) >= 0 && !isSaving, onClick = { onCerrar(monto.toDoubleOrNull() ?: 0.0) }) { Text(if (isSaving) "Cerrando..." else "Cerrar") } }, dismissButton = { TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }) }
 @Composable private fun FilaConRol(etiqueta: String, nombre: String?, rol: String?, fecha: String?) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("$etiqueta: ${nombre ?: "—"}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(fecha?.take(10) ?: "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
-
-/**
- * Segundo candado antes de cerrar turno: reingresar el PIN, reutilizando el
- * mismo AccesoViewModel/validarPin que ya usa PinLoginScreen (mismo
- * bloqueo por intentos fallidos, persistido en disco).
- */
 @Composable
 private fun ConfirmarPinDialog(accesoViewModel: AccesoViewModel, onCancelar: () -> Unit, onPinCorrecto: () -> Unit) {
     val uiState by accesoViewModel.uiState.collectAsState()
     var pin by remember { mutableStateOf("") }
     var validando by remember { mutableStateOf(false) }
     val bloqueado = uiState.pinBloqueado && uiState.pinBloqueadoSegundos > 0
-
     AlertDialog(
         onDismissRequest = onCancelar,
         icon = { Icon(Icons.Default.Lock, null) },
