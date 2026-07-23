@@ -23,7 +23,6 @@ import org.luisito.gestor360.data.local.entities.AccionPendienteEntity
 import org.luisito.gestor360.data.local.entities.AprobacionStockCacheEntity
 import org.luisito.gestor360.data.local.entities.MisVentasCacheEntity
 import org.luisito.gestor360.data.local.dao.MisVentasCacheDao
-import org.luisito.gestor360.data.local.entities.MisVentasCacheEntity
 import org.luisito.gestor360.data.local.dao.MisVentasCacheDao
 import org.luisito.gestor360.data.local.entities.ConflictoEntity
 import org.luisito.gestor360.data.local.entities.DevolucionCacheEntity
@@ -233,7 +232,7 @@ val MIGRATION_14_15 = object : Migration(14, 15) {
         ProductoEliminadoCacheEntity::class,
         TurnoEntity::class, MermaEntity::class,
         UserEntity::class, LocalEntity::class, InventarioCacheEntity::class, DevolucionCacheEntity::class,
-        AprobacionStockCacheEntity::class, MisVentasCacheEntity::class, MisVentasCacheEntity::class
+        AprobacionStockCacheEntity::class, MisVentasCacheEntity::class
     ],
     version = 16,
     exportSchema = false
