@@ -13,6 +13,7 @@ import org.luisito.gestor360.data.local.dao.DevolucionCacheDao
 import org.luisito.gestor360.data.local.dao.InventarioCacheDao
 import org.luisito.gestor360.data.local.dao.LocalDao
 import org.luisito.gestor360.data.local.dao.MermaDao
+import org.luisito.gestor360.data.local.dao.MisVentasCacheDao
 import org.luisito.gestor360.data.local.dao.ProductoDao
 import org.luisito.gestor360.data.local.dao.ProductoEliminadoCacheDao
 import org.luisito.gestor360.data.local.dao.TarjetaDao
@@ -21,14 +22,12 @@ import org.luisito.gestor360.data.local.dao.UserDao
 import org.luisito.gestor360.data.local.dao.VentaDao
 import org.luisito.gestor360.data.local.entities.AccionPendienteEntity
 import org.luisito.gestor360.data.local.entities.AprobacionStockCacheEntity
-import org.luisito.gestor360.data.local.entities.MisVentasCacheEntity
-import org.luisito.gestor360.data.local.dao.MisVentasCacheDao
-import org.luisito.gestor360.data.local.dao.MisVentasCacheDao
 import org.luisito.gestor360.data.local.entities.ConflictoEntity
 import org.luisito.gestor360.data.local.entities.DevolucionCacheEntity
 import org.luisito.gestor360.data.local.entities.InventarioCacheEntity
 import org.luisito.gestor360.data.local.entities.LocalEntity
 import org.luisito.gestor360.data.local.entities.MermaEntity
+import org.luisito.gestor360.data.local.entities.MisVentasCacheEntity
 import org.luisito.gestor360.data.local.entities.ProductoEntity
 import org.luisito.gestor360.data.local.entities.ProductoEliminadoCacheEntity
 import org.luisito.gestor360.data.local.entities.TarjetaEntity
@@ -38,8 +37,7 @@ import org.luisito.gestor360.data.local.entities.VentaEntity
 
 val MIGRACION_8_9 = object : Migration(8, 9) {
     override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL(
-            """
+        db.execSQL("""
             CREATE TABLE IF NOT EXISTS productos_cache_new (
                 id TEXT NOT NULL,
                 nombre TEXT NOT NULL,
@@ -53,15 +51,12 @@ val MIGRACION_8_9 = object : Migration(8, 9) {
                 pendienteSync INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY(id, localId)
             )
-            """.trimIndent()
-        )
-        db.execSQL(
-            """
+        """.trimIndent())
+        db.execSQL("""
             INSERT INTO productos_cache_new (id, nombre, precio, stock, ubicacion, categoria, localId, createdAt, updatedAt, pendienteSync)
             SELECT CAST(id AS TEXT), nombre, precio, stock, ubicacion, categoria, localId, createdAt, updatedAt, 0
             FROM productos_cache
-            """.trimIndent()
-        )
+        """.trimIndent())
         db.execSQL("DROP TABLE productos_cache")
         db.execSQL("ALTER TABLE productos_cache_new RENAME TO productos_cache")
     }
@@ -69,8 +64,7 @@ val MIGRACION_8_9 = object : Migration(8, 9) {
 
 val MIGRACION_10_11 = object : Migration(10, 11) {
     override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL(
-            """
+        db.execSQL("""
             CREATE TABLE IF NOT EXISTS ventas_cache_new (
                 id TEXT NOT NULL,
                 productoId TEXT NOT NULL,
@@ -90,20 +84,16 @@ val MIGRACION_10_11 = object : Migration(10, 11) {
                 sincronizada INTEGER NOT NULL DEFAULT 1,
                 PRIMARY KEY(id)
             )
-            """.trimIndent()
-        )
-        db.execSQL(
-            """
+        """.trimIndent())
+        db.execSQL("""
             INSERT INTO ventas_cache_new (id, productoId, productoNombre, cantidad, total, metodo, efectivo, transferencia, usuarioId, localId, clienteCi, clienteTel, clienteNombre, tarjetaId, createdAt, sincronizada)
             SELECT id, CAST(productoId AS TEXT), productoNombre, cantidad, total, metodo, efectivo, transferencia, usuarioId, localId, clienteCi, clienteTel, clienteNombre, tarjetaId, createdAt, sincronizada
             FROM ventas_cache
-            """.trimIndent()
-        )
+        """.trimIndent())
         db.execSQL("DROP TABLE ventas_cache")
         db.execSQL("ALTER TABLE ventas_cache_new RENAME TO ventas_cache")
 
-        db.execSQL(
-            """
+        db.execSQL("""
             CREATE TABLE IF NOT EXISTS mermas_cache_new (
                 id INTEGER NOT NULL,
                 productoId TEXT NOT NULL,
@@ -116,15 +106,12 @@ val MIGRACION_10_11 = object : Migration(10, 11) {
                 localId INTEGER NOT NULL,
                 PRIMARY KEY(id, localId)
             )
-            """.trimIndent()
-        )
-        db.execSQL(
-            """
+        """.trimIndent())
+        db.execSQL("""
             INSERT INTO mermas_cache_new (id, productoId, productoNombre, cantidad, motivo, solicitadoPor, solicitadoPorNombre, estado, localId)
             SELECT id, CAST(productoId AS TEXT), productoNombre, cantidad, motivo, solicitadoPor, solicitadoPorNombre, estado, localId
             FROM mermas_cache
-            """.trimIndent()
-        )
+        """.trimIndent())
         db.execSQL("DROP TABLE mermas_cache")
         db.execSQL("ALTER TABLE mermas_cache_new RENAME TO mermas_cache")
     }
@@ -133,8 +120,7 @@ val MIGRACION_10_11 = object : Migration(10, 11) {
 val MIGRATION_12_13 = object : Migration(12, 13) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("DROP TABLE IF EXISTS mermas_cache")
-        db.execSQL(
-            """
+        db.execSQL("""
             CREATE TABLE IF NOT EXISTS mermas_cache (
                 id TEXT NOT NULL PRIMARY KEY,
                 localId INTEGER NOT NULL,
@@ -147,16 +133,14 @@ val MIGRATION_12_13 = object : Migration(12, 13) {
                 estado TEXT NOT NULL DEFAULT 'pendiente',
                 pendienteSync INTEGER NOT NULL DEFAULT 1
             )
-            """.trimIndent()
-        )
+        """.trimIndent())
         db.execSQL("CREATE INDEX IF NOT EXISTS index_mermas_cache_localId ON mermas_cache(localId)")
     }
 }
 
 val MIGRATION_13_14 = object : Migration(13, 14) {
     override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL(
-            """
+        db.execSQL("""
             CREATE TABLE IF NOT EXISTS ventas_cache_new (
                 id TEXT NOT NULL,
                 productoId TEXT NOT NULL,
@@ -176,18 +160,23 @@ val MIGRATION_13_14 = object : Migration(13, 14) {
                 sincronizada INTEGER NOT NULL DEFAULT 1,
                 PRIMARY KEY(id)
             )
-            """.trimIndent()
-        )
-        db.execSQL(
-            """
+        """.trimIndent())
+        db.execSQL("""
             INSERT INTO ventas_cache_new (id, productoId, productoNombre, cantidad, total, metodo, efectivo, transferencia, usuarioId, localId, clienteCi, clienteTel, clienteNombre, tarjetaId, createdAt, sincronizada)
             SELECT id, productoId, productoNombre, cantidad, total, metodo, efectivo, transferencia, usuarioId, localId, clienteCi, clienteTel, clienteNombre, NULL, createdAt, sincronizada
             FROM ventas_cache
-            """.trimIndent()
-        )
+        """.trimIndent())
         db.execSQL("DROP TABLE ventas_cache")
         db.execSQL("ALTER TABLE ventas_cache_new RENAME TO ventas_cache")
     }
+}
+
+val MIGRATION_14_15 = object : Migration(14, 15) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE ventas_cache ADD COLUMN turnoId INTEGER")
+    }
+}
+
 val MIGRATION_15_16 = object : Migration(15, 16) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("""
@@ -212,25 +201,10 @@ val MIGRATION_15_16 = object : Migration(15, 16) {
     }
 }
 
-}
-    }
-}
-
-val MIGRATION_14_15 = object : Migration(14, 15) {
-    override fun migrate(db: SupportSQLiteDatabase) {
-        // Simple ADD COLUMN alcanza acá (columna nueva, nullable, sin
-        // constraints) — no hace falta el patrón de tabla-nueva que usa
-        // MIGRATION_13_14 arriba, porque no se está tocando ninguna columna
-        // existente.
-        db.execSQL("ALTER TABLE ventas_cache ADD COLUMN turnoId INTEGER")
-    }
-}
-
 @Database(
     entities = [
         ProductoEntity::class, AccionPendienteEntity::class, TarjetaEntity::class, VentaEntity::class, ConflictoEntity::class,
-        ProductoEliminadoCacheEntity::class,
-        TurnoEntity::class, MermaEntity::class,
+        ProductoEliminadoCacheEntity::class, TurnoEntity::class, MermaEntity::class,
         UserEntity::class, LocalEntity::class, InventarioCacheEntity::class, DevolucionCacheEntity::class,
         AprobacionStockCacheEntity::class, MisVentasCacheEntity::class
     ],
