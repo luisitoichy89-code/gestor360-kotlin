@@ -91,22 +91,20 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
         }
     }
 
-    suspend fun solicitarProducto(androidId: String, nombre: String, precio: Double, cantidad: Double): Result<Unit> {
+    suspend fun solicitarProducto(androidId: String, nombre: String, precio: Double, cantidad: Int): Result<Unit> {
         val yaPendiente = db.accionPendienteDao().obtenerPendientes()
             .filter { it.tipo == "solicitar_producto" }
             .any { it.payloadJson.contains("\"p_nombre\":\"$nombre\"") }
         if (yaPendiente) return Result.success(Unit)
-
         val localId = localIdActivo()
         val id = UUID.randomUUID().toString()
         val accionId = UUID.randomUUID().toString()
         val actuales = db.aprobacionStockCacheDao().obtener(localId)?.toModel() ?: emptyList()
         val nueva = AprobacionStock(
             id = id, producto_id = null, producto_nombre = nombre, precio = precio,
-            cantidad = cantidad, tipo = "producto", estado = "pendiente", local_id = localId
+            cantidad = cantidad.toDouble(), tipo = "producto", estado = "pendiente", local_id = localId
         )
         db.aprobacionStockCacheDao().guardar((listOf(nueva) + actuales).toEntity(localId))
-
         val payload = buildJsonObject {
             put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id)
             put("p_nombre", nombre); put("p_precio", precio); put("p_cantidad", cantidad)
@@ -116,22 +114,20 @@ class AprobacionStockRepository(private val context: Context = AppContextHolder.
         return Result.success(Unit)
     }
 
-    suspend fun solicitarAumento(androidId: String, productoId: String, productoNombre: String, cantidad: Double): Result<Unit> {
+    suspend fun solicitarAumento(androidId: String, productoId: String, productoNombre: String, cantidad: Int): Result<Unit> {
         val yaPendiente = db.accionPendienteDao().obtenerPendientes()
             .filter { it.tipo == "solicitar_aumento_stock" }
             .any { it.payloadJson.contains("\"p_producto_id\":\"$productoId\"") }
         if (yaPendiente) return Result.success(Unit)
-
         val localId = localIdActivo()
         val id = UUID.randomUUID().toString()
         val accionId = UUID.randomUUID().toString()
         val actuales = db.aprobacionStockCacheDao().obtener(localId)?.toModel() ?: emptyList()
         val nueva = AprobacionStock(
             id = id, producto_id = productoId, producto_nombre = productoNombre,
-            cantidad = cantidad, tipo = "aumento", estado = "pendiente", local_id = localId
+            cantidad = cantidad.toDouble(), tipo = "aumento", estado = "pendiente", local_id = localId
         )
         db.aprobacionStockCacheDao().guardar((listOf(nueva) + actuales).toEntity(localId))
-
         val payload = buildJsonObject {
             put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id)
             put("p_producto_id", productoId); put("p_cantidad", cantidad)
