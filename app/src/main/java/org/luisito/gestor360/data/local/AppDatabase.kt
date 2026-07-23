@@ -276,7 +276,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun devolucionCacheDao(): DevolucionCacheDao
     abstract fun aprobacionStockCacheDao(): AprobacionStockCacheDao
     abstract fun misVentasCacheDao(): MisVentasCacheDao
-    abstract fun misVentasCacheDao(): MisVentasCacheDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
