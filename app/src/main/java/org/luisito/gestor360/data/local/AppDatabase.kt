@@ -214,29 +214,6 @@ val MIGRATION_15_16 = object : Migration(15, 16) {
 }
 
 }
-
-val MIGRATION_15_16 = object : Migration(15, 16) {
-    override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL("""
-            CREATE TABLE IF NOT EXISTS mis_ventas_cache (
-                id TEXT PRIMARY KEY NOT NULL,
-                localId INTEGER NOT NULL,
-                usuarioId INTEGER NOT NULL,
-                productoId TEXT NOT NULL,
-                productoNombre TEXT,
-                cantidad REAL NOT NULL,
-                total REAL NOT NULL,
-                metodo TEXT NOT NULL,
-                efectivo REAL NOT NULL,
-                transferencia REAL NOT NULL,
-                tarjetaId TEXT,
-                turnoId INTEGER,
-                createdAt TEXT,
-                sincronizada INTEGER NOT NULL DEFAULT 0
-            )
-        """)
-        db.execSQL("CREATE INDEX IF NOT EXISTS idx_mis_ventas_local_usuario ON mis_ventas_cache(localId, usuarioId)")
-        db.execSQL("CREATE INDEX IF NOT EXISTS idx_mis_ventas_turno ON mis_ventas_cache(turnoId)")
     }
 }
 
