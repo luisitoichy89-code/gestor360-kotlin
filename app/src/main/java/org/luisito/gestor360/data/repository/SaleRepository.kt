@@ -72,6 +72,24 @@ class SaleRepository(
                 )
                 db.ventaDao().insertarUna(ventaLocal.toEntity(localId, sincronizada = false, turnoId = turnoActivoId))
                     db.misVentasCacheDao().insertar(
+                        MisVentasCacheEntity(
+                            id = id,
+                            localId = localId,
+                            usuarioId = session.getUserId() ?: 0,
+                            productoId = item.productId,
+                            productoNombre = item.nombre,
+                            cantidad = item.cantidad,
+                            total = item.subtotal,
+                            metodo = metodo,
+                            efectivo = efectivoItem,
+                            transferencia = transferenciaItem,
+                            tarjetaId = cliente?.tarjetaId,
+                            turnoId = turnoActivoId,
+                            createdAt = java.time.LocalDateTime.now().toString(),
+                            sincronizada = false
+                        )
+                    )
+                    db.misVentasCacheDao().insertar(
                         org.luisito.gestor360.data.local.entities.MisVentasCacheEntity(
                             id = id,
                             localId = localId,

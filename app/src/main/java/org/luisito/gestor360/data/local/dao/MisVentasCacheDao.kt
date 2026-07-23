@@ -11,9 +11,6 @@ interface MisVentasCacheDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertar(venta: MisVentasCacheEntity)
 
-    @Query("DELETE FROM mis_ventas_cache WHERE localId = :localId AND usuarioId = :usuarioId AND turnoId != :turnoActivoId")
-    suspend fun limpiarTurnosViejos(localId: Long, usuarioId: Long, turnoActivoId: Long)
-
     @Query("DELETE FROM mis_ventas_cache WHERE localId = :localId AND usuarioId = :usuarioId")
     suspend fun limpiarTodo(localId: Long, usuarioId: Long)
 

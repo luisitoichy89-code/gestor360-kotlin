@@ -42,18 +42,9 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
     var isRefreshing by remember { mutableStateOf(false) }
     var trigger by remember { mutableStateOf(0) }
 
-    // 100% independiente: usa su propia tabla mis_ventas_cache.
-    // Solo muestra ventas del vendedor en el turno activo.
     suspend fun cargarMisVentas() {
         val localId = session.getLocalId() ?: return
         val usuarioId = session.getUserId() ?: return
-
-        val turnoActivoId = db.turnoDao().obtenerActivo(localId)?.id
-
-        // Limpiar ventas de turnos viejos automáticamente
-        if (turnoActivoId != null) {
-            db.misVentasCacheDao().limpiarTurnosViejos(localId, usuarioId, turnoActivoId)
-        }
 
         val misVentas = db.misVentasCacheDao().obtenerMisVentas(localId, usuarioId)
 

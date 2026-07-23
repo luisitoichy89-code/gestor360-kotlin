@@ -23,6 +23,8 @@ import org.luisito.gestor360.data.local.entities.AccionPendienteEntity
 import org.luisito.gestor360.data.local.entities.AprobacionStockCacheEntity
 import org.luisito.gestor360.data.local.entities.MisVentasCacheEntity
 import org.luisito.gestor360.data.local.dao.MisVentasCacheDao
+import org.luisito.gestor360.data.local.entities.MisVentasCacheEntity
+import org.luisito.gestor360.data.local.dao.MisVentasCacheDao
 import org.luisito.gestor360.data.local.entities.ConflictoEntity
 import org.luisito.gestor360.data.local.entities.DevolucionCacheEntity
 import org.luisito.gestor360.data.local.entities.InventarioCacheEntity
@@ -187,6 +189,30 @@ val MIGRATION_13_14 = object : Migration(13, 14) {
         db.execSQL("DROP TABLE ventas_cache")
         db.execSQL("ALTER TABLE ventas_cache_new RENAME TO ventas_cache")
     }
+val MIGRATION_15_16 = object : Migration(15, 16) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS mis_ventas_cache (
+                id TEXT PRIMARY KEY NOT NULL,
+                localId INTEGER NOT NULL,
+                usuarioId INTEGER NOT NULL,
+                productoId TEXT NOT NULL,
+                productoNombre TEXT,
+                cantidad REAL NOT NULL,
+                total REAL NOT NULL,
+                metodo TEXT NOT NULL,
+                efectivo REAL NOT NULL,
+                transferencia REAL NOT NULL,
+                tarjetaId TEXT,
+                turnoId INTEGER,
+                createdAt TEXT,
+                sincronizada INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_mis_ventas_local_usuario ON mis_ventas_cache(localId, usuarioId)")
+    }
+}
+
 }
 
 val MIGRATION_15_16 = object : Migration(15, 16) {
@@ -230,7 +256,7 @@ val MIGRATION_14_15 = object : Migration(14, 15) {
         ProductoEliminadoCacheEntity::class,
         TurnoEntity::class, MermaEntity::class,
         UserEntity::class, LocalEntity::class, InventarioCacheEntity::class, DevolucionCacheEntity::class,
-        AprobacionStockCacheEntity::class, MisVentasCacheEntity::class
+        AprobacionStockCacheEntity::class, MisVentasCacheEntity::class, MisVentasCacheEntity::class
     ],
     version = 16,
     exportSchema = false
@@ -249,6 +275,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun inventarioCacheDao(): InventarioCacheDao
     abstract fun devolucionCacheDao(): DevolucionCacheDao
     abstract fun aprobacionStockCacheDao(): AprobacionStockCacheDao
+    abstract fun misVentasCacheDao(): MisVentasCacheDao
     abstract fun misVentasCacheDao(): MisVentasCacheDao
 
     companion object {
