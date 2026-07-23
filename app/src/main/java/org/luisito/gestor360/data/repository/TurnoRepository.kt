@@ -53,6 +53,7 @@ class TurnoRepository(
                     TurnoEntity(turno.id, turno.usuario_id, turno.apertura, turno.cierre, turno.diferencia, turno.created_at, localId)
                 )
             }
+            db.turnoDao().limpiarDuplicadosAbiertos(localId, turno?.id)
             Result.success(turno)
         } catch (e: Exception) {
             Result.failure(e)
