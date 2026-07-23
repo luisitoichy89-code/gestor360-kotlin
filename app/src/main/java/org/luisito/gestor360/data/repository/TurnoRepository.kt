@@ -66,19 +66,31 @@ class TurnoRepository(
      * por eso, a diferencia de abrir_turno, esto SÍ requiere conexión.
      */
     suspend fun cerrarTurno(androidId: String, turnoId: Long, cierre: Double): Result<Long> {
-        if (!NetworkMonitor.hayInternet(context)) {
-            return Result.failure(IllegalStateException("Necesitas conexión para cerrar el turno (hay que confirmar el total vendido con el servidor)"))
-        }
         val localId = localIdActivo()
-        return try {
-            val params = buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId); put("p_turno_id", turnoId); put("p_cierre", cierre) }
-            val nuevoTurnoId = SupabaseClientProvider.client.postgrest.rpc("cerrar_turno", params).decodeAs<Long>()
-            db.turnoDao().cerrar(turnoId, cierre, 0.0, localId)
-            refrescarDesdeServidor(androidId)
-            Result.success(nuevoTurnoId)
-        } catch (e: Exception) {
-            Result.failure(e)
+
+        // 1. Cerrar turno viejo en Room AHORA (offline-first)
+        db.turnoDao().cerrar(turnoId, cierre, 0.0, localId)
+
+        // 2. Crear turno local con id=0 (marcador de turno nuevo sin ventas)
+        db.turnoDao().insertar(
+            TurnoEntity(id = 0, usuarioId = null, apertura = 0.0, cierre = null, diferencia = null, createdAt = java.time.LocalDateTime.now().toString(), localId = localId)
+        )
+
+        // 3. Intentar sincronizar con servidor (no bloquea)
+        if (NetworkMonitor.hayInternet(context)) {
+            try {
+                val params = buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId); put("p_turno_id", turnoId); put("p_cierre", cierre) }
+                val nuevoTurnoId = SupabaseClientProvider.client.postgrest.rpc("cerrar_turno", params).decodeAs<Long>()
+                // Reemplazar turno id=0 por el real
+                db.turnoDao().reemplazarIdTemporal(0, nuevoTurnoId, localId)
+                refrescarDesdeServidor(androidId)
+            } catch (e: Exception) {
+                // No hay internet o falló el servidor, el turno id=0 queda como marcador
+                // El Worker lo sincronizará cuando haya conexión
+            }
         }
+
+        return Result.success(0)
     }
 
     suspend fun getTurnos(androidId: String): Result<List<Turno>> {

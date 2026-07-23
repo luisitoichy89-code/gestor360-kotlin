@@ -46,7 +46,9 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
         val localId = session.getLocalId() ?: return
         val usuarioId = session.getUserId() ?: return
 
+        val turnoActivoId = db.turnoDao().obtenerActivo(localId)?.id
         val misVentas = db.misVentasCacheDao().obtenerMisVentas(localId, usuarioId)
+            .filter { it.turnoId == turnoActivoId }
 
         val agrupadas = misVentas.map { v ->
             val nombreTarjeta = if (v.tarjetaId != null) {
