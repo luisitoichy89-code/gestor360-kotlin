@@ -35,6 +35,7 @@ fun AprobacionesScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val aprobUiState by aprobacionVM.uiState.collectAsState()
+
     val context = LocalContext.current
     val sessionManager = remember { SessionManager(context) }
     val clienteId = remember { sessionManager.getClienteId() }
@@ -47,10 +48,28 @@ fun AprobacionesScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { TopAppBar(title = { Text("Aprobaciones generales", fontWeight = FontWeight.Bold) }, navigationIcon = { if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null) } }, actions = { IconButton(onClick = { viewModel.refrescar(); aprobacionVM.cargar(androidId) }) { Icon(Icons.Default.Refresh, null) } }) }
+        topBar = {
+            TopAppBar(
+                title = { Text("Aprobaciones generales", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null) }
+                },
+                actions = {
+                    IconButton(onClick = { viewModel.refrescar(); aprobacionVM.cargar(androidId) }) {
+                        Icon(Icons.Default.Refresh, null)
+                    }
+                }
+            )
+        }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-            ConfirmacionSmsCard(activo = smsActivo, habilitado = puedeConfigurar, onCambiar = { nuevoValor -> smsActivo = nuevoValor; ConfigManager.setConfirmacionSmsActiva(context, clienteId, nuevoValor) })
+            ConfirmacionSmsCard(
+                activo = smsActivo, habilitado = puedeConfigurar,
+                onCambiar = { nuevoValor ->
+                    smsActivo = nuevoValor
+                    ConfigManager.setConfirmacionSmsActiva(context, clienteId, nuevoValor)
+                }
+            )
             Spacer(Modifier.height(16.dp))
             when {
                 uiState.isLoading || aprobUiState.isLoading -> EstadoCargando()
@@ -60,11 +79,21 @@ fun AprobacionesScreen(
                 else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(aprobUiState.pendientes.filter { it.id != null }, key = { "stock_${it.id}" }) { sol ->
                         val solId = sol.id!!
-                        AprobacionStockCard(sol, aprobUiState.isSaving,
+                        val estaGuardando = aprobUiState.isSaving  // AprobacionStock aún usa isSaving global
+                        AprobacionStockCard(
+                            sol, estaGuardando,
                             onAprobar = { aprobacionVM.resolver(solId, "aprobada") },
-                            onRechazar = { aprobacionVM.resolver(solId, "rechazada") })
+                            onRechazar = { aprobacionVM.resolver(solId, "rechazada") }
+                        )
                     }
-                    items(uiState.pendientes, key = { "merma_${it.id}" }) { merma -> MermaCard(merma, uiState.isSaving, { viewModel.aprobar(merma) }, { viewModel.rechazar(merma) }) }
+                    items(uiState.pendientes, key = { "merma_${it.id}" }) { merma ->
+                        val estaGuardandoEsta = uiState.savingIds.contains(merma.id)
+                        MermaCard(
+                            merma, estaGuardandoEsta,
+                            { viewModel.aprobar(merma) },
+                            { viewModel.rechazar(merma) }
+                        )
+                    }
                     item { Spacer(Modifier.height(72.dp)) }
                 }
             }
@@ -80,8 +109,16 @@ private fun ConfirmacionSmsCard(activo: Boolean, habilitado: Boolean, onCambiar:
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text("Confirmación x SMS", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(if (activo) "Activado: las ventas TFR y MXT esperan el SMS de PAGOxMOVIL antes de continuar." else "Desactivado: del carrito se pasa directo a datos del cliente, como antes.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (!habilitado) { Spacer(Modifier.height(2.dp)); Text("Solo un admin puede cambiar esto.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error) }
+                Text(
+                    if (activo) "Activado: las ventas TFR y MXT esperan el SMS de PAGOxMOVIL antes de continuar."
+                    else "Desactivado: del carrito se pasa directo a datos del cliente, como antes.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (!habilitado) {
+                    Spacer(Modifier.height(2.dp))
+                    Text("Solo un admin puede cambiar esto.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                }
             }
             Spacer(Modifier.width(8.dp))
             Switch(checked = activo, onCheckedChange = onCambiar, enabled = habilitado)
@@ -93,31 +130,96 @@ private fun ConfirmacionSmsCard(activo: Boolean, habilitado: Boolean, onCambiar:
 private fun MermaCard(merma: MermaEntity, isSaving: Boolean, onAprobar: () -> Unit, onRechazar: () -> Unit) {
     NeuCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.RemoveCircleOutline, null, tint = MaterialTheme.colorScheme.error); Spacer(Modifier.width(10.dp)); Text(merma.productoNombre, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold); Spacer(Modifier.weight(1f)); Text("Merma", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.RemoveCircleOutline, null, tint = MaterialTheme.colorScheme.error)
+                Spacer(Modifier.width(10.dp))
+                Text(merma.productoNombre, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.weight(1f))
+                Text("Merma", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Spacer(Modifier.height(10.dp))
             Text("Cantidad: ${merma.cantidad}", fontWeight = FontWeight.Medium)
-            if (!merma.motivo.isNullOrBlank()) { Spacer(Modifier.height(4.dp)); Text("Motivo: ${merma.motivo}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            if (!merma.motivo.isNullOrBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text("Motivo: ${merma.motivo}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Spacer(Modifier.height(6.dp))
-            Text("Solicitado por: ${merma.solicitadoPorNombre ?: "Usuario #${merma.solicitadoPor}"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "Solicitado por: ${merma.solicitadoPorNombre ?: "Usuario #${merma.solicitadoPor}"}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { NeuButton(onClick = onAprobar, enabled = !isSaving, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) { Icon(Icons.Default.Check, null); Spacer(Modifier.width(6.dp)); Text("Aprobar") }; NeuOutlinedButton(onClick = onRechazar, enabled = !isSaving, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), contentColor = MaterialTheme.colorScheme.error) { Icon(Icons.Default.Close, null); Spacer(Modifier.width(6.dp)); Text("Rechazar") } }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NeuButton(
+                    onClick = onAprobar, enabled = !isSaving,
+                    modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.Check, null); Spacer(Modifier.width(6.dp)); Text("Aprobar")
+                }
+                NeuOutlinedButton(
+                    onClick = onRechazar, enabled = !isSaving,
+                    modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp),
+                    contentColor = MaterialTheme.colorScheme.error
+                ) {
+                    Icon(Icons.Default.Close, null); Spacer(Modifier.width(6.dp)); Text("Rechazar")
+                }
+            }
         }
     }
 }
 
 @Composable
 private fun AprobacionStockCard(sol: AprobacionStock, isSaving: Boolean, onAprobar: () -> Unit, onRechazar: () -> Unit) {
-    val (icono, etiqueta) = when (sol.tipo) { "producto" -> Icons.Default.AddBox to "Producto nuevo"; "aumento" -> Icons.Default.Add to "Aumento de stock"; "anular_venta" -> Icons.Default.Cancel to "Anular venta"; else -> Icons.Default.FactCheck to sol.tipo }
+    val (icono, etiqueta) = when (sol.tipo) {
+        "producto" -> Icons.Default.AddBox to "Producto nuevo"
+        "aumento" -> Icons.Default.Add to "Aumento de stock"
+        "anular_venta" -> Icons.Default.Cancel to "Anular venta"
+        else -> Icons.Default.FactCheck to sol.tipo
+    }
     NeuCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) { Icon(icono, null, tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(10.dp)); Text(if (sol.tipo == "anular_venta") "Venta #${sol.venta_id?.take(8) ?: ""}" else sol.producto_nombre, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold); Spacer(Modifier.weight(1f)); Text(etiqueta, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(icono, null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    if (sol.tipo == "anular_venta") "Venta #${sol.venta_id?.take(8) ?: ""}" else sol.producto_nombre,
+                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.weight(1f))
+                Text(etiqueta, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Spacer(Modifier.height(10.dp))
-            when (sol.tipo) { "producto" -> { Text("Precio: ${formatearMonto(sol.precio ?: 0.0)} CUP  ·  Cantidad: ${sol.cantidad}", fontWeight = FontWeight.Medium) }; "aumento" -> { Text("Cantidad a agregar: ${sol.cantidad}", fontWeight = FontWeight.Medium) }; "anular_venta" -> { Text("Total de la venta: ${formatearMonto(sol.venta_total ?: 0.0)} CUP", fontWeight = FontWeight.Medium) } }
+            when (sol.tipo) {
+                "producto" -> {
+                    Text("Precio: ${formatearMonto(sol.precio ?: 0.0)} CUP  ·  Cantidad: ${sol.cantidad}", fontWeight = FontWeight.Medium)
+                }
+                "aumento" -> {
+                    Text("Cantidad a agregar: ${sol.cantidad}", fontWeight = FontWeight.Medium)
+                }
+                "anular_venta" -> {
+                    Text("Total de la venta: ${formatearMonto(sol.venta_total ?: 0.0)} CUP", fontWeight = FontWeight.Medium)
+                }
+            }
             Spacer(Modifier.height(6.dp))
             Text("Solicitado por: ${sol.solicitado_por_nombre ?: "—"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (!sol.created_at.isNullOrBlank()) Text(sol.created_at.take(16).replace("T", " "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { NeuButton(onClick = onAprobar, enabled = !isSaving, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) { Icon(Icons.Default.Check, null); Spacer(Modifier.width(6.dp)); Text("Aprobar") }; NeuOutlinedButton(onClick = onRechazar, enabled = !isSaving, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), contentColor = MaterialTheme.colorScheme.error) { Icon(Icons.Default.Close, null); Spacer(Modifier.width(6.dp)); Text("Rechazar") } }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NeuButton(
+                    onClick = onAprobar, enabled = !isSaving,
+                    modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.Check, null); Spacer(Modifier.width(6.dp)); Text("Aprobar")
+                }
+                NeuOutlinedButton(
+                    onClick = onRechazar, enabled = !isSaving,
+                    modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp),
+                    contentColor = MaterialTheme.colorScheme.error
+                ) {
+                    Icon(Icons.Default.Close, null); Spacer(Modifier.width(6.dp)); Text("Rechazar")
+                }
+            }
         }
     }
 }

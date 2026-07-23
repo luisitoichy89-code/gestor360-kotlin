@@ -115,26 +115,43 @@ class MermaRepository(
         return Result.success(Unit)
     }
 
-    suspend fun resolver(androidId: String, id: String, estado: String): Result<Unit> {
+    suspend fun aprobar(androidId: String, id: String): Result<Unit> {
+        return resolver(androidId, id, "aprobada")
+    }
+
+    suspend fun rechazar(androidId: String, id: String): Result<Unit> {
+        return resolver(androidId, id, "rechazada")
+    }
+
+    private suspend fun resolver(androidId: String, id: String, estado: String): Result<Unit> {
         val localId = localIdActivo()
-        val accionId = UUID.randomUUID().toString()
-        val merma = db.mermaDao().obtenerPorId(id, localId)
-        merma?.let {
-            db.mermaDao().insertarUna(it.copy(estado = estado, pendienteSync = true))
-            if (estado == "aprobada") {
-                db.productoDao().descontarStock(it.productoId, it.cantidad, localId)
-            }
+        val mermaExistente = db.mermaDao().obtenerPorId(id, localId)
+        if (mermaExistente == null) {
+            return Result.failure(IllegalStateException("La solicitud de merma ya no está disponible"))
         }
+        if (mermaExistente.estado != "pendiente") {
+            return Result.failure(IllegalStateException("Esta solicitud ya fue ${mermaExistente.estado}"))
+        }
+
+        // Actualiza SOLO esta merma a su nuevo estado localmente
+        db.mermaDao().insertarUna(mermaExistente.copy(estado = estado, pendienteSync = true))
+
+        // Descuenta stock local SOLO si es aprobada
+        if (estado == "aprobada") {
+            db.productoDao().descontarStock(mermaExistente.productoId, mermaExistente.cantidad, localId)
+        }
+
+        val accionId = UUID.randomUUID().toString()
         val payload = buildJsonObject {
-            put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id)
-            put("p_estado", estado); put("p_accion_id", accionId)
+            put("p_android_id", androidId)
+            put("p_local_id", localId)
+            put("p_id", id)
+            put("p_estado", estado)
+            put("p_accion_id", accionId)
         }
         encolarYSincronizar("resolver_merma", payload)
         return Result.success(Unit)
     }
-
-    suspend fun aprobar(androidId: String, id: String): Result<Unit> = resolver(androidId, id, "aprobada")
-    suspend fun rechazar(androidId: String, id: String): Result<Unit> = resolver(androidId, id, "rechazada")
 
     private suspend fun encolarYSincronizar(tipo: String, payload: JsonObject) {
         db.accionPendienteDao().encolar(

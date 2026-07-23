@@ -55,6 +55,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         AppContextHolder.init(applicationContext)
         SyncWorker.programarPeriodico(applicationContext)
+
         setContent { Gestor360App() }
     }
 }
@@ -91,6 +92,7 @@ fun Gestor360App() {
 @Composable
 private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit) {
     var mostrarSplash by remember { mutableStateOf(true) }
+
     if (mostrarSplash) {
         SplashScreen(onFinished = { mostrarSplash = false })
         return
@@ -105,6 +107,7 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
     val scope = rememberCoroutineScope()
     val accesoViewModel: AccesoViewModel = viewModel()
     val localSeleccionViewModel: LocalSeleccionViewModel = viewModel()
+
     var isLoading by remember { mutableStateOf(true) }
     var isLoggedIn by remember { mutableStateOf(false) }
     var usuarioParaPin by remember { mutableStateOf<User?>(null) }
@@ -112,6 +115,7 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
     var fotoUsuarioLogueado by remember { mutableStateOf<ByteArray?>(null) }
     var pantalla by remember { mutableStateOf<PantallaInterna>(PantallaInterna.Home) }
     var mostrarConfirmarSalir by remember { mutableStateOf(false) }
+    var mostrarConfirmarLogout by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     var localRecienCambiado by remember { mutableStateOf<Local?>(null) }
 
@@ -196,6 +200,7 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
         }
     }
 
+    // Diálogo para salir de la app (BackHandler)
     if (mostrarConfirmarSalir) {
         AlertDialog(
             onDismissRequest = { mostrarConfirmarSalir = false },
@@ -203,6 +208,24 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
             text = { Text("Vas a cerrar la aplicación.") },
             confirmButton = { TextButton(onClick = { (context as? ComponentActivity)?.finish() }) { Text("Salir") } },
             dismissButton = { TextButton(onClick = { mostrarConfirmarSalir = false }) { Text("Cancelar") } }
+        )
+    }
+
+    // Diálogo para cerrar sesión (botón en TopBar / Drawer)
+    if (mostrarConfirmarLogout) {
+        AlertDialog(
+            onDismissRequest = { mostrarConfirmarLogout = false },
+            title = { Text("Cerrar sesión") },
+            text = { Text("¿Estás seguro de que querés cerrar sesión?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    mostrarConfirmarLogout = false
+                    cerrarSesion()
+                }) { Text("Aceptar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { mostrarConfirmarLogout = false }) { Text("Cancelar") }
+            }
         )
     }
 
@@ -216,10 +239,22 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
             !isLoggedIn && usuarioParaPin != null -> PinLoginScreen(
                 usuario = usuarioParaPin!!,
                 onLoginExitoso = { usuario ->
-                    sessionManager.saveSession(userId = usuario.id, username = usuario.username, rol = usuario.rol, localId = usuario.local_id, clienteId = usuario.cliente_id, androidId = usuario.android_id ?: "", nombre = usuario.nombre)
+                    sessionManager.saveSession(
+                        userId = usuario.id,
+                        username = usuario.username,
+                        rol = usuario.rol,
+                        localId = usuario.local_id,
+                        clienteId = usuario.cliente_id,
+                        androidId = usuario.android_id ?: "",
+                        nombre = usuario.nombre
+                    )
                     isLoggedIn = true
                 },
-                onCambiarDispositivo = { usuarioParaPin = null; accesoViewModel.reiniciar(); sessionManager.limpiarLicenciaVerificada() },
+                onCambiarDispositivo = {
+                    usuarioParaPin = null
+                    accesoViewModel.reiniciar()
+                    sessionManager.limpiarLicenciaVerificada()
+                },
                 viewModel = accesoViewModel,
                 fotoBytes = fotoUsuarioPin
             )
@@ -231,7 +266,10 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
                 AnimatedContent(
                     targetState = pantalla,
                     label = "navegacion_principal",
-                    transitionSpec = { fadeIn(animationSpec = androidx.compose.animation.core.tween(350)) togetherWith fadeOut(animationSpec = androidx.compose.animation.core.tween(300)) }
+                    transitionSpec = {
+                        fadeIn(animationSpec = androidx.compose.animation.core.tween(350)) togetherWith
+                        fadeOut(animationSpec = androidx.compose.animation.core.tween(300))
+                    }
                 ) { pantallaActual ->
                     when (pantallaActual) {
                         is PantallaInterna.Home -> Column(modifier = Modifier.statusBarsPadding()) {
@@ -242,7 +280,7 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
                                 androidId = androidId,
                                 localSeleccionViewModel = localSeleccionViewModel,
                                 onLocalCambiado = { local -> localRecienCambiado = local },
-                                onLogout = { cerrarSesion() },
+                                onLogout = { mostrarConfirmarLogout = true },
                                 fotoUsuario = fotoUsuarioLogueado,
                                 onFotoSeleccionada = { bytes -> onFotoDashboardSeleccionada(bytes) },
                                 onFotoError = {
@@ -267,25 +305,59 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
                                         else -> PantallaInterna.Home
                                     }
                                 },
-                                onLogout = { cerrarSesion() },
+                                onLogout = { mostrarConfirmarLogout = true },
                                 localSeleccionViewModel = localSeleccionViewModel,
                                 onLocalCambiado = { local -> localRecienCambiado = local }
                             )
                         }
-                        is PantallaInterna.Ventas -> VentasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }, onIrACarrito = { pantalla = PantallaInterna.Carrito })
-                        is PantallaInterna.Carrito -> CarritoScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Ventas }, onVentaConfirmada = { pantalla = PantallaInterna.Ventas })
-                        is PantallaInterna.Productos -> ProductosScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home })
-                        is PantallaInterna.Inventario -> InventarioScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home }, onVerVentasRealizadas = { pantalla = PantallaInterna.MisVentas })
-                        is PantallaInterna.Tarjetas -> if (esAdmin) TarjetasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
-                        is PantallaInterna.Aprobaciones -> if (esAdmin) AprobacionesScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
-                        is PantallaInterna.Devolucion -> if (esAdmin) DevolucionScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
-                        is PantallaInterna.Conflictos -> ConflictosScreen(onBack = { pantalla = PantallaInterna.Home })
-                        is PantallaInterna.MisVentas -> MisVentasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Inventario })
+                        is PantallaInterna.Ventas -> VentasScreen(
+                            androidId = androidId,
+                            onBack = { pantalla = PantallaInterna.Home },
+                            onIrACarrito = { pantalla = PantallaInterna.Carrito }
+                        )
+                        is PantallaInterna.Carrito -> CarritoScreen(
+                            androidId = androidId,
+                            onBack = { pantalla = PantallaInterna.Ventas },
+                            onVentaConfirmada = { pantalla = PantallaInterna.Ventas }
+                        )
+                        is PantallaInterna.Productos -> ProductosScreen(
+                            androidId = androidId,
+                            rol = rol,
+                            onBack = { pantalla = PantallaInterna.Home }
+                        )
+                        is PantallaInterna.Inventario -> InventarioScreen(
+                            androidId = androidId,
+                            rol = rol,
+                            onBack = { pantalla = PantallaInterna.Home },
+                            onVerVentasRealizadas = { pantalla = PantallaInterna.MisVentas }
+                        )
+                        is PantallaInterna.Tarjetas -> if (esAdmin) TarjetasScreen(
+                            androidId = androidId,
+                            onBack = { pantalla = PantallaInterna.Home }
+                        ) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
+                        is PantallaInterna.Aprobaciones -> if (esAdmin) AprobacionesScreen(
+                            androidId = androidId,
+                            rol = rol,
+                            onBack = { pantalla = PantallaInterna.Home }
+                        ) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
+                        is PantallaInterna.Devolucion -> if (esAdmin) DevolucionScreen(
+                            androidId = androidId,
+                            onBack = { pantalla = PantallaInterna.Home }
+                        ) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
+                        is PantallaInterna.Conflictos -> ConflictosScreen(
+                            onBack = { pantalla = PantallaInterna.Home }
+                        )
+                        is PantallaInterna.MisVentas -> MisVentasScreen(
+                            androidId = androidId,
+                            onBack = { pantalla = PantallaInterna.Inventario }
+                        )
                     }
                 }
             }
         }
+
         SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
+
         val feedbackVM = remember { FeedbackViewModel() }
         CompositionLocalProvider(LocalFeedback provides feedbackVM) {
             val feedbackState by feedbackVM.state.collectAsState()
@@ -326,13 +398,14 @@ private fun InicioTopBar(
                 }
                 AvatarUsuario(fotoBytes = fotoUsuario, size = 40.dp, editable = true, onFotoSeleccionada = onFotoSeleccionada, onError = onFotoError)
             }
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(username, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
             Spacer(modifier = Modifier.width(10.dp))
-            BotonTema(temaOscuro = temaOscuro, onClick = onCambiarTema)
-            Spacer(modifier = Modifier.weight(1f))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = username, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(text = if (esAdmin) "Administrador" else "Vendedor", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            BotonTema(temaOscuro = temaOscuro, onCambiarTema = onCambiarTema)
             IconButton(onClick = onLogout) {
-                Icon(Icons.Default.Logout, contentDescription = "Cerrar sesión", tint = MaterialTheme.colorScheme.onSurface)
+                Icon(Icons.Default.Logout, contentDescription = "Cerrar sesión", tint = MaterialTheme.colorScheme.error)
             }
         }
     }
