@@ -372,17 +372,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
     }
 
     suspend fun cerrarTurno(androidId: String, turnoId: Long, cierre: Double): Result<Long> {
-        if (!NetworkMonitor.hayInternet(context)) {
-            return Result.failure(IllegalStateException("Necesitas conexión para cerrar el turno"))
-        }
-        return try {
-            val nuevoTurnoId = SupabaseClientProvider.client.postgrest.rpc("cerrar_turno", buildJsonObject {
-                put("p_android_id", androidId); put("p_local_id", localIdActivo()); put("p_turno_id", turnoId); put("p_cierre", cierre)
-            }).decodeAs<Long>()
-            Result.success(nuevoTurnoId)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+        return TurnoRepository(context).cerrarTurno(androidId, turnoId, cierre)
     }
 
     suspend fun precargarLocal(androidId: String, localId: Long, fecha: LocalDate = LocalDate.now()): Result<Unit> {
