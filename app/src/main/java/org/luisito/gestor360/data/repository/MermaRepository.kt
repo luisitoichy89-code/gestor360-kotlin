@@ -28,11 +28,6 @@ class MermaRepository(
         session.getLocalId() ?: throw IllegalStateException("No hay un local activo seleccionado")
 
     // ---------- Lecturas ----------
-    // Igual que Tarjetas: solo hay 2 RPCs (crear_merma, resolver_merma), así
-    // que la lectura es directo por postgrest sobre la tabla "mermas", sin
-    // pasar por validar_admin_merma (esa función solo la llaman los RPC de
-    // escritura; ver comentario en mermas_setup.sql).
-
     suspend fun getPendientes(androidId: String): Result<List<MermaEntity>> {
         val localId = localIdActivo()
         val cacheadas = db.mermaDao().obtenerPendientes(localId)
@@ -74,13 +69,6 @@ class MermaRepository(
     suspend fun refrescarDesdeServidor(localId: Long): Result<List<MermaEntity>> {
         return try {
             val mermas = fetchRemoto(localId)
-            // Antes de reinsertar lo confirmado por el servidor, se limpia solo
-            // lo que ya estaba confirmado (pendienteSync = 0): así una merma
-            // creada offline que todavía no sincronizó no desaparece de la
-            // lista mientras se espera la confirmación.
-            // BLINDAJE: limpiar + insertar ahora corre como una sola transacción
-            // atómica (reemplazarSincronizadas en MermaDao) para que un corte a
-            // mitad de camino no pierda mermas ya sincronizadas.
             db.mermaDao().reemplazarSincronizadas(localId, mermas.map { it.copy(pendienteSync = false) })
             Result.success(mermas)
         } catch (e: Exception) {
@@ -106,27 +94,18 @@ class MermaRepository(
             .decodeList<MermaEntity>()
 
     // ---------- Escrituras ----------
-
-    /**
-     * Cualquier usuario activo del local puede solicitar una merma (no hace
-     * falta ser admin para pedirla, solo para resolverla — ver
-     * validar_usuario_local vs validar_admin_merma en el SQL).
-     */
     suspend fun crear(
-        androidId: String, productoId: String, productoNombre: String, cantidad: Double, motivo: String
+        androidId: String, productoId: String, productoNombre: String, cantidad: Int, motivo: String
     ): Result<Unit> {
         val localId = localIdActivo()
-        // UUID generado en el dispositivo: es el id definitivo, el mismo antes
-        // y después de sincronizar. Igual que Productos y Tarjetas.
         val id = UUID.randomUUID().toString()
         val accionId = UUID.randomUUID().toString()
         val merma = MermaEntity(
             id = id, localId = localId, productoId = productoId, productoNombre = productoNombre,
-            cantidad = cantidad, motivo = motivo, solicitadoPor = null, solicitadoPorNombre = null,
+            cantidad = cantidad.toDouble(), motivo = motivo, solicitadoPor = null, solicitadoPorNombre = null,
             estado = "pendiente", pendienteSync = true
         )
         db.mermaDao().insertarUna(merma)
-
         val payload = buildJsonObject {
             put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id)
             put("p_producto_id", productoId); put("p_cantidad", cantidad); put("p_motivo", motivo)
@@ -136,12 +115,6 @@ class MermaRepository(
         return Result.success(Unit)
     }
 
-    /**
-     * Solo admin (validado también server-side en el RPC). estado debe ser
-     * "aprobada" o "rechazada". Si se aprueba, el RPC descuenta el stock del
-     * producto en el servidor; acá se descuenta también en el caché local
-     * para que la UI no espere a la próxima sincronización.
-     */
     suspend fun resolver(androidId: String, id: String, estado: String): Result<Unit> {
         val localId = localIdActivo()
         val accionId = UUID.randomUUID().toString()

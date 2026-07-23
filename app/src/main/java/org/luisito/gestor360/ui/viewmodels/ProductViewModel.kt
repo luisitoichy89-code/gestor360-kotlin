@@ -60,9 +60,9 @@ class ProductViewModel(
         }
     }
 
-    fun registrarMerma(producto: Product, cantidad: Double) {
+    fun registrarMerma(producto: Product, cantidad: Int, motivo: String = "Merma") {
         viewModelScope.launch {
-            repository.registrarMerma(androidIdActual, producto, cantidad)
+            repository.registrarMerma(androidIdActual, producto, cantidad, motivo)
                 .onSuccess { refrescar() }
                 .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo registrar la merma")) }
         }

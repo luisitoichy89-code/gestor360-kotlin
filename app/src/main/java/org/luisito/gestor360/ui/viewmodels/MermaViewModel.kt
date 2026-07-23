@@ -41,7 +41,7 @@ class MermaViewModel(
         if (androidIdActual.isNotBlank()) cargarPendientes(androidIdActual)
     }
 
-    fun solicitar(androidId: String, productoId: String, productoNombre: String, cantidad: Double, motivo: String, onListo: () -> Unit = {}) {
+    fun solicitar(androidId: String, productoId: String, productoNombre: String, cantidad: Int, motivo: String, onListo: () -> Unit = {}) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             repository.crear(androidId, productoId, productoNombre, cantidad, motivo)

@@ -55,18 +55,7 @@ class ProductRepository(
             val productos = SupabaseClientProvider.client.postgrest
                 .rpc("get_productos", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
                 .decodeList<Product>()
-            // FIX: se busca la fila anterior de cada producto ANTES de limpiar,
-            // para que toEntity() pueda conservar su createdAt/updatedAt real
-            // en vez de pisarlos con "ahora" en cada refresh (ver ProductoEntity.kt).
             val anteriores = db.productoDao().obtenerTodos(localId).associateBy { it.id }
-            // Antes de reinsertar lo confirmado por el servidor, se limpia solo
-            // lo que ya estaba confirmado (pendienteSync = 0): así un producto
-            // creado offline que todavía no sincronizó no desaparece de la lista
-            // mientras se espera la confirmación.
-            // BLINDAJE: limpiar + insertar ahora corre como una sola transacción
-            // atómica (reemplazarSincronizados en ProductoDao) para que un corte
-            // de luz o de red a mitad de camino no borre productos ya
-            // sincronizados sin llegar a reinsertarlos.
             db.productoDao().reemplazarSincronizados(
                 localId,
                 productos.map { it.toEntity(localId, pendienteSync = false, anterior = anteriores[it.id]) }
@@ -89,13 +78,10 @@ class ProductRepository(
         ubicacion: String, categoria: String
     ): Result<Unit> {
         val localId = localIdActivo()
-        // UUID generado en el dispositivo: es el id definitivo, el mismo antes
-        // y después de sincronizar. Ya no existe la noción de "id temporal".
         val id = UUID.randomUUID().toString()
         val accionId = UUID.randomUUID().toString()
         val producto = Product(id, nombre, precio, stock, ubicacion, categoria, localId)
         db.productoDao().insertarUno(producto.toEntity(localId, pendienteSync = true))
-
         val payload = buildJsonObject {
             put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id)
             put("p_nombre", nombre); put("p_precio", precio); put("p_stock", stock)
@@ -111,9 +97,6 @@ class ProductRepository(
     ): Result<Unit> {
         val localId = localIdActivo()
         val accionId = UUID.randomUUID().toString()
-        // FIX: el copy() no tocaba updatedAt, así que una edición real hecha
-        // acá nunca quedaba marcada como "modificada hoy" (ver ProductoEntity.kt
-        // / InventarioRepository "modificados", que depende de updatedAt).
         db.productoDao().obtenerPorId(id, localId)?.let {
             db.productoDao().insertarUno(
                 it.copy(
@@ -131,7 +114,7 @@ class ProductRepository(
         return Result.success(Unit)
     }
 
-    suspend fun registrarMerma(androidId: String, producto: Product, cantidad: Double, motivo: String = "Merma"): Result<Unit> {
+    suspend fun registrarMerma(androidId: String, producto: Product, cantidad: Int, motivo: String = "Merma"): Result<Unit> {
         val localId = localIdActivo()
         val accionId = UUID.randomUUID().toString()
         val nuevoStock = (producto.stock - cantidad).coerceAtLeast(0.0)
@@ -148,11 +131,6 @@ class ProductRepository(
 
     suspend fun deleteProduct(androidId: String, id: String): Result<Unit> {
         val localId = localIdActivo()
-
-        // Si el producto se creó offline y esa creación todavía no sincronizó,
-        // no tiene sentido avisarle al servidor de una eliminación: el servidor
-        // nunca llegó a saber que este producto existía. Se cancela la
-        // creación pendiente directamente.
         val creacionPendiente = db.accionPendienteDao().obtenerPendientes()
             .firstOrNull { it.tipo == "crear_producto" && it.payloadJson.contains("\"p_id\":\"$id\"") }
         if (creacionPendiente != null) {
@@ -160,12 +138,9 @@ class ProductRepository(
             db.productoDao().eliminar(id, localId)
             return Result.success(Unit)
         }
-
-        // Evitar encolar un eliminar_producto duplicado si ya hay uno pendiente.
         val yaPendiente = db.accionPendienteDao().obtenerPendientes()
             .any { it.tipo == "eliminar_producto" && it.payloadJson.contains("\"p_id\":\"$id\"") }
         if (yaPendiente) return Result.success(Unit)
-
         val fechaHoy = LocalDate.now().toString()
         val producto = db.productoDao().obtenerPorId(id, localId)
         if (producto != null) {
@@ -176,7 +151,6 @@ class ProductRepository(
                 )
             )
         }
-
         val accionId = UUID.randomUUID().toString()
         db.productoDao().eliminar(id, localId)
         db.accionPendienteDao().encolar(AccionPendienteEntity(tipo = "eliminar_producto", payloadJson = buildJsonObject {

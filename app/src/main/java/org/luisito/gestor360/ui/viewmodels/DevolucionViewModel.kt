@@ -37,7 +37,7 @@ class DevolucionViewModel(
 
     fun refrescar() { if (androidIdActual.isNotBlank()) cargar(androidIdActual) }
 
-    fun solicitar(androidId: String, productoId: String, productoNombre: String, cantidad: Double, metodo: String, motivo: String, onListo: () -> Unit = {}) {
+    fun solicitar(androidId: String, productoId: String, productoNombre: String, cantidad: Int, metodo: String, motivo: String, onListo: () -> Unit = {}) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             repository.solicitar(androidId, productoId, productoNombre, cantidad, metodo, motivo)

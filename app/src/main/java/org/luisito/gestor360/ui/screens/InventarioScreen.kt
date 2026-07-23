@@ -190,6 +190,7 @@ fun InventarioScreen(
                         if (ventasNoAnuladas.isEmpty()) item { TextoVacioSeccion("Sin ventas este día") }
                         items(ventasPagina, key = { "vt_${it.id}" }) { v -> VentaInfoRow(v) }
                         if (ventasNoAnuladas.isNotEmpty()) item { PaginacionBar(pagina = paginaSegura, totalPaginas = totalPaginasVentas, onPaginaAnterior = { paginaVentas = paginaSegura - 1 }, onPaginaSiguiente = { paginaVentas = paginaSegura + 1 }) }
+
                         item { Spacer(Modifier.height(56.dp)) }
                     }
                 }
@@ -245,18 +246,85 @@ fun InventarioScreen(
     }
 }
 
-@Composable private fun ProductoEliminadoRow(p: ProductoEliminadoInfo) { NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) { Text(p.nombre, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer); Text("Stock al eliminar: ${p.stock.toInt()}", style = MaterialTheme.typography.bodySmall); p.resuelto_por_nombre?.let { Text("Eliminado por: $it", style = MaterialTheme.typography.labelSmall) } } } }
-@Composable private fun DevueltoInfoRow(d: DevueltoInfo) { NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) { Text(d.producto_nombre, fontWeight = FontWeight.Bold); Text("Cantidad: ${d.cantidad.toInt()}  ·  Método: ${d.metodo}", style = MaterialTheme.typography.bodySmall); EstadoDevolucionChip(d.estado) } } }
-@Composable private fun MermaInfoRow(m: MermaInfo) { NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) { Text(m.producto_nombre, fontWeight = FontWeight.Bold); Text("Cantidad: ${m.cantidad.toInt()}  ·  Estado: ${m.estado}", style = MaterialTheme.typography.bodySmall); Text("Motivo: ${m.motivo}", style = MaterialTheme.typography.bodySmall); m.solicitado_por_nombre?.let { Text("Solicitado por: $it", style = MaterialTheme.typography.labelSmall) }; m.resuelto_por_nombre?.let { Text("Resuelto por: $it", style = MaterialTheme.typography.labelSmall) } } } }
-@Composable private fun EstadoDevolucionChip(estado: String) { val (texto, color) = when (estado) { "aprobada_stock" -> "Vuelve a stock" to MaterialTheme.colorScheme.primary; "aprobada_merma" -> "Merma" to MaterialTheme.colorScheme.error; "rechazada" -> "Rechazada" to MaterialTheme.colorScheme.error; else -> "Pendiente" to MaterialTheme.colorScheme.tertiary }; Text(texto, style = MaterialTheme.typography.labelSmall, color = color, fontWeight = FontWeight.Bold) }
-@Composable private fun VentaInfoRow(v: VentaInfo) { NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) { Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) { Text(v.producto_nombre, fontWeight = FontWeight.Bold); Text("${formatearMonto(v.total)} CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) }; Text("Cantidad: ${v.cantidad.toInt()}  ·  Método: ${v.metodo}", style = MaterialTheme.typography.bodySmall); FilaConRol("Vendido por", v.usuario_nombre, v.usuario_rol, v.fecha) } } }
-@Composable private fun TotalesGeneralesCard(totales: TotalesVentas) { NeuCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) { FilaResumenDinero("Total efectivo", totales.efectivo); FilaResumenDinero("Total transferencia", totales.transferencia); Divider(modifier = Modifier.padding(vertical = 8.dp)); FilaResumenDinero("Total generado (${totales.cantidad_ventas} ventas)", totales.efectivo + totales.transferencia, destacado = true) } } }
-@Composable private fun FilaResumenDinero(etiqueta: String, valor: Double, destacado: Boolean = false) { Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text(etiqueta, style = if (destacado) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium); Text("${formatearMonto(valor)} CUP", style = if (destacado) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium, fontWeight = if (destacado) FontWeight.Bold else FontWeight.Normal, color = if (destacado) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) } }
-@Composable private fun TarjetaResumenRow(t: TarjetaResumen) { NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) { Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Column(modifier = Modifier.weight(1f, fill = false)) { Text(t.nombre, fontWeight = FontWeight.Bold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis); Text(t.numero, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant); if (!t.titular.isNullOrBlank()) Text(t.titular, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }; Spacer(Modifier.width(12.dp)); Text("${formatearMonto(t.total)} CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, maxLines = 1, softWrap = false) } } }
-@Composable private fun ProductoVendidoRow(p: ProductoVendidoInfo) { NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) { Text(p.nombre, fontWeight = FontWeight.Bold); Spacer(Modifier.height(4.dp)); Text("Total vendidos: ${p.total_vendido.toInt()}", style = MaterialTheme.typography.bodySmall); Text("Total actual: ${p.total_actual.toInt()}", style = MaterialTheme.typography.bodySmall); Text("Total agregados: ${p.total_agregado.toInt()}", style = MaterialTheme.typography.bodySmall); Text("Total merma: ${p.total_merma.toInt()}", style = MaterialTheme.typography.bodySmall); Text("Total inicial: ${p.total_inicial.toInt()}", style = MaterialTheme.typography.bodySmall) } } }
-@Composable private fun PagoTarjetaRow(v: VentaInfo) { NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) { Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) { Text("${v.tarjeta_banco ?: ""} · ${v.tarjeta_numero}", fontWeight = FontWeight.Bold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp)); Text("${formatearMonto(v.transferencia)} CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, maxLines = 1, softWrap = false) }; if (!v.tarjeta_titular.isNullOrBlank()) Text("Titular de la cuenta: ${v.tarjeta_titular}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.height(6.dp)); Text("Cliente: ${v.cliente_nombre?.takeIf { it.isNotBlank() } ?: "—"}", style = MaterialTheme.typography.bodySmall); Text("Teléfono: ${v.cliente_tel?.takeIf { it.isNotBlank() } ?: "—"}", style = MaterialTheme.typography.bodySmall); Text("CI: ${v.cliente_ci?.takeIf { it.isNotBlank() } ?: "—"}", style = MaterialTheme.typography.bodySmall) } } }
-@Composable private fun CerrarTurnoDialog(efectivoEsperado: Double, isSaving: Boolean, onDismiss: () -> Unit, onCerrar: (Double) -> Unit) { var monto by remember { mutableStateOf("") }; AlertDialog(onDismissRequest = onDismiss, shape = RoundedCornerShape(18.dp), title = { Text("Cerrar turno", fontWeight = FontWeight.Bold) }, text = { Column { NeuCard(shape = RoundedCornerShape(14.dp), containerColor = MaterialTheme.colorScheme.primaryContainer) { Text("Esperado: ${formatearMonto(efectivoEsperado)} CUP", Modifier.padding(12.dp), fontWeight = FontWeight.Bold) }; Spacer(Modifier.height(12.dp)); OutlinedTextField(monto, { monto = it }, label = { Text("Efectivo contado") }, singleLine = true, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) } }, confirmButton = { TextButton(enabled = (monto.toDoubleOrNull() ?: -1.0) >= 0 && !isSaving, onClick = { onCerrar(monto.toDoubleOrNull() ?: 0.0) }) { Text(if (isSaving) "Cerrando..." else "Cerrar") } }, dismissButton = { TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }) }
-@Composable private fun FilaConRol(etiqueta: String, nombre: String?, rol: String?, fecha: String?) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("$etiqueta: ${nombre ?: "—"}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(fecha?.take(10) ?: "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+@Composable
+private fun SeccionTitulo(texto: String, icono: androidx.compose.ui.graphics.vector.ImageVector) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icono, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(texto.uppercase(), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun TextoVacioSeccion(texto: String) {
+    Text(
+        text = texto,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 26.dp)
+    )
+}
+
+@Composable
+private fun ProductoNuevoRow(p: ProductoInfo) {
+    NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            Text(p.nombre, fontWeight = FontWeight.Bold)
+            Text("Stock: ${p.stock.toInt()}  ·  Precio: ${formatearMonto(p.precio)}", style = MaterialTheme.typography.bodySmall)
+            p.ubicacion?.let { Text("Ubicación: $it", style = MaterialTheme.typography.labelSmall) }
+            p.resuelto_por_nombre?.let { Text("Ingresado por: $it", style = MaterialTheme.typography.labelSmall) }
+        }
+    }
+}
+
+@Composable
+private fun ProductoInfoRow(p: ProductoInfo) {
+    NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            Text(p.nombre, fontWeight = FontWeight.Bold)
+            Text("Stock: ${p.stock.toInt()}  ·  Precio: ${formatearMonto(p.precio)}", style = MaterialTheme.typography.bodySmall)
+            p.ubicacion?.let { Text("Ubicación: $it", style = MaterialTheme.typography.labelSmall) }
+            p.resuelto_por_nombre?.let { Text("Modificado por: $it", style = MaterialTheme.typography.labelSmall) }
+        }
+    }
+}
+
+@Composable
+private fun ProductoEliminadoRow(p: ProductoEliminadoInfo) { NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) { Text(p.nombre, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer); Text("Stock al eliminar: ${p.stock.toInt()}", style = MaterialTheme.typography.bodySmall); p.resuelto_por_nombre?.let { Text("Eliminado por: $it", style = MaterialTheme.typography.labelSmall) } } } }
+
+@Composable
+private fun DevueltoInfoRow(d: DevueltoInfo) { NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) { Text(d.producto_nombre, fontWeight = FontWeight.Bold); Text("Cantidad: ${d.cantidad.toInt()}  ·  Método: ${d.metodo}", style = MaterialTheme.typography.bodySmall); EstadoDevolucionChip(d.estado) } } }
+
+@Composable
+private fun MermaInfoRow(m: MermaInfo) { NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) { Text(m.producto_nombre, fontWeight = FontWeight.Bold); Text("Cantidad: ${m.cantidad.toInt()}  ·  Estado: ${m.estado}", style = MaterialTheme.typography.bodySmall); Text("Motivo: ${m.motivo}", style = MaterialTheme.typography.bodySmall); m.solicitado_por_nombre?.let { Text("Solicitado por: $it", style = MaterialTheme.typography.labelSmall) }; m.resuelto_por_nombre?.let { Text("Resuelto por: $it", style = MaterialTheme.typography.labelSmall) } } } }
+
+@Composable
+private fun EstadoDevolucionChip(estado: String) { val (texto, color) = when (estado) { "aprobada_stock" -> "Vuelve a stock" to MaterialTheme.colorScheme.primary; "aprobada_merma" -> "Merma" to MaterialTheme.colorScheme.error; "rechazada" -> "Rechazada" to MaterialTheme.colorScheme.error; else -> "Pendiente" to MaterialTheme.colorScheme.tertiary }; Text(texto, style = MaterialTheme.typography.labelSmall, color = color, fontWeight = FontWeight.Bold) }
+
+@Composable
+private fun VentaInfoRow(v: VentaInfo) { NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) { Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) { Text(v.producto_nombre, fontWeight = FontWeight.Bold); Text("${formatearMonto(v.total)} CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) }; Text("Cantidad: ${v.cantidad.toInt()}  ·  Método: ${v.metodo}", style = MaterialTheme.typography.bodySmall); FilaConRol("Vendido por", v.usuario_nombre, v.usuario_rol, v.fecha) } } }
+
+@Composable
+private fun TotalesGeneralesCard(totales: TotalesVentas) { NeuCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) { FilaResumenDinero("Total efectivo", totales.efectivo); FilaResumenDinero("Total transferencia", totales.transferencia); Divider(modifier = Modifier.padding(vertical = 8.dp)); FilaResumenDinero("Total generado (${totales.cantidad_ventas} ventas)", totales.efectivo + totales.transferencia, destacado = true) } } }
+
+@Composable
+private fun FilaResumenDinero(etiqueta: String, valor: Double, destacado: Boolean = false) { Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text(etiqueta, style = if (destacado) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium); Text("${formatearMonto(valor)} CUP", style = if (destacado) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium, fontWeight = if (destacado) FontWeight.Bold else FontWeight.Normal, color = if (destacado) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) } }
+
+@Composable
+private fun TarjetaResumenRow(t: TarjetaResumen) { NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) { Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Column(modifier = Modifier.weight(1f, fill = false)) { Text(t.nombre, fontWeight = FontWeight.Bold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis); Text(t.numero, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant); if (!t.titular.isNullOrBlank()) Text(t.titular, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }; Spacer(Modifier.width(12.dp)); Text("${formatearMonto(t.total)} CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, maxLines = 1, softWrap = false) } } }
+
+@Composable
+private fun ProductoVendidoRow(p: ProductoVendidoInfo) { NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) { Text(p.nombre, fontWeight = FontWeight.Bold); Spacer(Modifier.height(4.dp)); Text("Total vendidos: ${p.total_vendido.toInt()}", style = MaterialTheme.typography.bodySmall); Text("Total actual: ${p.total_actual.toInt()}", style = MaterialTheme.typography.bodySmall); Text("Total agregados: ${p.total_agregado.toInt()}", style = MaterialTheme.typography.bodySmall); Text("Total merma: ${p.total_merma.toInt()}", style = MaterialTheme.typography.bodySmall); Text("Total inicial: ${p.total_inicial.toInt()}", style = MaterialTheme.typography.bodySmall) } } }
+
+@Composable
+private fun PagoTarjetaRow(v: VentaInfo) { NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) { Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) { Text("${v.tarjeta_banco ?: ""} · ${v.tarjeta_numero}", fontWeight = FontWeight.Bold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp)); Text("${formatearMonto(v.transferencia)} CUP", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, maxLines = 1, softWrap = false) }; if (!v.tarjeta_titular.isNullOrBlank()) Text("Titular de la cuenta: ${v.tarjeta_titular}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.height(6.dp)); Text("Cliente: ${v.cliente_nombre?.takeIf { it.isNotBlank() } ?: "—"}", style = MaterialTheme.typography.bodySmall); Text("Teléfono: ${v.cliente_tel?.takeIf { it.isNotBlank() } ?: "—"}", style = MaterialTheme.typography.bodySmall); Text("CI: ${v.cliente_ci?.takeIf { it.isNotBlank() } ?: "—"}", style = MaterialTheme.typography.bodySmall) } } }
+
+@Composable
+private fun CerrarTurnoDialog(efectivoEsperado: Double, isSaving: Boolean, onDismiss: () -> Unit, onCerrar: (Double) -> Unit) { var monto by remember { mutableStateOf("") }; AlertDialog(onDismissRequest = onDismiss, shape = RoundedCornerShape(18.dp), title = { Text("Cerrar turno", fontWeight = FontWeight.Bold) }, text = { Column { NeuCard(shape = RoundedCornerShape(14.dp), containerColor = MaterialTheme.colorScheme.primaryContainer) { Text("Esperado: ${formatearMonto(efectivoEsperado)} CUP", Modifier.padding(12.dp), fontWeight = FontWeight.Bold) }; Spacer(Modifier.height(12.dp)); OutlinedTextField(monto, { monto = it }, label = { Text("Efectivo contado") }, singleLine = true, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) } }, confirmButton = { TextButton(enabled = (monto.toDoubleOrNull() ?: -1.0) >= 0 && !isSaving, onClick = { onCerrar(monto.toDoubleOrNull() ?: 0.0) }) { Text(if (isSaving) "Cerrando..." else "Cerrar") } }, dismissButton = { TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }) }
+
+@Composable
+private fun FilaConRol(etiqueta: String, nombre: String?, rol: String?, fecha: String?) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("$etiqueta: ${nombre ?: "—"}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(fecha?.take(10) ?: "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+
 @Composable
 private fun ConfirmarPinDialog(accesoViewModel: AccesoViewModel, onCancelar: () -> Unit, onPinCorrecto: () -> Unit) {
     val uiState by accesoViewModel.uiState.collectAsState()

@@ -56,22 +56,20 @@ class DevolucionRepository(private val context: Context = AppContextHolder.conte
         } catch (e: Exception) { Result.failure(e) }
     }
 
-    suspend fun solicitar(androidId: String, productoId: String, productoNombre: String, cantidad: Double, metodo: String, motivo: String): Result<Unit> {
+    suspend fun solicitar(androidId: String, productoId: String, productoNombre: String, cantidad: Int, metodo: String, motivo: String): Result<Unit> {
         val yaPendiente = db.accionPendienteDao().obtenerPendientes()
             .filter { it.tipo == "solicitar_devolucion" }
             .any { it.payloadJson.contains("\"p_producto_id\":\"$productoId\"") }
         if (yaPendiente) return Result.success(Unit)
-
         val localId = localIdActivo()
         val id = UUID.randomUUID().toString()
         val accionId = UUID.randomUUID().toString()
         val actuales = db.devolucionCacheDao().obtener(localId)?.toModel() ?: emptyList()
         val nueva = Devolucion(
             id = id, producto_id = productoId, producto_nombre = productoNombre,
-            cantidad = cantidad, metodo = metodo, motivo = motivo, estado = "pendiente", local_id = localId
+            cantidad = cantidad.toDouble(), metodo = metodo, motivo = motivo, estado = "pendiente", local_id = localId
         )
         db.devolucionCacheDao().guardar((listOf(nueva) + actuales).toEntity(localId))
-
         val payload = buildJsonObject {
             put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id)
             put("p_producto_id", productoId); put("p_cantidad", cantidad); put("p_metodo", metodo); put("p_motivo", motivo)
