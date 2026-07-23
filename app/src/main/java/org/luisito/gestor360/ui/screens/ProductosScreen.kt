@@ -104,7 +104,7 @@ fun ProductosScreen(
     }
 
     if (mostrarFormulario) ProductoFormDialog(productoEnEdicion, esAdmin, categorias, uiState.productos, uiState.isSaving, { mostrarFormulario = false }) { nombre, precio, stock, ubicacion, categoria ->
-        if (esAdmin) { if (productoEnEdicion == null) viewModel.crear(nombre, precio, stock, ubicacion, categoria) else viewModel.editar(productoEnEdicion!!.id, nombre, precio, stock, ubicacion, categoria) } else aprobacionVM.solicitarProducto(androidId, nombre, precio, stock)
+        if (esAdmin) { if (productoEnEdicion == null) viewModel.crear(nombre, precio, stock, ubicacion, categoria) else viewModel.editar(productoEnEdicion!!.id, nombre, precio, stock, ubicacion, categoria) } else aprobacionVM.solicitarProducto(androidId, nombre, precio, stock.toInt())
         mostrarFormulario = false
     }
 
@@ -151,7 +151,6 @@ private fun ProductoFormDialog(producto: Product?, esAdmin: Boolean, categoriasE
     val stockInvalido = stockTexto.isBlank() || stock == null || stock < 0
     val valido = !nombreVacio && !nombreDuplicado && !precioInvalido && !stockInvalido
     val sugerencias = remember(categoria, categoriasExistentes) { if (categoria.isBlank()) categoriasExistentes else categoriasExistentes.filter { it.contains(categoria, true) && it != categoria } }
-
     AlertDialog(onDismissRequest = onDismiss, shape = RoundedCornerShape(18.dp), title = { Text(if (producto == null) if (esAdmin) "Nuevo producto" else "Solicitar producto" else "Editar producto", fontWeight = FontWeight.Bold) }, text = { Column {
         OutlinedTextField(nombre, { nombre = it.uppercase() }, label = { Text("Nombre") }, singleLine = true, isError = nombreVacio || nombreDuplicado, supportingText = { when { nombreVacio -> Text("El nombre es obligatorio"); nombreDuplicado -> Text("Ya existe un producto con ese nombre") } }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)); Spacer(Modifier.height(10.dp))
         OutlinedTextField(precioTexto, { precioTexto = it }, label = { Text("Precio (CUP)") }, singleLine = true, isError = precioInvalido, supportingText = { if (precioInvalido) Text("Ingresá un precio mayor que 0") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)); Spacer(Modifier.height(10.dp))
