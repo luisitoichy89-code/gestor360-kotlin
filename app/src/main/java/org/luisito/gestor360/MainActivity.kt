@@ -403,7 +403,7 @@ private fun InicioTopBar(
                 Text(text = username, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(text = if (esAdmin) "Administrador" else "Vendedor", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            BotonTema(temaOscuro = temaOscuro, onCambiarTema = onCambiarTema)
+            BotonTema(temaOscuro = temaOscuro, onClick = onCambiarTema)
             IconButton(onClick = onLogout) {
                 Icon(Icons.Default.Logout, contentDescription = "Cerrar sesión", tint = MaterialTheme.colorScheme.error)
             }
