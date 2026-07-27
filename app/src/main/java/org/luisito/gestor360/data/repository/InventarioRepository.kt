@@ -11,8 +11,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.local.AppDatabase
 import org.luisito.gestor360.data.local.entities.VentaEntity
-import org.luisito.gestor360.data.local.entities.TurnoEntity
-import org.luisito.gestor360.data.local.entities.InventarioCacheEntity
 import org.luisito.gestor360.data.local.entities.toEntity
 import org.luisito.gestor360.data.local.entities.toModel
 import org.luisito.gestor360.data.models.*
@@ -29,6 +27,25 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
     private fun localIdActivo(): Long =
         session.getLocalId() ?: throw IllegalStateException("No hay un local activo seleccionado")
 
+    private fun <T> filtrarPorTurno(
+        items: List<T>,
+        turnoIdDe: (T) -> Long?,
+        fechaDe: (T) -> String?,
+        turnoIdsExplicitos: List<Long>?,
+        turnoActivoId: Long?,
+        fechaStr: String,
+        esHoy: Boolean
+    ): List<T> = when {
+        !turnoIdsExplicitos.isNullOrEmpty() ->
+            items.filter { val t = turnoIdDe(it); t != null && t in turnoIdsExplicitos }
+
+        esHoy && turnoActivoId != null ->
+            items.filter { turnoIdDe(it) == turnoActivoId || (turnoIdDe(it) == null && fechaDe(it)?.startsWith(fechaStr) == true) }
+
+        else ->
+            items.filter { fechaDe(it)?.startsWith(fechaStr) == true }
+    }
+
     suspend fun getInventarioDia(
         androidId: String,
         fecha: LocalDate,
@@ -38,34 +55,12 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
     ): Result<InventarioDia> {
         val localId = localIdActivo()
         val fechaStr = fecha.toString()
-        val cacheado = db.inventarioCacheDao().obtener(localId, fechaStr)
 
         if (!turnoIds.isNullOrEmpty()) {
-            // Sin conexión: insistir contra el servidor solo dejaría el error en
-            // pantalla con los datos del turno viejo. Para HOY reconstruimos desde
-            // Room, que ya refleja el turno recién cerrado/abierto (así el cierre
-            // de turno siempre se ve reiniciado, aunque no haya red en ese momento).
-            if (!NetworkMonitor.hayInternet(context)) {
-                return if (fecha == LocalDate.now()) {
-                    val reconstruido = construirDesdeRoom(localId, fecha)
-                    db.inventarioCacheDao().guardar(reconstruido.toEntity(localId, fechaStr))
-                    Result.success(reconstruido)
-                } else {
-                    Result.success(resolverOfflineForzado(cacheado, localId, fecha))
-                }
-            }
-
-            val resultado = refrescarDesdeServidor(androidId, fecha, turnoIds)
-            // Había red pero la recarga igual falló (timeout, error puntual del
-            // servidor, etc.): no dejamos en pantalla los datos del turno viejo,
-            // reconstruimos localmente con el turno ya actualizado en Room.
-            if (resultado.isFailure && fecha == LocalDate.now()) {
-                val reconstruido = construirDesdeRoom(localId, fecha)
-                db.inventarioCacheDao().guardar(reconstruido.toEntity(localId, fechaStr))
-                return Result.success(reconstruido)
-            }
-            return resultado
+            return refrescarDesdeServidor(androidId, fecha, turnoIds)
         }
+
+        val cacheado = db.inventarioCacheDao().obtener(localId, fechaStr)
 
         if (cacheado != null && !forzarRefresh) {
             if (NetworkMonitor.hayInternet(context)) {
@@ -82,35 +77,8 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 .onSuccess { onActualizadoDesdeServidor?.invoke(it) }
         }
 
-        return Result.success(resolverOfflineForzado(cacheado, localId, fecha))
-    }
-
-    private suspend fun resolverOfflineForzado(cacheado: InventarioCacheEntity?, localId: Long, fecha: LocalDate): InventarioDia =
-        if (cacheado != null) fusionarConVentasPendientes(cacheado.toModel(), localId, fecha)
-        else construirDesdeRoom(localId, fecha)
-
-    private suspend fun fusionarConVentasPendientes(base: InventarioDia, localId: Long, fecha: LocalDate): InventarioDia {
-        val fechaStr = fecha.toString()
-        val idsConocidos = base.ventas.map { it.id }.toSet()
-        val pendientes = db.ventaDao().obtenerTodas(localId)
-            .filter { !it.sincronizada && it.createdAt?.startsWith(fechaStr) == true && it.id !in idsConocidos }
-        if (pendientes.isEmpty()) return base
-
-        val nombreUsuarioLocal = session.getNombre().takeIf { it.isNotBlank() }
-        val eliminadosPorId = db.productoEliminadoCacheDao().obtenerTodos(localId)
-            .associate { e -> e.id to ProductoEliminadoInfo(id = e.id, nombre = e.nombre, stock = e.stock, fecha = e.fecha, resuelto_por_nombre = null) }
-
-        val ventasNuevasInfo = pendientes.map { it.toVentaInfo(localId, nombreUsuarioLocal, eliminadosPorId) }
-
-        return base.copy(
-            ventas = base.ventas + ventasNuevasInfo,
-            productos_vendidos = fusionarProductosVendidos(base.productos_vendidos, pendientes, localId, eliminadosPorId),
-            totales_ventas = base.totales_ventas.copy(
-                efectivo = base.totales_ventas.efectivo + pendientes.sumOf { it.efectivo },
-                transferencia = base.totales_ventas.transferencia + pendientes.sumOf { it.transferencia },
-                cantidad_ventas = base.totales_ventas.cantidad_ventas + pendientes.size
-            )
-        )
+        val desdeRoom = construirDesdeRoom(localId, fecha, turnoIds)
+        return Result.success(desdeRoom)
     }
 
     suspend fun refrescar(androidId: String, fecha: LocalDate): Result<InventarioDia> {
@@ -138,30 +106,35 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         }
     }
 
-    private suspend fun construirDesdeRoom(localId: Long, fecha: LocalDate): InventarioDia {
+    private suspend fun construirDesdeRoom(
+        localId: Long,
+        fecha: LocalDate,
+        turnoIds: List<Long>? = null
+    ): InventarioDia {
         val fechaStr = fecha.toString()
+        val esHoy = fecha == LocalDate.now()
         val nombreUsuarioLocal = session.getNombre().takeIf { it.isNotBlank() }
 
-        val eliminados = db.productoEliminadoCacheDao().obtenerPorFecha(localId, fechaStr)
-            .map { e ->
-                ProductoEliminadoInfo(id = e.id, nombre = e.nombre, stock = e.stock, fecha = e.fecha, resuelto_por_nombre = null)
-            }
-        val eliminadosPorId = db.productoEliminadoCacheDao().obtenerTodos(localId)
-            .associate { e -> e.id to ProductoEliminadoInfo(id = e.id, nombre = e.nombre, stock = e.stock, fecha = e.fecha, resuelto_por_nombre = null) }
-
-        val turnoActivo = db.turnoDao().obtenerActivo(localId)
+        val turnoActivo = if (esHoy) db.turnoDao().obtenerActivo(localId) else null
         val turnoActivoId = turnoActivo?.id
-        val turnoDesde = turnoActivo?.createdAt
 
-        val ventasHoy = db.ventaDao().obtenerTodas(localId)
-            .filter { it.createdAt?.startsWith(fechaStr) == true }
-            .filter { venta ->
-                when {
-                    turnoActivoId == null -> true
-                    venta.turnoId != null -> venta.turnoId == turnoActivoId
-                    else -> turnoDesde == null || (venta.createdAt != null && venta.createdAt!! >= turnoDesde)
-                }
-            }
+        val eliminadosTodos = db.productoEliminadoCacheDao().obtenerTodos(localId)
+        val eliminadosPorId = eliminadosTodos.associate { e ->
+            e.id to ProductoEliminadoInfo(id = e.id, nombre = e.nombre, stock = e.stock, fecha = e.fecha, resuelto_por_nombre = null)
+        }
+        val eliminados = filtrarPorTurno(
+            eliminadosTodos,
+            turnoIdDe = { it.turnoId }, fechaDe = { it.fecha },
+            turnoIdsExplicitos = turnoIds, turnoActivoId = turnoActivoId, fechaStr = fechaStr, esHoy = esHoy
+        ).map { e ->
+            ProductoEliminadoInfo(id = e.id, nombre = e.nombre, stock = e.stock, fecha = e.fecha, resuelto_por_nombre = null)
+        }
+
+        val ventasHoy = filtrarPorTurno(
+            db.ventaDao().obtenerTodas(localId),
+            turnoIdDe = { it.turnoId }, fechaDe = { it.createdAt },
+            turnoIdsExplicitos = turnoIds, turnoActivoId = turnoActivoId, fechaStr = fechaStr, esHoy = esHoy
+        )
 
         val ventasInfo = ventasHoy.map { it.toVentaInfo(localId, nombreUsuarioLocal, eliminadosPorId) }
 
@@ -195,11 +168,13 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
 
         val devolucionesCache = db.devolucionCacheDao().obtener(localId)
         val devueltos = if (devolucionesCache != null) {
-            devolucionesCache.toModel().filter { d ->
-                d.created_at?.startsWith(fechaStr) == true || d.resuelto_at?.startsWith(fechaStr) == true
-            }.map { d ->
+            filtrarPorTurno(
+                devolucionesCache.toModel(),
+                turnoIdDe = { it.turno_id }, fechaDe = { it.resuelto_at ?: it.created_at },
+                turnoIdsExplicitos = turnoIds, turnoActivoId = turnoActivoId, fechaStr = fechaStr, esHoy = esHoy
+            ).map { d ->
                 DevueltoInfo(
-                    id = d.id ?: "", producto_nombre = d.producto_nombre, cantidad = d.cantidad,
+                    id = d.id, producto_nombre = d.producto_nombre, cantidad = d.cantidad,
                     metodo = d.metodo, estado = d.estado,
                     solicitado_por_nombre = d.solicitado_por_nombre,
                     resuelto_por_nombre = d.resuelto_por_nombre, resuelto_por_rol = null,
@@ -208,10 +183,26 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             }
         } else emptyList()
 
-        val mermasLocales = db.mermaDao().obtenerPendientes(localId).map { m -> MermaInfo(id = m.id, producto_nombre = m.productoNombre, cantidad = m.cantidad, motivo = m.motivo ?: "", estado = m.estado, solicitado_por_nombre = m.solicitadoPorNombre, resuelto_por_nombre = null, fecha = null) }
+        val mermasPendientesTodas = db.mermaDao().obtenerPendientes(localId)
+        val mermasFiltradas = if (esHoy && turnoActivoId != null) {
+            mermasPendientesTodas.filter { it.turnoId == turnoActivoId || it.turnoId == null }
+        } else if (!turnoIds.isNullOrEmpty()) {
+            mermasPendientesTodas.filter { it.turnoId != null && it.turnoId in turnoIds }
+        } else {
+            mermasPendientesTodas
+        }
+        val mermasLocales = mermasFiltradas.map { m ->
+            MermaInfo(id = m.id, producto_nombre = m.productoNombre, cantidad = m.cantidad, motivo = m.motivo ?: "", estado = m.estado, solicitado_por_nombre = m.solicitadoPorNombre, resuelto_por_nombre = null, fecha = null)
+        }
 
         return InventarioDia(
             fecha = fechaStr,
+            turno = turnoActivo?.let {
+                TurnoInfo(
+                    id = it.id, apertura = it.apertura, cierre = it.cierre, diferencia = it.diferencia,
+                    created_at = it.createdAt, usuario_nombre = nombreUsuarioLocal, usuario_rol = null
+                )
+            },
             ventas = ventasInfo,
             productos_vendidos = productosVendidos,
             productos_nuevos = nuevos,
@@ -290,22 +281,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                     }
                 })
                 .decodeAs<InventarioDia>()
-            if (turnoIds.isNullOrEmpty() || fecha == LocalDate.now()) {
-                db.inventarioCacheDao().guardar(resultado.toEntity(localId, fecha.toString()))
-            }
-
-            if (fecha == LocalDate.now()) {
-                resultado.turno?.let { t ->
-                    db.turnoDao().limpiarCerrados()
-                    db.turnoDao().insertar(
-                        TurnoEntity(
-                            id = t.id, usuarioId = null, apertura = t.apertura,
-                            cierre = t.cierre, diferencia = t.diferencia,
-                            createdAt = t.created_at, localId = localId
-                        )
-                    )
-                }
-            }
+            if (turnoIds.isNullOrEmpty()) db.inventarioCacheDao().guardar(resultado.toEntity(localId, fecha.toString()))
             Result.success(resultado)
         } catch (e: Exception) {
             Log.e("InventarioRepo", "Error refrescando servidor para fecha=$fecha", e)
@@ -314,19 +290,26 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
     }
 
     suspend fun cerrarTurno(androidId: String, turnoId: Long, cierre: Double): Result<Long> {
-        return TurnoRepository(context).cerrarTurno(androidId, turnoId, cierre)
-    }
-
-    suspend fun haySolicitudesPendientes(): Boolean {
-        val localId = localIdActivo()
-        val aprobacionesPendientes = db.aprobacionStockCacheDao().obtener(localId)
-            ?.toModel()
-            ?.any { it.estado == "pendiente" } ?: false
-        val mermasPendientes = db.mermaDao().obtenerPendientes(localId).isNotEmpty()
-        val devolucionesPendientes = db.devolucionCacheDao().obtener(localId)
-            ?.toModel()
-            ?.any { it.estado == "pendiente" } ?: false
-        return aprobacionesPendientes || mermasPendientes || devolucionesPendientes
+        if (!NetworkMonitor.hayInternet(context)) {
+            return Result.failure(IllegalStateException("Necesitas conexión para cerrar el turno"))
+        }
+        return try {
+            val nuevoTurnoId = SupabaseClientProvider.client.postgrest.rpc("cerrar_turno", buildJsonObject {
+                put("p_android_id", androidId); put("p_local_id", localIdActivo()); put("p_turno_id", turnoId); put("p_cierre", cierre)
+            }).decodeAs<Long>()
+            db.turnoDao().cerrarYRegistrarNuevo(
+                turnoAnteriorId = turnoId,
+                cierreAnterior = cierre,
+                localId = localIdActivo(),
+                nuevo = org.luisito.gestor360.data.local.entities.TurnoEntity(
+                    id = nuevoTurnoId, localId = localIdActivo(), usuarioId = null, apertura = 0.0,
+                    cierre = null, diferencia = null, createdAt = java.time.LocalDateTime.now().toString()
+                )
+            )
+            Result.success(nuevoTurnoId)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     suspend fun precargarLocal(androidId: String, localId: Long, fecha: LocalDate = LocalDate.now()): Result<Unit> {
@@ -337,17 +320,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 })
                 .decodeAs<InventarioDia>()
             db.inventarioCacheDao().guardar(resultado.toEntity(localId, fecha.toString()))
-            if (fecha == LocalDate.now()) {
-                resultado.turno?.let { t ->
-                    db.turnoDao().insertar(
-                        TurnoEntity(
-                            id = t.id, usuarioId = null, apertura = t.apertura,
-                            cierre = t.cierre, diferencia = t.diferencia,
-                            createdAt = t.created_at, localId = localId
-                        )
-                    )
-                }
-            }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
