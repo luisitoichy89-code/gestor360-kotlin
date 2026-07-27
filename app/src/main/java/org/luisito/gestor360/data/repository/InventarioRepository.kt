@@ -170,7 +170,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         val devueltos = if (devolucionesCache != null) {
             filtrarPorTurno(
                 devolucionesCache.toModel(),
-                turnoIdDe = { it.turno_id }, fechaDe = { it.resuelto_at ?: it.created_at },
+                turnoIdDe = { null }, fechaDe = { it.resuelto_at ?: it.created_at },
                 turnoIdsExplicitos = turnoIds, turnoActivoId = turnoActivoId, fechaStr = fechaStr, esHoy = esHoy
             ).map { d ->
                 DevueltoInfo(
@@ -326,3 +326,15 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         }
     }
 }
+
+    suspend fun haySolicitudesPendientes(): Boolean {
+        val localId = localIdActivo()
+        val aprobacionesPendientes = db.aprobacionStockCacheDao().obtener(localId)
+            ?.toModel()
+            ?.any { it.estado == "pendiente" } ?: false
+        val mermasPendientes = db.mermaDao().obtenerPendientes(localId).isNotEmpty()
+        val devolucionesPendientes = db.devolucionCacheDao().obtener(localId)
+            ?.toModel()
+            ?.any { it.estado == "pendiente" } ?: false
+        return aprobacionesPendientes || mermasPendientes || devolucionesPendientes
+    }
