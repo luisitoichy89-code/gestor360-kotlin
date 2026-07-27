@@ -325,7 +325,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             Result.failure(e)
         }
     }
-}
 
     suspend fun haySolicitudesPendientes(): Boolean {
         val localId = localIdActivo()
@@ -338,3 +337,4 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             ?.any { it.estado == "pendiente" } ?: false
         return aprobacionesPendientes || mermasPendientes || devolucionesPendientes
     }
+}
