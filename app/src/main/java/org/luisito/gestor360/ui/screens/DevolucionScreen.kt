@@ -67,7 +67,7 @@ private fun DevolucionCard(dev: Devolucion, isSaving: Boolean, onAprobar: () -> 
                 Text(dev.producto_nombre, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
             Spacer(Modifier.height(10.dp))
-            Text("Cantidad: ${dev.cantidad.toInt()}  ·  Método: ${dev.metodo}", fontWeight = FontWeight.Medium)
+            Text("Cantidad: ${dev.cantidad}  ·  Método: ${dev.metodo}", fontWeight = FontWeight.Medium)
             if (!dev.motivo.isNullOrBlank()) { Spacer(Modifier.height(4.dp)); Text("Motivo: ${dev.motivo}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             Spacer(Modifier.height(6.dp))
             Text("Solicitado por: ${dev.solicitado_por_nombre ?: "Usuario #${dev.solicitado_por}"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

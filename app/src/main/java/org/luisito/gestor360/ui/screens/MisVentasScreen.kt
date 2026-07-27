@@ -13,6 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.luisito.gestor360.data.local.AppDatabase
+import org.luisito.gestor360.data.repository.SaleRepository
+import org.luisito.gestor360.data.sync.NetworkMonitor
 import org.luisito.gestor360.ui.theme.NeuCard
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
@@ -34,7 +36,8 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
     val context = AppContextHolder.context
     val db = remember { AppDatabase.obtener(context) }
     val session = remember { SessionManager(context) }
-
+    val saleRepository = remember { SaleRepository() }
+    
     var ventas by remember { mutableStateOf<List<VentaAgrupada>>(emptyList()) }
     var totalEfectivo by remember { mutableStateOf(0.0) }
     var totalTransferencia by remember { mutableStateOf(0.0) }
@@ -42,15 +45,55 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
     var isRefreshing by remember { mutableStateOf(false) }
     var trigger by remember { mutableStateOf(0) }
 
-    suspend fun cargarMisVentas() {
+    // Con internet: sincroniza contra el servidor antes de leer, así
+    // "Ventas realizadas" también refleja lo vendido en otros dispositivos
+    // del mismo local (antes SOLO leía de Room, sin importar la conexión).
+    // Sin internet: lee directo de Room, igual que siempre. El botón de
+    // refrescar dispara esta misma función.
+    suspend fun cargarDesdeRoom() {
         val localId = session.getLocalId() ?: return
-        val usuarioId = session.getUserId() ?: return
 
-        val turnoActivoId = db.turnoDao().obtenerActivo(localId)?.id
-        val misVentas = db.misVentasCacheDao().obtenerMisVentas(localId, usuarioId)
-            .filter { it.turnoId == turnoActivoId }
+        if (NetworkMonitor.hayInternet(context)) {
+            // SaleRepository.getSales() ya existía en el proyecto pero
+            // ningún código lo llamaba. Hace upsert por id en ventas_cache
+            // (nunca borra), así que una venta local que este dispositivo
+            // guardó y todavía no confirma el servidor no se pierde aunque
+            // haya conexión. Si falla, se ignora a propósito: igual se sigue
+            // leyendo de Room justo abajo, como si no hubiera habido internet.
+            try {
+                saleRepository.getSales(androidId)
+            } catch (e: Exception) {
+                android.util.Log.e("MisVentasScreen", "No se pudo sincronizar ventas con el servidor, se usa Room", e)
+            }
+        }
 
-        val agrupadas = misVentas.map { v ->
+        val usuarioId = session.getUserId()
+        val turnoActivo = db.turnoDao().obtenerActivo(localId)
+        val turnoActivoId = turnoActivo?.id
+        val aperturaStr = turnoActivo?.createdAt
+
+        val todasVentas = db.ventaDao().obtenerTodas(localId)
+            // "Mis Ventas" es individual: cada vendedor tiene que ver SOLO lo
+            // suyo, es la única forma de saber cuánto vendió cada uno. Antes
+            // esto no filtraba por usuario y mezclaba las ventas de todo el
+            // local.
+            .filter { it.usuarioId == usuarioId }
+        val ventasTurno = if (turnoActivoId != null) {
+            todasVentas.filter { v ->
+                when {
+                    v.turnoId != null -> v.turnoId == turnoActivoId // venta con turno real estampado: exacto
+                    else -> v.createdAt != null && aperturaStr != null && v.createdAt >= aperturaStr // venta vieja sin turnoId: fallback por hora, igual que antes
+                }
+            }
+        } else {
+            todasVentas
+        }
+
+        val sorted = ventasTurno.sortedByDescending { it.createdAt }
+        val agrupadas = sorted.map { v ->
+            val nombreProducto = v.productoNombre
+                ?: db.productoDao().obtenerPorId(v.productoId.toString(), localId)?.nombre
+                ?: "Producto #${v.productoId}"
             val nombreTarjeta = if (v.tarjetaId != null) {
                 db.tarjetaDao().obtenerPorId(v.tarjetaId, localId)?.nombre
             } else null
@@ -58,7 +101,7 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
             VentaAgrupada(
                 id = v.id,
                 hora = v.createdAt?.substring(11, 16) ?: "--:--",
-                productos = "${v.productoNombre ?: "Producto"} x${v.cantidad.toInt()}",
+                productos = "${nombreProducto} x${v.cantidad.toInt()}",
                 total = v.total,
                 metodo = v.metodo,
                 efectivo = v.efectivo,
@@ -68,13 +111,13 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
         }
 
         ventas = agrupadas
-        totalEfectivo = misVentas.sumOf { it.efectivo }
-        totalTransferencia = misVentas.sumOf { it.transferencia }
+        totalEfectivo = ventasTurno.sumOf { it.efectivo }
+        totalTransferencia = ventasTurno.sumOf { it.transferencia }
     }
 
     LaunchedEffect(androidId, trigger) {
         if (trigger == 0) isLoading = true else isRefreshing = true
-        cargarMisVentas()
+        cargarDesdeRoom()
         isLoading = false
         isRefreshing = false
     }
@@ -124,13 +167,13 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
                         }
                     }
                 }
-
+                
                 if (ventas.isEmpty()) {
                     item {
                         Text("Sin ventas en este turno", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-
+                
                 items(ventas, key = { it.id }) { venta ->
                     NeuCard(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
                         Row(

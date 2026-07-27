@@ -13,7 +13,6 @@ import org.luisito.gestor360.ui.util.mensajeAmigable
 data class MermaUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
-    val savingIds: Set<String> = emptySet(),  // IDs que se están procesando ahora
     val pendientes: List<MermaEntity> = emptyList(),
     val error: String? = null,
     val mensaje: String? = null
@@ -33,15 +32,8 @@ class MermaViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             repository.getPendientes(androidId)
-                .onSuccess { lista ->
-                    _uiState.value = _uiState.value.copy(isLoading = false, pendientes = lista)
-                }
-                .onFailure { e ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = e.mensajeAmigable("No se pudieron cargar las mermas pendientes")
-                    )
-                }
+                .onSuccess { lista -> _uiState.value = _uiState.value.copy(isLoading = false, pendientes = lista) }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.mensajeAmigable("No se pudieron cargar las mermas pendientes")) }
         }
     }
 
@@ -49,10 +41,7 @@ class MermaViewModel(
         if (androidIdActual.isNotBlank()) cargarPendientes(androidIdActual)
     }
 
-    fun solicitar(
-        androidId: String, productoId: String, productoNombre: String,
-        cantidad: Int, motivo: String, onListo: () -> Unit = {}
-    ) {
+    fun solicitar(androidId: String, productoId: String, productoNombre: String, cantidad: Double, motivo: String, onListo: () -> Unit = {}) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             repository.crear(androidId, productoId, productoNombre, cantidad, motivo)
@@ -60,63 +49,24 @@ class MermaViewModel(
                     _uiState.value = _uiState.value.copy(mensaje = "Merma enviada para aprobación del admin")
                     onListo()
                 }
-                .onFailure { e ->
-                    _uiState.value = _uiState.value.copy(
-                        error = e.mensajeAmigable("No se pudo registrar la merma")
-                    )
-                }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo registrar la merma")) }
             _uiState.value = _uiState.value.copy(isSaving = false)
         }
     }
 
     fun aprobar(merma: MermaEntity) {
-        val id = merma.id
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                savingIds = _uiState.value.savingIds + id,
-                error = null
-            )
-            repository.aprobar(androidIdActual, id)
-                .onSuccess {
-                    // Elimina SOLO esta merma de la lista local, sin refrescar todo
-                    _uiState.value = _uiState.value.copy(
-                        pendientes = _uiState.value.pendientes.filter { it.id != id },
-                        mensaje = "Merma aprobada correctamente"
-                    )
-                }
-                .onFailure { e ->
-                    _uiState.value = _uiState.value.copy(
-                        error = e.mensajeAmigable("No se pudo aprobar la merma")
-                    )
-                }
-            _uiState.value = _uiState.value.copy(
-                savingIds = _uiState.value.savingIds - id
-            )
+            _uiState.value = _uiState.value.copy(isSaving = true, error = null)
+            repository.aprobar(androidIdActual, merma.id)
+                .onSuccess { refrescar() }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo aprobar la merma")) }
+            _uiState.value = _uiState.value.copy(isSaving = false)
         }
     }
 
     fun rechazar(merma: MermaEntity) {
-        val id = merma.id
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                savingIds = _uiState.value.savingIds + id,
-                error = null
-            )
-            repository.rechazar(androidIdActual, id)
-                .onSuccess {
-                    _uiState.value = _uiState.value.copy(
-                        pendientes = _uiState.value.pendientes.filter { it.id != id },
-                        mensaje = "Merma rechazada correctamente"
-                    )
-                }
-                .onFailure { e ->
-                    _uiState.value = _uiState.value.copy(
-                        error = e.mensajeAmigable("No se pudo rechazar la merma")
-                    )
-                }
-            _uiState.value = _uiState.value.copy(
-                savingIds = _uiState.value.savingIds - id
-            )
+            repository.rechazar(androidIdActual, merma.id).onSuccess { refrescar() }
         }
     }
 

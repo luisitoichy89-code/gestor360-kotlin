@@ -8,7 +8,6 @@ import kotlinx.serialization.json.put
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.local.AppDatabase
 import org.luisito.gestor360.data.local.entities.AccionPendienteEntity
-import org.luisito.gestor360.data.local.entities.MisVentasCacheEntity
 import org.luisito.gestor360.data.local.entities.toEntity
 import org.luisito.gestor360.data.local.entities.toModel
 import org.luisito.gestor360.data.models.CartItem
@@ -72,42 +71,6 @@ class SaleRepository(
                     created_at = java.time.LocalDateTime.now().toString()
                 )
                 db.ventaDao().insertarUna(ventaLocal.toEntity(localId, sincronizada = false, turnoId = turnoActivoId))
-                    db.misVentasCacheDao().insertar(
-                        MisVentasCacheEntity(
-                            id = id,
-                            localId = localId,
-                            usuarioId = session.getUserId() ?: 0,
-                            productoId = item.productId,
-                            productoNombre = item.nombre,
-                            cantidad = item.cantidad,
-                            total = item.subtotal,
-                            metodo = metodo,
-                            efectivo = efectivoItem,
-                            transferencia = transferenciaItem,
-                            tarjetaId = cliente?.tarjetaId,
-                            turnoId = turnoActivoId,
-                            createdAt = java.time.LocalDateTime.now().toString(),
-                            sincronizada = false
-                        )
-                    )
-                    db.misVentasCacheDao().insertar(
-                        org.luisito.gestor360.data.local.entities.MisVentasCacheEntity(
-                            id = id,
-                            localId = localId,
-                            usuarioId = session.getUserId() ?: 0,
-                            productoId = item.productId,
-                            productoNombre = item.nombre,
-                            cantidad = item.cantidad,
-                            total = item.subtotal,
-                            metodo = metodo,
-                            efectivo = efectivoItem,
-                            transferencia = transferenciaItem,
-                            tarjetaId = cliente?.tarjetaId,
-                            turnoId = turnoActivoId,
-                            createdAt = java.time.LocalDateTime.now().toString(),
-                            sincronizada = false
-                        )
-                    )
 
                 val payload = buildJsonObject {
                     put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id)
@@ -158,11 +121,11 @@ class SaleRepository(
             val ventas = SupabaseClientProvider.client.postgrest
                 .rpc("get_ventas", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
                 .decodeList<Sale>()
-            // Solo marca como sincronizadas las que ya están en Supabase.
-            // No borra nada: las ventas offline pendientes quedan intactas.
-            ventas.forEach { venta ->
-                venta.id?.let { db.ventaDao().marcarSincronizada(it) }
-            }
+            // BLINDAJE: limpiar + insertar ahora corre como una sola transacción
+            // atómica (reemplazarDeLocal en VentaDao) para que un corte de luz o
+            // de red a mitad de camino no deje ventas_cache vacía sin llegar a
+            // reinsertar las ventas ya sincronizadas.
+            db.ventaDao().reemplazarDeLocal(localId, ventas.map { it.toEntity(localId, sincronizada = true) })
             Result.success(ventas)
         } catch (e: Exception) {
             Result.failure(e)

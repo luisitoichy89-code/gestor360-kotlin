@@ -70,7 +70,6 @@ fun ProductosScreen(
     }
 
     LaunchedEffect(androidId) { viewModel.cargar(androidId) }
-
     val categorias = remember(uiState.productos) { uiState.productos.mapNotNull { it.categoria?.takeIf { c -> c.isNotBlank() } }.distinct().sorted() }
     val filtrados = remember(uiState.productos, query, categoriaSeleccionada) { uiState.productos.filter { p -> (query.isBlank() || p.nombre.contains(query, true)) && (categoriaSeleccionada == null || p.categoria == categoriaSeleccionada) } }
     LaunchedEffect(query, categoriaSeleccionada, uiState.productos) { pagina = 0 }
@@ -104,13 +103,13 @@ fun ProductosScreen(
     }
 
     if (mostrarFormulario) ProductoFormDialog(productoEnEdicion, esAdmin, categorias, uiState.productos, uiState.isSaving, { mostrarFormulario = false }) { nombre, precio, stock, ubicacion, categoria ->
-        if (esAdmin) { if (productoEnEdicion == null) viewModel.crear(nombre, precio, stock, ubicacion, categoria) else viewModel.editar(productoEnEdicion!!.id, nombre, precio, stock, ubicacion, categoria) } else aprobacionVM.solicitarProducto(androidId, nombre, precio, stock.toInt())
+        if (esAdmin) { if (productoEnEdicion == null) viewModel.crear(nombre, precio, stock, ubicacion, categoria) else viewModel.editar(productoEnEdicion!!.id, nombre, precio, stock, ubicacion, categoria) } else aprobacionVM.solicitarProducto(androidId, nombre, precio, stock)
         mostrarFormulario = false
     }
 
-    if (mostrarAumentoStock != null) { var c by remember { mutableStateOf("") }; AlertDialog(onDismissRequest = { mostrarAumentoStock = null }, title = { Text("Agregar stock · ${mostrarAumentoStock!!.nombre}") }, text = { OutlinedTextField(c, { c = it.filter { it.isDigit() } }, label = { Text("Cantidad a agregar") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true) }, confirmButton = { TextButton(onClick = { val cant = c.toIntOrNull() ?: 0; if (cant > 0) { aprobacionVM.solicitarAumento(androidId, mostrarAumentoStock!!.id, mostrarAumentoStock!!.nombre, cant); mostrarAumentoStock = null } }) { Text("Enviar a aprobación") } }, dismissButton = { TextButton(onClick = { mostrarAumentoStock = null }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }) }
+    if (mostrarAumentoStock != null) { var c by remember { mutableStateOf("") }; AlertDialog(onDismissRequest = { mostrarAumentoStock = null }, title = { Text("Agregar stock · ${mostrarAumentoStock!!.nombre}") }, text = { OutlinedTextField(c, { c = it.filter { it.isDigit() } }, label = { Text("Cantidad a agregar") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true) }, confirmButton = { TextButton(onClick = { val cant = c.toDoubleOrNull() ?: 0.0; if (cant > 0) { aprobacionVM.solicitarAumento(androidId, mostrarAumentoStock!!.id, mostrarAumentoStock!!.nombre, cant); mostrarAumentoStock = null } }) { Text("Enviar a aprobación") } }, dismissButton = { TextButton(onClick = { mostrarAumentoStock = null }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }) }
 
-    productoParaMerma?.let { p -> MermaDialog(p, esAdmin, if (esAdmin) uiState.isSaving else mermaUiState.isSaving, { productoParaMerma = null }) { cantidad, motivo -> if (esAdmin) { viewModel.registrarMerma(p, cantidad, motivo); productoParaMerma = null } else { mermaViewModel.solicitar(androidId = androidId, productoId = p.id, productoNombre = p.nombre, cantidad = cantidad, motivo = motivo, onListo = { productoParaMerma = null }) } } }
+    productoParaMerma?.let { p -> MermaDialog(p, esAdmin, if (esAdmin) uiState.isSaving else mermaUiState.isSaving, { productoParaMerma = null }) { cantidad, motivo -> if (esAdmin) { viewModel.registrarMerma(p, cantidad); productoParaMerma = null } else { mermaViewModel.solicitar(androidId = androidId, productoId = p.id, productoNombre = p.nombre, cantidad = cantidad, motivo = motivo, onListo = { productoParaMerma = null }) } } }
 
     productoParaDevolucion?.let { p -> DevolucionDialog(p, devolucionUiState.isSaving, { productoParaDevolucion = null }) { cantidad, metodo, motivo -> devolucionViewModel.solicitar(androidId = androidId, productoId = p.id, productoNombre = p.nombre, cantidad = cantidad, metodo = metodo, motivo = motivo, onListo = { productoParaDevolucion = null }) } }
 
@@ -151,47 +150,50 @@ private fun ProductoFormDialog(producto: Product?, esAdmin: Boolean, categoriasE
     val stockInvalido = stockTexto.isBlank() || stock == null || stock < 0
     val valido = !nombreVacio && !nombreDuplicado && !precioInvalido && !stockInvalido
     val sugerencias = remember(categoria, categoriasExistentes) { if (categoria.isBlank()) categoriasExistentes else categoriasExistentes.filter { it.contains(categoria, true) && it != categoria } }
+
     AlertDialog(onDismissRequest = onDismiss, shape = RoundedCornerShape(18.dp), title = { Text(if (producto == null) if (esAdmin) "Nuevo producto" else "Solicitar producto" else "Editar producto", fontWeight = FontWeight.Bold) }, text = { Column {
         OutlinedTextField(nombre, { nombre = it.uppercase() }, label = { Text("Nombre") }, singleLine = true, isError = nombreVacio || nombreDuplicado, supportingText = { when { nombreVacio -> Text("El nombre es obligatorio"); nombreDuplicado -> Text("Ya existe un producto con ese nombre") } }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)); Spacer(Modifier.height(10.dp))
         OutlinedTextField(precioTexto, { precioTexto = it }, label = { Text("Precio (CUP)") }, singleLine = true, isError = precioInvalido, supportingText = { if (precioInvalido) Text("Ingresá un precio mayor que 0") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)); Spacer(Modifier.height(10.dp))
         OutlinedTextField(stockTexto, { stockTexto = it }, label = { Text(if (producto == null) "Stock inicial" else "Stock total") }, singleLine = true, isError = stockInvalido, supportingText = { if (stockInvalido) Text("Ingresá un stock válido (0 o más)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)); Spacer(Modifier.height(10.dp))
-        OutlinedTextField(ubicacion, { ubicacion = it }, label = { Text("Ubicación") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)); Spacer(Modifier.height(10.dp))
-        Box {
-            OutlinedTextField(categoria, { categoria = it; menuCategoriaAbierto = true }, label = { Text("Categoría") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
-            DropdownMenu(expanded = menuCategoriaAbierto && sugerencias.isNotEmpty(), onDismissRequest = { menuCategoriaAbierto = false }) { sugerencias.forEach { s -> DropdownMenuItem(text = { Text(s) }, onClick = { categoria = s; menuCategoriaAbierto = false }) } }
-        }
-    } }, confirmButton = { TextButton(enabled = valido && !isSaving, onClick = { onGuardar(nombre.trim(), precio ?: 0.0, stock ?: 0.0, ubicacion.trim(), categoria.trim()) }) { Text(if (isSaving) "Guardando..." else if (!esAdmin) "Enviar a aprobación" else "Guardar", fontWeight = FontWeight.Bold) } }, dismissButton = { TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } })
-}
+        OutlinedTextField(ubicacion, { ubicacion = it.uppercase() }, label = { Text("Ubicación (ej: A-03-12)") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)); Spacer(Modifier.height(10.dp))
+        ExposedDropdownMenuBox(expanded = menuCategoriaAbierto && sugerencias.isNotEmpty(), onExpandedChange = { menuCategoriaAbierto = it }) { OutlinedTextField(categoria, { categoria = it; menuCategoriaAbierto = true }, label = { Text("Categoría") }, singleLine = true, modifier = Modifier.fillMaxWidth().menuAnchor(), shape = RoundedCornerShape(14.dp)); ExposedDropdownMenu(expanded = menuCategoriaAbierto && sugerencias.isNotEmpty(), onDismissRequest = { menuCategoriaAbierto = false }) { sugerencias.forEach { s -> DropdownMenuItem(text = { Text(s) }, onClick = { categoria = s; menuCategoriaAbierto = false }) } } }
+    } }, confirmButton = { TextButton(enabled = valido && !isSaving, onClick = { onGuardar(nombre.trim(), precio ?: 0.0, stock ?: 0.0, ubicacion.trim(), categoria.trim()) }) { Text(if (isSaving) "Guardando..." else if (!esAdmin) "Enviar a aprobación" else "Guardar", fontWeight = FontWeight.Bold) } }, dismissButton = { TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }) }
 
 @Composable
-private fun MermaDialog(producto: Product, esAdmin: Boolean, isSaving: Boolean, onDismiss: () -> Unit, onConfirmar: (cantidad: Int, motivo: String) -> Unit) {
+private fun MermaDialog(producto: Product, esAdmin: Boolean, isSaving: Boolean, onDismiss: () -> Unit, onConfirmar: (cantidad: Double, motivo: String) -> Unit) {
     var cantidadTexto by remember { mutableStateOf("") }; var motivo by remember { mutableStateOf("") }
-    val cantidad = cantidadTexto.toIntOrNull(); val valido = cantidadTexto.isNotBlank() && cantidad != null && cantidad > 0 && cantidad <= producto.stock
-    AlertDialog(onDismissRequest = onDismiss, shape = RoundedCornerShape(18.dp), title = { Text("Merma · ${producto.nombre}") }, text = { Column {
-        Text("Stock actual: ${producto.stock.toInt()}", style = MaterialTheme.typography.bodyMedium)
+    val cantidad = cantidadTexto.toDoubleOrNull(); val valido = cantidadTexto.isNotBlank() && cantidad != null && cantidad > 0 && cantidad <= producto.stock
+    AlertDialog(onDismissRequest = onDismiss, shape = RoundedCornerShape(18.dp), title = { Text(if (esAdmin) "Registrar merma" else "Proponer merma", fontWeight = FontWeight.Bold) }, text = { Column {
+        NeuCard(shape = RoundedCornerShape(14.dp), containerColor = MaterialTheme.colorScheme.errorContainer) { Column(Modifier.padding(12.dp)) { Text(producto.nombre, fontWeight = FontWeight.Bold); Text("Stock disponible: ${producto.stock.toInt()}", style = MaterialTheme.typography.bodySmall) } }
         Spacer(Modifier.height(12.dp))
+        if (!esAdmin) { Text("Esta solicitud quedará pendiente de aprobación.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.height(8.dp)) }
         OutlinedTextField(cantidadTexto, { cantidadTexto = it }, label = { Text("Cantidad") }, singleLine = true, isError = cantidad != null && cantidad > producto.stock, supportingText = { if (cantidad != null && cantidad > producto.stock) Text("No puede superar el stock") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
-        Spacer(Modifier.height(8.dp))
-        OutlinedTextField(motivo, { motivo = it }, label = { Text("Motivo") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
-    } }, confirmButton = { TextButton(enabled = valido, onClick = { onConfirmar(cantidad ?: 0, motivo.trim()) }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)) { Text(if (isSaving) "Enviando..." else if (esAdmin) "Registrar" else "Enviar a aprobación", fontWeight = FontWeight.Bold) } }, dismissButton = { TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } })
+        Spacer(Modifier.height(10.dp)); OutlinedTextField(motivo, { motivo = it }, label = { Text("Motivo") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
+    } }, confirmButton = { TextButton(enabled = valido, onClick = { onConfirmar(cantidad ?: 0.0, motivo.trim()) }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)) { Text(if (isSaving) "Enviando..." else if (esAdmin) "Registrar" else "Enviar a aprobación", fontWeight = FontWeight.Bold) } }, dismissButton = { TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } })
 }
 
 @Composable
-private fun DevolucionDialog(producto: Product, isSaving: Boolean, onDismiss: () -> Unit, onConfirmar: (cantidad: Int, metodo: String, motivo: String) -> Unit) {
+private fun DevolucionDialog(producto: Product, isSaving: Boolean, onDismiss: () -> Unit, onConfirmar: (cantidad: Double, metodo: String, motivo: String) -> Unit) {
     var cantidadTexto by remember { mutableStateOf("") }
-    var metodo by remember { mutableStateOf("") }
+    var metodo by remember { mutableStateOf("cash") }
     var motivo by remember { mutableStateOf("") }
-    val cantidad = cantidadTexto.toIntOrNull()
-    val valido = cantidad != null && cantidad > 0 && metodo.isNotBlank()
-    AlertDialog(onDismissRequest = onDismiss, shape = RoundedCornerShape(18.dp), title = { Text("Devolución · ${producto.nombre}") }, text = { Column {
+    val cantidad = cantidadTexto.toDoubleOrNull()
+    val valido = cantidad != null && cantidad > 0
+
+    AlertDialog(onDismissRequest = onDismiss, shape = RoundedCornerShape(18.dp), title = { Text("Solicitar devolución", fontWeight = FontWeight.Bold) }, text = { Column {
+        NeuCard(shape = RoundedCornerShape(14.dp), containerColor = MaterialTheme.colorScheme.primaryContainer) { Column(Modifier.padding(12.dp)) { Text(producto.nombre, fontWeight = FontWeight.Bold) } }
+        Spacer(Modifier.height(12.dp))
+        Text("Esta solicitud quedará pendiente de aprobación del admin.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(8.dp))
         OutlinedTextField(cantidadTexto, { cantidadTexto = it }, label = { Text("Cantidad devuelta") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
-        Spacer(Modifier.height(8.dp))
-        Text("Método de pago original", style = MaterialTheme.typography.labelMedium)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = metodo == "efectivo", onClick = { metodo = "efectivo" }, label = { Text("Efectivo") })
-            FilterChip(selected = metodo == "transferencia", onClick = { metodo = "transferencia" }, label = { Text("Transferencia") })
+        Spacer(Modifier.height(10.dp))
+        Text("Método de devolución del dinero", style = MaterialTheme.typography.labelMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+            FilterChip(selected = metodo == "cash", onClick = { metodo = "cash" }, label = { Text("Efectivo") })
+            FilterChip(selected = metodo == "transfer", onClick = { metodo = "transfer" }, label = { Text("Transferencia") })
+            FilterChip(selected = metodo == "mixed", onClick = { metodo = "mixed" }, label = { Text("Mixto") })
         }
-        Spacer(Modifier.height(8.dp))
-        OutlinedTextField(motivo, { motivo = it }, label = { Text("Motivo") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
-    } }, confirmButton = { TextButton(enabled = valido && !isSaving, onClick = { onConfirmar(cantidad ?: 0, metodo, motivo.trim()) }) { Text(if (isSaving) "Enviando..." else "Enviar a aprobación", fontWeight = FontWeight.Bold) } }, dismissButton = { TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } })
+        Spacer(Modifier.height(10.dp))
+        OutlinedTextField(motivo, { motivo = it }, label = { Text("Motivo") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
+    } }, confirmButton = { TextButton(enabled = valido && !isSaving, onClick = { onConfirmar(cantidad ?: 0.0, metodo, motivo.trim()) }) { Text(if (isSaving) "Enviando..." else "Enviar a aprobación", fontWeight = FontWeight.Bold) } }, dismissButton = { TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } })
 }

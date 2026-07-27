@@ -35,7 +35,7 @@ class AprobacionStockViewModel(
         }
     }
 
-    fun solicitarProducto(androidId: String, nombre: String, precio: Double, cantidad: Int) {
+    fun solicitarProducto(androidId: String, nombre: String, precio: Double, cantidad: Double) {
         viewModelScope.launch {
             repository.solicitarProducto(androidId, nombre, precio, cantidad)
                 .onSuccess { _uiState.value = _uiState.value.copy(mensaje = "Producto enviado a aprobación"); cargar(androidId) }
@@ -43,7 +43,7 @@ class AprobacionStockViewModel(
         }
     }
 
-    fun solicitarAumento(androidId: String, productoId: String, productoNombre: String, cantidad: Int) {
+    fun solicitarAumento(androidId: String, productoId: String, productoNombre: String, cantidad: Double) {
         viewModelScope.launch {
             repository.solicitarAumento(androidId, productoId, productoNombre, cantidad)
                 .onSuccess { _uiState.value = _uiState.value.copy(mensaje = "Aumento enviado a aprobación"); cargar(androidId) }
