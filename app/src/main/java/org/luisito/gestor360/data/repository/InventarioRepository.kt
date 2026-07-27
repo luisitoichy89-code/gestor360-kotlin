@@ -41,10 +41,30 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         val cacheado = db.inventarioCacheDao().obtener(localId, fechaStr)
 
         if (!turnoIds.isNullOrEmpty()) {
-            if (forzarRefresh && !NetworkMonitor.hayInternet(context)) {
-                return Result.success(resolverOfflineForzado(cacheado, localId, fecha))
+            // Sin conexión: insistir contra el servidor solo dejaría el error en
+            // pantalla con los datos del turno viejo. Para HOY reconstruimos desde
+            // Room, que ya refleja el turno recién cerrado/abierto (así el cierre
+            // de turno siempre se ve reiniciado, aunque no haya red en ese momento).
+            if (!NetworkMonitor.hayInternet(context)) {
+                return if (fecha == LocalDate.now()) {
+                    val reconstruido = construirDesdeRoom(localId, fecha)
+                    db.inventarioCacheDao().guardar(reconstruido.toEntity(localId, fechaStr))
+                    Result.success(reconstruido)
+                } else {
+                    Result.success(resolverOfflineForzado(cacheado, localId, fecha))
+                }
             }
-            return refrescarDesdeServidor(androidId, fecha, turnoIds)
+
+            val resultado = refrescarDesdeServidor(androidId, fecha, turnoIds)
+            // Había red pero la recarga igual falló (timeout, error puntual del
+            // servidor, etc.): no dejamos en pantalla los datos del turno viejo,
+            // reconstruimos localmente con el turno ya actualizado en Room.
+            if (resultado.isFailure && fecha == LocalDate.now()) {
+                val reconstruido = construirDesdeRoom(localId, fecha)
+                db.inventarioCacheDao().guardar(reconstruido.toEntity(localId, fechaStr))
+                return Result.success(reconstruido)
+            }
+            return resultado
         }
 
         if (cacheado != null && !forzarRefresh) {

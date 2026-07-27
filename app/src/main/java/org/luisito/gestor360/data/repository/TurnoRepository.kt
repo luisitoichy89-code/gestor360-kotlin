@@ -76,6 +76,11 @@ class TurnoRepository(
             TurnoEntity(id = 0, usuarioId = null, apertura = 0.0, cierre = null, diferencia = null, createdAt = java.time.LocalDateTime.now().toString(), localId = localId)
         )
 
+        // El id del turno nuevo con el que se debe recargar el inventario.
+        // Si no hay red o falla la sincronización, se queda en el marcador
+        // local 0 recién insertado (Room ya lo conoce como turno activo).
+        var idTurnoNuevo = 0L
+
         // 3. Intentar sincronizar con servidor (no bloquea)
         if (NetworkMonitor.hayInternet(context)) {
             try {
@@ -84,13 +89,14 @@ class TurnoRepository(
                 // Reemplazar turno id=0 por el real
                 db.turnoDao().reemplazarIdTemporal(0, nuevoTurnoId, localId)
                 refrescarDesdeServidor(androidId)
+                idTurnoNuevo = nuevoTurnoId
             } catch (e: Exception) {
                 // No hay internet o falló el servidor, el turno id=0 queda como marcador
                 // El Worker lo sincronizará cuando haya conexión
             }
         }
 
-        return Result.success(0)
+        return Result.success(idTurnoNuevo)
     }
 
     suspend fun getTurnos(androidId: String): Result<List<Turno>> {
