@@ -289,24 +289,28 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         }
     }
 
-    suspend fun cerrarTurno(androidId: String, turnoId: Long, cierre: Double): Result<Long> {
+    suspend fun cerrarTurno(androidId: String, turnoId: Long, cierre: Double): Result<InventarioDia> {
         if (!NetworkMonitor.hayInternet(context)) {
             return Result.failure(IllegalStateException("Necesitas conexión para cerrar el turno"))
         }
         return try {
+            val localId = localIdActivo()
             val nuevoTurnoId = SupabaseClientProvider.client.postgrest.rpc("cerrar_turno", buildJsonObject {
-                put("p_android_id", androidId); put("p_local_id", localIdActivo()); put("p_turno_id", turnoId); put("p_cierre", cierre)
+                put("p_android_id", androidId); put("p_local_id", localId); put("p_turno_id", turnoId); put("p_cierre", cierre)
             }).decodeAs<Long>()
             db.turnoDao().cerrarYRegistrarNuevo(
                 turnoAnteriorId = turnoId,
                 cierreAnterior = cierre,
-                localId = localIdActivo(),
+                localId = localId,
                 nuevo = org.luisito.gestor360.data.local.entities.TurnoEntity(
-                    id = nuevoTurnoId, localId = localIdActivo(), usuarioId = null, apertura = 0.0,
+                    id = nuevoTurnoId, localId = localId, usuarioId = null, apertura = 0.0,
                     cierre = null, diferencia = null, createdAt = java.time.LocalDateTime.now().toString()
                 )
             )
-            Result.success(nuevoTurnoId)
+            val fechaHoy = LocalDate.now()
+            val diaEnCero = construirDesdeRoom(localId, fechaHoy, turnoIds = listOf(nuevoTurnoId))
+            db.inventarioCacheDao().guardar(diaEnCero.toEntity(localId, fechaHoy.toString()))
+            Result.success(diaEnCero)
         } catch (e: Exception) {
             Result.failure(e)
         }

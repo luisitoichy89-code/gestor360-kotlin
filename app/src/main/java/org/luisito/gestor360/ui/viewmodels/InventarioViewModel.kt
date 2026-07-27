@@ -92,8 +92,8 @@ class InventarioViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             repository.cerrarTurno(androidIdActual, turno.id, cierreContado)
-                .onSuccess { nuevoTurnoId ->
-                    cargarFecha(_uiState.value.fecha, turnoIds = listOf(nuevoTurnoId))
+                .onSuccess { diaEnCero ->
+                    _uiState.value = _uiState.value.copy(dia = diaEnCero)
                 }
                 .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo cerrar el turno")) }
             _uiState.value = _uiState.value.copy(isSaving = false)

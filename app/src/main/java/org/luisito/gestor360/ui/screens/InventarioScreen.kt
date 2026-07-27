@@ -238,7 +238,15 @@ fun InventarioScreen(
         ConfirmarPinDialog(
             accesoViewModel = accesoViewModel,
             onCancelar = { pasoCierreTurno = PasoCierreTurno.NINGUNO },
-            onPinCorrecto = { pasoCierreTurno = PasoCierreTurno.MONTO }
+            onPinCorrecto = {
+                // Segunda frontera de control: se vuelve a revisar justo antes del monto final,
+                // por si algo (merma, solicitud de aumento, producto nuevo o devolución) quedó
+                // pendiente mientras se escribía el PIN, para que no se arrastre al turno siguiente.
+                scope.launch {
+                    val hayPendientes = viewModel.haySolicitudesPendientes()
+                    pasoCierreTurno = if (hayPendientes) PasoCierreTurno.PENDIENTES else PasoCierreTurno.MONTO
+                }
+            }
         )
     }
 
