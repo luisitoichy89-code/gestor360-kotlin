@@ -20,7 +20,14 @@ interface TurnoDao {
     @Query("DELETE FROM turno_cache WHERE cierre IS NOT NULL")
     suspend fun limpiarCerrados()
 
-    /** Limpia todo el caché (se usa al cambiar de local activo). */
+    @Query(
+        """
+        DELETE FROM turno_cache WHERE localId = :localId AND cierre IS NULL
+        AND id != 0 AND (:idConservar IS NULL OR id != :idConservar)
+        """
+    )
+    suspend fun limpiarDuplicadosAbiertos(localId: Long, idConservar: Long?)
+
     @Query("DELETE FROM turno_cache")
     suspend fun limpiarTodos()
 }

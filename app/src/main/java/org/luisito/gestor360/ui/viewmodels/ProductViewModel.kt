@@ -60,7 +60,7 @@ class ProductViewModel(
         }
     }
 
-    fun registrarMerma(producto: Product, cantidad: Int, motivo: String = "Merma") {
+    fun registrarMerma(producto: Product, cantidad: Double, motivo: String = "Merma") {
         viewModelScope.launch {
             repository.registrarMerma(androidIdActual, producto, cantidad, motivo)
                 .onSuccess { refrescar() }
