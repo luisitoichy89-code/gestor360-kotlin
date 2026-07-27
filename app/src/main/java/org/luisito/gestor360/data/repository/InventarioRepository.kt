@@ -38,21 +38,10 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
     ): Result<InventarioDia> {
         val localId = localIdActivo()
         val fechaStr = fecha.toString()
-        // Se busca antes de decidir la rama (antes se pedía más abajo, solo
-        // para la rama sin turnoIds) porque ahora ambas ramas la necesitan
-        // como base para el fallback offline forzado de más abajo.
         val cacheado = db.inventarioCacheDao().obtener(localId, fechaStr)
 
         if (!turnoIds.isNullOrEmpty()) {
             if (forzarRefresh && !NetworkMonitor.hayInternet(context)) {
-                // Antes esta rama iba SIEMPRE directo al servidor sin mirar
-                // conectividad: sin internet, refrescarDesdeServidor tiraba
-                // excepción → Result.failure → InventarioScreen reemplazaba
-                // toda la pantalla por el mensaje de error (ver auditoría,
-                // Causa raíz A). Con turnoIds explícito no hay forma de
-                // honrar ESE filtro puntual sin servidor, así que se degrada
-                // a lo mejor disponible localmente: última copia confiable +
-                // ventas de este dispositivo aún no sincronizadas.
                 return Result.success(resolverOfflineForzado(cacheado, localId, fecha))
             }
             return refrescarDesdeServidor(androidId, fecha, turnoIds)
@@ -69,57 +58,17 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         }
 
         if (NetworkMonitor.hayInternet(context)) {
-            // Con forzarRefresh = true esto ya no es una mejora silenciosa en
-            // segundo plano: se espera la respuesta real del servidor antes
-            // de devolver algo (isLoading queda en true mientras tanto, ver
-            // InventarioViewModel.cargarFecha), así el botón Refrescar
-            // efectivamente actualiza todos los datos de forma visible en
-            // vez de devolver la caché de inmediato y refrescar "a
-            // escondidas" (ver auditoría, Causa raíz C).
             return refrescarDesdeServidor(androidId, fecha)
                 .onSuccess { onActualizadoDesdeServidor?.invoke(it) }
         }
 
-        // Sin conexión y sin nada más que intentar contra el servidor. Antes
-        // esto llamaba siempre construirDesdeRoom() sin importar si ya había
-        // una caché de una sincronización anterior (ver auditoría, Causa
-        // raíz B) — con forzarRefresh = true eso tiraba a la basura toda la
-        // riqueza de la última copia confiable del servidor (nombres/roles
-        // de otros vendedores, turno exacto, aprobaciones) para reconstruir
-        // un InventarioDia más pobre desde cero. resolverOfflineForzado()
-        // usa esa caché como base cuando existe y solo le suma lo que
-        // realmente puede faltarle: las ventas de ESTE dispositivo con
-        // sincronizada = false. Sin ninguna caché previa (dispositivo nuevo,
-        // 100% offline) construirDesdeRoom() sigue siendo el único material
-        // posible, igual que antes.
         return Result.success(resolverOfflineForzado(cacheado, localId, fecha))
     }
 
-    /**
-     * Punto único del fallback offline con forzarRefresh = true: reusa la
-     * última caché del servidor si existe (fusionándole las ventas locales
-     * pendientes de sincronizar) o, en su defecto, construye desde Room.
-     */
     private suspend fun resolverOfflineForzado(cacheado: InventarioCacheEntity?, localId: Long, fecha: LocalDate): InventarioDia =
         if (cacheado != null) fusionarConVentasPendientes(cacheado.toModel(), localId, fecha)
         else construirDesdeRoom(localId, fecha)
 
-    /**
-     * Le suma a un InventarioDia ya calculado (de caché o de servidor) las
-     * ventas hechas en este dispositivo que todavía no confirmaron con
-     * Supabase. VentaEntity.sincronizada ya existía en el proyecto, pero
-     * nada en este archivo lo leía — la caché de inventario se trataba
-     * siempre como una foto fija, nunca como algo a completar con lo
-     * pendiente local.
-     *
-     * El chequeo de duplicados por id importa: InventarioRepository y
-     * SaleRepository sincronizan la tabla ventas_cache por caminos
-     * separados (esta clase nunca llama ventaDao().marcarSincronizada ni
-     * reemplazarDeLocal), así que una venta puede figurar ya en `base`
-     * porque el servidor la confirmó, mientras localmente sigue marcada
-     * sincronizada = false hasta que ese otro camino la alcance. Sin el
-     * filtro, esa venta se contaría dos veces.
-     */
     private suspend fun fusionarConVentasPendientes(base: InventarioDia, localId: Long, fecha: LocalDate): InventarioDia {
         val fechaStr = fecha.toString()
         val idsConocidos = base.ventas.map { it.id }.toSet()
@@ -180,11 +129,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         val eliminadosPorId = db.productoEliminadoCacheDao().obtenerTodos(localId)
             .associate { e -> e.id to ProductoEliminadoInfo(id = e.id, nombre = e.nombre, stock = e.stock, fecha = e.fecha, resuelto_por_nombre = null) }
 
-        // Límite de hora del turno activo (si turno_cache ya lo conoce). Esto
-        // es lo que evita que, 100% sin conexión, las ventas de un turno ya
-        // cerrado se sigan sumando junto con las del turno nuevo: antes acá
-        // solo se filtraba por fecha, así que un cierre de turno no cambiaba
-        // nada en esta reconstrucción offline.
         val turnoActivo = db.turnoDao().obtenerActivo(localId)
         val turnoActivoId = turnoActivo?.id
         val turnoDesde = turnoActivo?.createdAt
@@ -193,9 +137,9 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             .filter { it.createdAt?.startsWith(fechaStr) == true }
             .filter { venta ->
                 when {
-                    turnoActivoId == null -> true // no se conoce el turno activo: no se puede acotar más que por fecha (mismo comportamiento que antes)
-                    venta.turnoId != null -> venta.turnoId == turnoActivoId // venta con turno real estampado: comparación exacta, sin ambigüedad posible
-                    else -> turnoDesde == null || (venta.createdAt != null && venta.createdAt!! >= turnoDesde) // venta vieja sin turnoId (de antes de esta actualización, o sincronizada del servidor): fallback por hora
+                    turnoActivoId == null -> true
+                    venta.turnoId != null -> venta.turnoId == turnoActivoId
+                    else -> turnoDesde == null || (venta.createdAt != null && venta.createdAt!! >= turnoDesde)
                 }
             }
 
@@ -327,32 +271,10 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 })
                 .decodeAs<InventarioDia>()
             if (turnoIds.isNullOrEmpty() || fecha == LocalDate.now()) {
-                // Para "hoy" el caché siempre debe reflejar el turno activo,
-                // sin importar si esta llamada vino con turnoIds explícito
-                // (por ejemplo justo después de cerrar_turno, con el id del
-                // turno nuevo) o sin filtro. Con el fix del RPC get_inventario_dia,
-                // ambos casos representan lo mismo para el día de hoy: el
-                // turno actualmente activo. Guardarlo de inmediato evita que,
-                // tras cerrar turno, el próximo arranque de la app muestre
-                // por un momento la caché del turno ya cerrado mientras espera
-                // el refresh en segundo plano. Para días pasados (calendario)
-                // se mantiene el comportamiento anterior: esa caché es "todo
-                // el día" y no se pisa con una selección parcial de turnos.
                 db.inventarioCacheDao().guardar(resultado.toEntity(localId, fecha.toString()))
             }
 
             if (fecha == LocalDate.now()) {
-                // turno_cache existía en el proyecto (TurnoDao/TurnoEntity)
-                // pero nada lo llenaba nunca, así que obtenerActivo() siempre
-                // devolvía null. Se actualiza acá, cada vez que se confirma
-                // con el servidor cuál es el turno vigente de HOY (el campo
-                // "turno" del RPC es siempre el más reciente, sin importar el
-                // filtro de turnoIds pedido). Esto es lo que le permite a
-                // construirDesdeRoom() saber, incluso sin ninguna conexión ni
-                // caché de inventario, desde qué hora en adelante cuentan las
-                // ventas del turno actual — sin esto, un teléfono 100% offline
-                // (recién instalado, o con el caché de inventario borrado) no
-                // tenía forma de distinguir el turno cerrado del nuevo.
                 resultado.turno?.let { t ->
                     db.turnoDao().limpiarCerrados()
                     db.turnoDao().insertar(
@@ -373,6 +295,18 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
 
     suspend fun cerrarTurno(androidId: String, turnoId: Long, cierre: Double): Result<Long> {
         return TurnoRepository(context).cerrarTurno(androidId, turnoId, cierre)
+    }
+
+    suspend fun haySolicitudesPendientes(): Boolean {
+        val localId = localIdActivo()
+        val aprobacionesPendientes = db.aprobacionStockCacheDao().obtener(localId)
+            ?.toModel()
+            ?.any { it.estado == "pendiente" } ?: false
+        val mermasPendientes = db.mermaDao().obtenerPendientes(localId).isNotEmpty()
+        val devolucionesPendientes = db.devolucionCacheDao().obtener(localId)
+            ?.toModel()
+            ?.any { it.estado == "pendiente" } ?: false
+        return aprobacionesPendientes || mermasPendientes || devolucionesPendientes
     }
 
     suspend fun precargarLocal(androidId: String, localId: Long, fecha: LocalDate = LocalDate.now()): Result<Unit> {

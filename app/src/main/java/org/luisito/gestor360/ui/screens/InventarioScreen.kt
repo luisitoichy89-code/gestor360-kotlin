@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import org.luisito.gestor360.data.models.*
 import org.luisito.gestor360.ui.components.*
 import org.luisito.gestor360.ui.viewmodels.AccesoViewModel
@@ -48,6 +49,8 @@ fun InventarioScreen(
     val esAdmin = rol == "admin"
     var mostrarDatePicker by remember { mutableStateOf(false) }
     var pasoCierreTurno by remember { mutableStateOf(PasoCierreTurno.NINGUNO) }
+    var verificandoPendientes by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     var mostrarMenuExportar by remember { mutableStateOf(false) }
     var paginaVentas by remember { mutableStateOf(0) }
     val formatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
@@ -198,19 +201,29 @@ fun InventarioScreen(
         }
     }
 
-    // Diálogo de confirmación inicial
     if (pasoCierreTurno == PasoCierreTurno.CONFIRMAR) {
         AlertDialog(
             onDismissRequest = { pasoCierreTurno = PasoCierreTurno.NINGUNO },
             shape = RoundedCornerShape(18.dp),
             title = { Text("¿Cerrar turno de todo el local?") },
             text = { Text("Se reiniciará a cero el inventario de todos los vendedores del local. Las ventas del turno cerrado se podrán ver seleccionando la fecha en el calendario.") },
-            confirmButton = { TextButton(onClick = { pasoCierreTurno = PasoCierreTurno.PENDIENTES }) { Text("Continuar", color = MaterialTheme.colorScheme.error) } },
+            confirmButton = {
+                TextButton(
+                    enabled = !verificandoPendientes,
+                    onClick = {
+                        verificandoPendientes = true
+                        scope.launch {
+                            val hayPendientes = viewModel.haySolicitudesPendientes()
+                            verificandoPendientes = false
+                            pasoCierreTurno = if (hayPendientes) PasoCierreTurno.PENDIENTES else PasoCierreTurno.PIN
+                        }
+                    }
+                ) { Text(if (verificandoPendientes) "Revisando..." else "Continuar", color = MaterialTheme.colorScheme.error) }
+            },
             dismissButton = { TextButton(onClick = { pasoCierreTurno = PasoCierreTurno.NINGUNO }) { Text("Cancelar") } }
         )
     }
 
-    // Diálogo de pendientes: bloquea si hay solicitudes sin resolver
     if (pasoCierreTurno == PasoCierreTurno.PENDIENTES) {
         AlertDialog(
             onDismissRequest = { pasoCierreTurno = PasoCierreTurno.NINGUNO },
@@ -221,7 +234,6 @@ fun InventarioScreen(
         )
     }
 
-    // Diálogo de PIN
     if (pasoCierreTurno == PasoCierreTurno.PIN) {
         ConfirmarPinDialog(
             accesoViewModel = accesoViewModel,
@@ -230,7 +242,6 @@ fun InventarioScreen(
         )
     }
 
-    // Diálogo de monto
     if (pasoCierreTurno == PasoCierreTurno.MONTO && dia != null) {
         val efectivoEsperado = dia.totales_ventas.efectivo + dia.totales_ventas.transferencia
         CerrarTurnoDialog(

@@ -84,14 +84,6 @@ class InventarioViewModel(
     }
 
     fun refrescar() {
-        // forzarRefresh = true: antes este botón siempre mandaba false (ver
-        // auditoría, Causa raíz C) y con caché existente + online no
-        // disparaba ninguna espera visible ni traía nada nuevo de forma
-        // perceptible. Con esto, InventarioRepository.getInventarioDia()
-        // espera de verdad la respuesta del servidor (mostrando isLoading
-        // mientras tanto) y, sin conexión, fusiona la última caché con las
-        // ventas locales aún no sincronizadas en vez de fallar o devolver la
-        // caché a secas.
         cargarFecha(_uiState.value.fecha, turnoIds = _uiState.value.turnosSeleccionadosIds.toList(), forzarRefresh = true)
     }
 
@@ -101,24 +93,12 @@ class InventarioViewModel(
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             repository.cerrarTurno(androidIdActual, turno.id, cierreContado)
                 .onSuccess { nuevoTurnoId ->
-                    // NO se fija turnosSeleccionadosIds acá (antes sí, ver
-                    // auditoría Causa raíz A / recomendación 4): ese campo es
-                    // solo para filtrar turnos de días pasados (se renderiza
-                    // gateado por !uiState.esHoy en InventarioScreen, y
-                    // cerrarTurno() solo puede llamarse con la fecha activa
-                    // en hoy). Dejarlo pegado en el turno recién cerrado hacía
-                    // que CUALQUIER refresco posterior de hoy — incluso ya
-                    // offline, mucho después de este cierre — reenviara ese
-                    // filtro y cayera directo a la rama turnoIds de
-                    // getInventarioDia() en vez de usar caché/Room.
-                    // turnoIds acá SÍ se pasa, pero solo como parámetro de
-                    // esta llamada puntual: refrescarDesdeServidor() ya sabe
-                    // tratar "hoy + turnoIds explícito" como equivalente a
-                    // "el turno activo" (ver InventarioRepository).
                     cargarFecha(_uiState.value.fecha, turnoIds = listOf(nuevoTurnoId))
                 }
                 .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo cerrar el turno")) }
             _uiState.value = _uiState.value.copy(isSaving = false)
         }
     }
+
+    suspend fun haySolicitudesPendientes(): Boolean = repository.haySolicitudesPendientes()
 }
