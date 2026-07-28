@@ -316,19 +316,19 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             val dbHelper = db.openHelper.writableDatabase
             dbHelper.execSQL(
                 "UPDATE turno_cache SET cierre = ?, diferencia = ? WHERE id = ? AND localId = ?",
-                arrayOf(cierre, 0.0, turnoId, localId)
+                arrayOf<Any>(cierre, 0.0, turnoId, localId)
             )
             dbHelper.execSQL(
                 "INSERT INTO turno_cache (id, localId, apertura, cierre, diferencia, createdAt) VALUES (?, ?, 0.0, NULL, NULL, ?)",
-                arrayOf(nuevoTurnoId, localId, now)
+                arrayOf<Any>(nuevoTurnoId, localId, now)
             )
             dbHelper.execSQL(
                 "DELETE FROM ventas_cache WHERE localId = ?",
-                arrayOf(localId)
+                arrayOf<Any>(localId)
             )
             dbHelper.execSQL(
                 "DELETE FROM inventario_cache WHERE localId = ?",
-                arrayOf(localId)
+                arrayOf<Any>(localId)
             )
 
             // Construir inventario en cero
