@@ -83,14 +83,6 @@ class InventarioViewModel(
         }
     }
 
-    // A diferencia de una carga normal (que puede mostrar el caché al
-    // instante y actualizar en segundo plano), acá el usuario pidió
-    // explícitamente actualizar: se fuerza una vuelta real a buscar datos
-    // frescos (online: al servidor; offline: caché de la última
-    // sincronización correcta + lo que este dispositivo sumó localmente).
-    // Antes esto llamaba a cargarFecha() igual que una carga normal, con
-    // forzarRefresh siempre en false, así que el botón de refrescar no hacía
-    // nada distinto de una recarga común.
     fun refrescar() {
         cargarFecha(_uiState.value.fecha, turnoIds = _uiState.value.turnosSeleccionadosIds.toList(), forzarRefresh = true)
     }
@@ -100,9 +92,8 @@ class InventarioViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             repository.cerrarTurno(androidIdActual, turno.id, cierreContado)
-                .onSuccess { nuevoTurnoId ->
-                    _uiState.value = _uiState.value.copy(turnosSeleccionadosIds = setOf(nuevoTurnoId))
-                    cargarFecha(_uiState.value.fecha, turnoIds = listOf(nuevoTurnoId))
+                .onSuccess { diaEnCero ->
+                    _uiState.value = _uiState.value.copy(dia = diaEnCero)
                 }
                 .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo cerrar el turno")) }
             _uiState.value = _uiState.value.copy(isSaving = false)

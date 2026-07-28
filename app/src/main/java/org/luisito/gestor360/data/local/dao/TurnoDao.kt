@@ -14,6 +14,12 @@ interface TurnoDao {
     @Query("UPDATE turno_cache SET cierre = :cierre, diferencia = :diferencia WHERE id = :id AND localId = :localId")
     suspend fun cerrar(id: Long, cierre: Double, diferencia: Double, localId: Long)
 
+    @Transaction
+    suspend fun cerrarYRegistrarNuevo(turnoAnteriorId: Long, cierreAnterior: Double, localId: Long, nuevo: TurnoEntity) {
+        cerrar(turnoAnteriorId, cierreAnterior, 0.0, localId)
+        insertar(nuevo)
+    }
+
     @Query("UPDATE turno_cache SET id = :idReal WHERE id = :idTemporal AND localId = :localId")
     suspend fun reemplazarIdTemporal(idTemporal: Long, idReal: Long, localId: Long)
 
