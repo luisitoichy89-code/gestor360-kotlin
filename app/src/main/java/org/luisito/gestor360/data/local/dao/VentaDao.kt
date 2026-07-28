@@ -14,6 +14,15 @@ interface VentaDao {
     @Query("SELECT * FROM ventas_cache WHERE localId = :localId ORDER BY createdAt DESC")
     suspend fun obtenerTodas(localId: Long): List<VentaEntity>
 
+    @Query(
+        """
+        SELECT * FROM ventas_cache
+        WHERE localId = :localId AND turnoId = :turnoId AND usuarioId = :usuarioId
+        ORDER BY createdAt DESC
+        """
+    )
+    suspend fun obtenerPorTurnoYUsuario(localId: Long, turnoId: Long, usuarioId: Long): List<VentaEntity>
+
     @Query("UPDATE ventas_cache SET sincronizada = 1 WHERE id = :id")
     suspend fun marcarSincronizada(id: String)
 
