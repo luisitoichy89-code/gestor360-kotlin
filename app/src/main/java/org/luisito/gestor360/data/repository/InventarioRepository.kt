@@ -310,15 +310,28 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             val nuevoTurnoId = SupabaseClientProvider.client.postgrest.rpc("cerrar_turno", buildJsonObject {
                 put("p_android_id", androidId); put("p_local_id", localId); put("p_turno_id", turnoId); put("p_cierre", cierre)
             }).decodeAs<Long>()
-            db.turnoDao().cerrarYRegistrarNuevo(
-                turnoAnteriorId = turnoId,
-                cierreAnterior = cierre,
-                localId = localId,
-                nuevo = TurnoEntity(
-                    id = nuevoTurnoId, localId = localId, usuarioId = null, apertura = 0.0,
-                    cierre = null, diferencia = null, createdAt = java.time.LocalDateTime.now().toString()
-                )
+
+            // OPCION 3: SQL directo sin Room
+            val now = java.time.LocalDateTime.now().toString()
+            val dbHelper = db.openHelper.writableDatabase
+            dbHelper.execSQL(
+                "UPDATE turno_cache SET cierre = ?, diferencia = ? WHERE id = ? AND localId = ?",
+                arrayOf(cierre, 0.0, turnoId, localId)
             )
+            dbHelper.execSQL(
+                "INSERT INTO turno_cache (id, localId, apertura, cierre, diferencia, createdAt) VALUES (?, ?, 0.0, NULL, NULL, ?)",
+                arrayOf(nuevoTurnoId, localId, now)
+            )
+            dbHelper.execSQL(
+                "DELETE FROM ventas_cache WHERE localId = ?",
+                arrayOf(localId)
+            )
+            dbHelper.execSQL(
+                "DELETE FROM inventario_cache WHERE localId = ?",
+                arrayOf(localId)
+            )
+
+            // Construir inventario en cero
             val fechaHoy = LocalDate.now()
             val diaEnCero = construirDesdeRoom(localId, fechaHoy)
             db.inventarioCacheDao().guardar(diaEnCero.toEntity(localId, fechaHoy.toString()))
