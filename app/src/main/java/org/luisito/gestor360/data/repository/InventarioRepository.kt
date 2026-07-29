@@ -113,6 +113,12 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                     else -> turnoDesde == null || (venta.createdAt != null && venta.createdAt!! >= turnoDesde)
                 }
             }
+            .filter { venta ->
+                when (session.getRol()) {
+                    "seller" -> venta.usuarioId == session.getUserId()
+                    else -> true
+                }
+            }
 
         val ventasInfo = ventasHoy.map { it.toVentaInfo(localId, nombreUsuarioLocal, eliminadosPorId) }
 
@@ -244,6 +250,12 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                     turnoActivoId == null -> true
                     venta.turnoId != null -> venta.turnoId == turnoActivoId
                     else -> turnoDesde == null || (venta.createdAt != null && venta.createdAt!! >= turnoDesde)
+                }
+            }
+            .filter { venta ->
+                when (session.getRol()) {
+                    "seller" -> venta.usuarioId == session.getUserId()
+                    else -> true
                 }
             }
             .filter { it.id !in idsEnCache }
