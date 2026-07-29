@@ -5,7 +5,7 @@ import org.luisito.gestor360.data.local.entities.TurnoEntity
 
 @Dao
 interface TurnoDao {
-    @Query("SELECT * FROM turno_cache WHERE cierre IS NULL AND localId = :localId LIMIT 1")
+    @Query("SELECT * FROM turno_cache WHERE cierre IS NULL AND localId = :localId ORDER BY id DESC LIMIT 1")
     suspend fun obtenerActivo(localId: Long): TurnoEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -26,13 +26,8 @@ interface TurnoDao {
     @Query("DELETE FROM turno_cache WHERE cierre IS NOT NULL")
     suspend fun limpiarCerrados()
 
-    @Query(
-        """
-        DELETE FROM turno_cache WHERE localId = :localId AND cierre IS NULL
-        AND id != 0 AND (:idConservar IS NULL OR id != :idConservar)
-        """
-    )
-    suspend fun limpiarDuplicadosAbiertos(localId: Long, idConservar: Long?)
+    @Query("DELETE FROM turno_cache WHERE cierre IS NULL AND localId = :localId AND id != :idFresco")
+    suspend fun limpiarDuplicadosAbiertos(localId: Long, idFresco: Long?)
 
     @Query("DELETE FROM turno_cache")
     suspend fun limpiarTodos()
