@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import org.luisito.gestor360.utils.SessionManager
 import org.luisito.gestor360.data.models.*
 import org.luisito.gestor360.ui.components.*
 import org.luisito.gestor360.ui.viewmodels.AccesoViewModel
@@ -30,6 +31,7 @@ import org.luisito.gestor360.ui.theme.NeuCard
 private const val VENTAS_POR_PAGINA = 20
 
 private data class TarjetaResumen(val nombre: String, val numero: String, val titular: String?, val total: Double)
+private data class VendedorFiltro(val nombre: String, val turnoIds: List<Long>)
 
 private enum class PasoCierreTurno { NINGUNO, CONFIRMAR, PIN, MONTO }
 
@@ -37,7 +39,6 @@ private enum class PasoCierreTurno { NINGUNO, CONFIRMAR, PIN, MONTO }
 @Composable
 fun InventarioScreen(
     androidId: String,
-    rol: String,
     onBack: (() -> Unit)? = null,
     onVerVentasRealizadas: () -> Unit = {},
     viewModel: InventarioViewModel = viewModel(),
@@ -45,14 +46,15 @@ fun InventarioScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    val esAdmin = rol == "admin"
+    val sessionManager = remember { SessionManager(context) }
+    val esAdmin = sessionManager.getRol() == "admin"
     var mostrarDatePicker by remember { mutableStateOf(false) }
     var pasoCierreTurno by remember { mutableStateOf(PasoCierreTurno.NINGUNO) }
     var mostrarMenuExportar by remember { mutableStateOf(false) }
     var paginaVentas by remember { mutableStateOf(0) }
     val formatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
 
-    LaunchedEffect(androidId) { viewModel.cargar(androidId, esAdmin) }
+    LaunchedEffect(androidId) { viewModel.cargar(androidId) }
     LaunchedEffect(uiState.dia) { paginaVentas = 0 }
 
     val dia = uiState.dia
@@ -126,9 +128,15 @@ fun InventarioScreen(
                     val dia = dia!!
                     LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
 
-                        if (esAdmin && !uiState.esHoy && uiState.turnosDelDia.isNotEmpty()) {
-                            item { SeccionTitulo("Turnos de este día", Icons.Default.Groups) }
+                        if (esAdmin && uiState.turnosDelDia.isNotEmpty()) {
+                            item { SeccionTitulo("Vendedores", Icons.Default.Groups) }
                             item {
+                                val vendedores = remember(uiState.turnosDelDia) {
+                                    uiState.turnosDelDia
+                                        .groupBy { it.usuario_nombre ?: "Sin nombre" }
+                                        .map { (nombre, turnos) -> VendedorFiltro(nombre, turnos.map { it.id }) }
+                                        .sortedBy { it.nombre }
+                                }
                                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     val todosSeleccionados = uiState.turnosSeleccionadosIds.size == uiState.turnosDelDia.size
                                     FilterChip(
@@ -137,13 +145,12 @@ fun InventarioScreen(
                                         label = { Text("Todos") },
                                         leadingIcon = if (todosSeleccionados) { { Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp)) } } else null
                                     )
-                                    uiState.turnosDelDia.forEach { turno ->
-                                        val seleccionado = turno.id in uiState.turnosSeleccionadosIds
-                                        val etiqueta = turno.usuario_nombre?.let { "$it · ${turno.created_at?.substring(11, 16) ?: ""}" } ?: "Turno ${turno.created_at?.take(16) ?: turno.id}"
+                                    vendedores.forEach { vendedor ->
+                                        val seleccionado = vendedor.turnoIds.isNotEmpty() && uiState.turnosSeleccionadosIds.containsAll(vendedor.turnoIds)
                                         FilterChip(
                                             selected = seleccionado,
-                                            onClick = { viewModel.toggleTurnoSeleccionado(turno.id) },
-                                            label = { Text(etiqueta) },
+                                            onClick = { viewModel.toggleVendedorSeleccionado(vendedor.turnoIds) },
+                                            label = { Text(vendedor.nombre) },
                                             leadingIcon = if (seleccionado) { { Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp)) } } else null
                                         )
                                     }

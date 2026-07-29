@@ -275,7 +275,7 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
                         is PantallaInterna.Ventas -> VentasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }, onIrACarrito = { pantalla = PantallaInterna.Carrito })
                         is PantallaInterna.Carrito -> CarritoScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Ventas }, onVentaConfirmada = { pantalla = PantallaInterna.Ventas })
                         is PantallaInterna.Productos -> ProductosScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home })
-                        is PantallaInterna.Inventario -> InventarioScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home }, onVerVentasRealizadas = { pantalla = PantallaInterna.MisVentas })
+                        is PantallaInterna.Inventario -> InventarioScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }, onVerVentasRealizadas = { pantalla = PantallaInterna.MisVentas })
                         is PantallaInterna.Tarjetas -> if (esAdmin) TarjetasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
                         is PantallaInterna.Aprobaciones -> if (esAdmin) AprobacionesScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
                         is PantallaInterna.Devolucion -> if (esAdmin) DevolucionScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }

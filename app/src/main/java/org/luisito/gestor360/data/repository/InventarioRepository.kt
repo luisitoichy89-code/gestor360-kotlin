@@ -33,6 +33,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         fecha: LocalDate,
         forzarRefresh: Boolean = false,
         turnoIds: List<Long>? = null,
+        vendedorId: Long? = null,
         onActualizadoDesdeServidor: (suspend (InventarioDia) -> Unit)? = null
     ): Result<InventarioDia> {
         val localId = localIdActivo()
