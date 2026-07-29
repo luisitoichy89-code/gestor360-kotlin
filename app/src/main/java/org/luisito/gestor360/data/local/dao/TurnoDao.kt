@@ -23,8 +23,11 @@ interface TurnoDao {
     @Query("UPDATE turno_cache SET id = :idReal WHERE id = :idTemporal AND localId = :localId")
     suspend fun reemplazarIdTemporal(idTemporal: Long, idReal: Long, localId: Long)
 
-    @Query("DELETE FROM turno_cache WHERE cierre IS NOT NULL")
-    suspend fun limpiarCerrados()
+    @Query("DELETE FROM turno_cache WHERE cierre IS NOT NULL AND localId = :localId")
+    suspend fun limpiarCerrados(localId: Long)
+
+    @Query("SELECT cierre FROM turno_cache WHERE id = :id AND localId = :localId LIMIT 1")
+    suspend fun cierreDe(id: Long, localId: Long): Double?
 
     @Query("DELETE FROM turno_cache WHERE cierre IS NULL AND localId = :localId AND id != :idFresco")
     suspend fun limpiarDuplicadosAbiertos(localId: Long, idFresco: Long?)

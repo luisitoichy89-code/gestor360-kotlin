@@ -297,14 +297,19 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
 
             if (fecha == LocalDate.now()) {
                 resultado.turno?.let { t ->
-                    db.turnoDao().limpiarCerrados()
-                    db.turnoDao().insertar(
-                        TurnoEntity(
-                            id = t.id, usuarioId = null, apertura = t.apertura,
-                            cierre = t.cierre, diferencia = t.diferencia,
-                            createdAt = t.created_at, localId = localId
+                    val yaCerradoLocalmente = t.cierre == null && db.turnoDao().cierreDe(t.id, localId) != null
+                    if (!yaCerradoLocalmente) {
+                        db.turnoDao().limpiarCerrados(localId)
+                        db.turnoDao().insertar(
+                            TurnoEntity(
+                                id = t.id, usuarioId = null, apertura = t.apertura,
+                                cierre = t.cierre, diferencia = t.diferencia,
+                                createdAt = t.created_at, localId = localId
+                            )
                         )
-                    )
+                    } else {
+                        Log.w("InventarioRepo", "Ignorando turno ${t.id} del server: ya cerrado localmente, RPC desactualizada")
+                    }
                 }
             }
             Result.success(resultado)
@@ -324,7 +329,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 put("p_android_id", androidId); put("p_local_id", localId); put("p_turno_id", turnoId); put("p_cierre", cierre)
             }).decodeAs<Long>()
 
-            // OPCION 3: SQL directo sin Room
             val now = java.time.LocalDateTime.now().toString()
             val dbHelper = db.openHelper.writableDatabase
             dbHelper.execSQL(
@@ -344,7 +348,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 arrayOf<Any>(localId)
             )
 
-            // Construir inventario en cero
             val fechaHoy = LocalDate.now()
             val diaEnCero = construirDesdeRoom(localId, fechaHoy)
             db.inventarioCacheDao().guardar(diaEnCero.toEntity(localId, fechaHoy.toString()))
