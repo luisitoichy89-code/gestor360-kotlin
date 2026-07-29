@@ -19,12 +19,6 @@ import org.luisito.gestor360.data.repository.TurnoRepository
 import org.luisito.gestor360.data.repository.VerificacionEnCalienteResultado
 import org.luisito.gestor360.utils.SessionManager
 
-/**
- * `licenciaBloqueada`: true cuando NO se sincronizó nada porque, antes de
- * tocar la cola, se detectó que el usuario ya no está activo o la licencia
- * ya no es válida (ver SyncManager.sincronizar()). Útil si SyncWorker quiere
- * avisar de esto en una notificación en vez de tratarlo como un fallo de red más.
- */
 data class SyncResultado(val exitosas: Int, val fallidas: Int, val error: String? = null, val licenciaBloqueada: Boolean = false)
 
 class SyncManager(private val context: Context) {
@@ -38,33 +32,10 @@ class SyncManager(private val context: Context) {
     private val aprobacionStockRepository = AprobacionStockRepository(context)
 
     companion object {
-        /** Tamaño de cada lote — evita mandar todo junto y saturar conexiones lentas o RPCs con timeout. */
         private const val TAMANO_LOTE = 50
-
-        /**
-         * Tope total de acciones a procesar en UNA sola invocación de sincronizar(),
-         * aunque queden más lotes pendientes. Sin esto, tras semanas/meses offline con
-         * miles de acciones en cola, un solo ciclo intentaría vaciarla entera y podría
-         * chocar contra el límite de ejecución que Android le da a un CoroutineWorker
-         * en background. El resto se procesa en el siguiente ciclo (periódico cada
-         * 15 min, o el próximo "sincronizar ahora" — ver SyncWorker).
-         */
         private const val MAX_ACCIONES_POR_SESION = 500
-
-        /** Pausa entre lotes para no ráfaguear la conexión ni a Supabase. */
         private const val PAUSA_ENTRE_LOTES_MS = 300L
-
-        /**
-         * Intentos fallidos antes de dejar de reintentar SOLA una acción y marcarla
-         * error_permanente, para que no ocupe un lugar en la cola para siempre por
-         * una sola acción rota (ej. referencia a un producto ya eliminado).
-         * OJO: "registrar_venta" y "anular_venta" quedan afuera de este límite a
-         * propósito — son dinero, y preferimos que reintenten para siempre a que se
-         * abandonen solas. Ver TIPOS_NUNCA_ABANDONAR abajo.
-         */
         private const val MAX_INTENTOS = 8
-
-        /** Tipos que NUNCA pasan a error_permanente sin importar cuántas veces fallen. */
         private val TIPOS_NUNCA_ABANDONAR = setOf("registrar_venta", "anular_venta")
     }
 
@@ -72,20 +43,8 @@ class SyncManager(private val context: Context) {
         if (androidId.isBlank()) return SyncResultado(0, 0, "Sin sesión activa")
         if (!NetworkMonitor.hayInternet(context)) return SyncResultado(0, 0, "Sin conexión")
 
-        // Antes de procesar CUALQUIER acción pendiente: si el usuario fue
-        // desactivado o la licencia dejó de ser válida mientras el
-        // dispositivo estuvo offline, no sincronizamos nada de lo pendiente
-        // (evita colar ventas falsas de un empleado ya echado) y marcamos la
-        // sesión como revocada para que la app vuelva a pedir verificación
-        // de dispositivo la próxima vez. Si no hay respuesta clara del
-        // servidor (sin internet real, error, timeout) esto NO bloquea —
-        // ver VerificacionEnCalienteResultado.NoVerificado.
         when (val estado = deviceVerificationRepository.verificarEnCaliente(androidId)) {
             is VerificacionEnCalienteResultado.Bloqueado -> {
-                // Igual que en MainActivity: NO se limpia la caché de licencia acá.
-                // Bloqueamos ESTE sync y forzamos que la sesión se cierre (si la
-                // app está abierta, ver SessionManager.sesionRevocada), pero la
-                // caché que permite el acceso offline queda intacta.
                 session.marcarSesionRevocada()
                 return SyncResultado(0, 0, estado.mensaje, licenciaBloqueada = true)
             }
@@ -100,10 +59,6 @@ class SyncManager(private val context: Context) {
         val eliminadosProductos = mutableListOf<Pair<String, Long>>()
         val eliminadosTarjetas = mutableListOf<Pair<String, Long>>()
 
-        // Loop real por lotes: procesa de a TAMANO_LOTE (50) hasta vaciar la cola,
-        // hasta llegar al tope de sesión, o hasta que se corte la conexión a mitad
-        // de la puesta al día. Cada lote se trae de la base con LIMIT (no se carga
-        // toda la cola pendiente en memoria de una vez).
         while (procesadasEnSesion < MAX_ACCIONES_POR_SESION) {
             if (!NetworkMonitor.hayInternet(context)) break
 
@@ -130,8 +85,6 @@ class SyncManager(private val context: Context) {
                             if (pid != null && lid != null) eliminadosProductos.add(pid to lid)
                         }
                         "registrar_venta" -> {
-                            // Confirma la venta local para que limpiarSincronizadas()
-                            // (al final del ciclo) sí la pueda purgar de ventas_cache.
                             val ventaId = payload["p_id"]?.toString()?.trim('"')
                             if (ventaId != null) db.ventaDao().marcarSincronizada(ventaId)
                         }
@@ -176,18 +129,10 @@ class SyncManager(private val context: Context) {
             }
 
             procesadasEnSesion += lote.size
-            if (lote.size < TAMANO_LOTE) break // ya no quedan más pendientes, no hace falta pausar
+            if (lote.size < TAMANO_LOTE) break
             kotlinx.coroutines.delay(PAUSA_ENTRE_LOTES_MS)
         }
 
-        // BLINDAJE: aplicar los eliminados de este ciclo es un lote de borrados
-        // sueltos (uno por producto/tarjeta eliminados). Antes, si el proceso se
-        // cortaba a mitad de este bucle, algunos quedaban borrados localmente y
-        // otros no, un estado intermedio que dependía del próximo refresh para
-        // corregirse. db.withTransaction agrupa todo el lote en una sola
-        // transacción SQLite: o se borran todos, o no se borra ninguno (y quedan
-        // igual de correctos, porque el próximo refresh los va a traer o excluir
-        // según corresponda). No cambia qué se borra, solo lo hace atómico.
         db.withTransaction {
             for ((pid, lid) in eliminadosProductos) db.productoDao().eliminar(pid, lid)
             for ((tid, lid) in eliminadosTarjetas) db.tarjetaDao().eliminar(tid, lid)
@@ -202,19 +147,10 @@ class SyncManager(private val context: Context) {
             aprobacionStockRepository.refrescarDesdeServidor(androidId)
         }
 
-        // BLINDAJE: estas tres limpiezas ("acciones_pendientes" ya sincronizadas,
-        // ventas ya sincronizadas, turnos ya cerrados) se hacían como tres
-        // llamadas sueltas. Si el proceso se cortaba entre medio, el estado
-        // quedaba parcialmente limpio pero nunca inconsistente para lo que ya
-        // se sincronizó de verdad (esas filas solo estaban marcadas, no
-        // desaparecían de golpe) — igual, agruparlas en una sola transacción
-        // evita cualquier corte a mitad de camino entre las tres queries y dejar
-        // la cola en un estado ambiguo del que no hay forma de saber qué se
-        // alcanzó a limpiar y qué no.
         db.withTransaction {
             db.accionPendienteDao().limpiarSincronizadas()
             db.ventaDao().limpiarSincronizadas(localIdActivo!!)
-            db.turnoDao().limpiarCerrados()
+            db.turnoDao().limpiarCerrados(localIdActivo!!)
         }
         return SyncResultado(exitosas, fallidas, null)
     }
