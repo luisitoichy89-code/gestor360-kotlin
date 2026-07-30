@@ -47,7 +47,8 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
 
         if (cacheado != null && !forzarRefresh) {
             if (NetworkMonitor.hayInternet(context)) {
-                CoroutineScope(Dispatchers.IO).launch {
+                refreshJob?.cancel()
+                refreshJob = CoroutineScope(Dispatchers.IO).launch {
                     refrescarDesdeServidor(androidId, fecha)
                         .onSuccess { servidor -> onActualizadoDesdeServidor?.invoke(servidor) }
                 }
@@ -291,25 +292,38 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                     }
                 })
                 .decodeAs<InventarioDia>()
+
+            if (fecha == LocalDate.now() && turnoIds.isNullOrEmpty()) {
+                val turnoServidor = resultado.turno
+                val yaCerradoLocalmente = turnoServidor != null &&
+                    turnoServidor.cierre == null &&
+                    db.turnoDao().cierreDe(turnoServidor.id, localId) != null
+
+                if (yaCerradoLocalmente) {
+                    Log.w("InventarioRepo", "Ignorando respuesta del server para turno ${turnoServidor?.id}: ya cerrado localmente, RPC desactualizada")
+                    val cacheActual = db.inventarioCacheDao().obtener(localId, fecha.toString())
+                    return if (cacheActual != null) {
+                        Result.success(cacheActual.toModel())
+                    } else {
+                        Result.failure(IllegalStateException("Turno cerrado localmente pero sin caché disponible todavía"))
+                    }
+                }
+            }
+
             if (turnoIds.isNullOrEmpty() || fecha == LocalDate.now()) {
                 db.inventarioCacheDao().guardar(resultado.toEntity(localId, fecha.toString()))
             }
 
             if (fecha == LocalDate.now()) {
                 resultado.turno?.let { t ->
-                    val yaCerradoLocalmente = t.cierre == null && db.turnoDao().cierreDe(t.id, localId) != null
-                    if (!yaCerradoLocalmente) {
-                        db.turnoDao().limpiarCerrados(localId)
-                        db.turnoDao().insertar(
-                            TurnoEntity(
-                                id = t.id, usuarioId = null, apertura = t.apertura,
-                                cierre = t.cierre, diferencia = t.diferencia,
-                                createdAt = t.created_at, localId = localId
-                            )
+                    db.turnoDao().limpiarCerrados(localId)
+                    db.turnoDao().insertar(
+                        TurnoEntity(
+                            id = t.id, usuarioId = null, apertura = t.apertura,
+                            cierre = t.cierre, diferencia = t.diferencia,
+                            createdAt = t.created_at, localId = localId
                         )
-                    } else {
-                        Log.w("InventarioRepo", "Ignorando turno ${t.id} del server: ya cerrado localmente, RPC desactualizada")
-                    }
+                    )
                 }
             }
             Result.success(resultado)
@@ -323,6 +337,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         if (!NetworkMonitor.hayInternet(context)) {
             return Result.failure(IllegalStateException("Necesitas conexión para cerrar el turno"))
         }
+        refreshJob?.cancel()
         return try {
             val localId = localIdActivo()
             val nuevoTurnoId = SupabaseClientProvider.client.postgrest.rpc("cerrar_turno", buildJsonObject {
@@ -336,7 +351,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 arrayOf<Any>(cierre, 0.0, turnoId, localId)
             )
             dbHelper.execSQL(
-                "INSERT INTO turno_cache (id, localId, apertura, cierre, diferencia, createdAt) VALUES (?, ?, 0.0, NULL, NULL, ?)",
+                "INSERT OR REPLACE INTO turno_cache (id, localId, apertura, cierre, diferencia, createdAt) VALUES (?, ?, 0.0, NULL, NULL, ?)",
                 arrayOf<Any>(nuevoTurnoId, localId, now)
             )
             dbHelper.execSQL(
