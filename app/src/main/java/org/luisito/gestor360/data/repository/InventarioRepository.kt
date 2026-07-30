@@ -302,11 +302,12 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 if (yaCerradoLocalmente) {
                     Log.w("InventarioRepo", "Ignorando respuesta del server para turno ${turnoServidor?.id}: ya cerrado localmente, RPC desactualizada")
                     val cacheActual = db.inventarioCacheDao().obtener(localId, fecha.toString())
-                    return if (cacheActual != null) {
-                        Result.success(cacheActual.toModel())
-                    } else {
-                        Result.failure(IllegalStateException("Turno cerrado localmente pero sin caché disponible todavía"))
+                    if (cacheActual != null) {
+                        return Result.success(cacheActual.toModel())
                     }
+                    val diaVacio = construirDesdeRoom(localId, fecha)
+                    db.inventarioCacheDao().guardar(diaVacio.toEntity(localId, fecha.toString()))
+                    return Result.success(diaVacio)
                 }
             }
 
