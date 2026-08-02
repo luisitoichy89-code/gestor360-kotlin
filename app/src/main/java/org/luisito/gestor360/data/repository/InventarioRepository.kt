@@ -37,13 +37,12 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         onActualizadoDesdeServidor: (suspend (InventarioDia) -> Unit)? = null
     ): Result<InventarioDia> {
         val localId = localIdActivo()
-        val fechaStr = fecha.toString()
 
         if (!turnoIds.isNullOrEmpty()) {
             return refrescarDesdeServidor(androidId, fecha, turnoIds)
         }
 
-        val cacheado = db.inventarioCacheDao().obtener(localId, fechaStr)
+        val cacheado = db.inventarioCacheDao().obtener(localId, fecha.toString())
 
         if (cacheado != null && !forzarRefresh) {
             if (NetworkMonitor.hayInternet(context)) {
@@ -284,31 +283,24 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
     suspend fun refrescarDesdeServidor(androidId: String, fecha: LocalDate, turnoIds: List<Long>? = null): Result<InventarioDia> {
         val localId = localIdActivo()
         return try {
-            val resultado = SupabaseClientProvider.client.postgrest
-                .rpc("get_inventario_dia", buildJsonObject {
-                    put("p_android_id", androidId); put("p_local_id", localId); put("p_fecha", fecha.toString())
-                    if (!turnoIds.isNullOrEmpty()) {
-                        put("p_turno_ids", buildJsonArray { turnoIds.forEach { add(JsonPrimitive(it)) } })
-                    }
-                })
-                .decodeAs<InventarioDia>()
-
-            if (fecha == LocalDate.now() && turnoIds.isNullOrEmpty()) {
-                val turnoServidor = resultado.turno
-                val yaCerradoLocalmente = turnoServidor != null &&
-                    turnoServidor.cierre == null &&
-                    db.turnoDao().cierreDe(turnoServidor.id, localId) != null
-
-                if (yaCerradoLocalmente) {
-                    Log.w("InventarioRepo", "Ignorando respuesta del server para turno ${turnoServidor?.id}: ya cerrado localmente, RPC desactualizada")
-                    val cacheActual = db.inventarioCacheDao().obtener(localId, fecha.toString())
-                    if (cacheActual != null) {
-                        return Result.success(cacheActual.toModel())
-                    }
-                    val diaVacio = construirDesdeRoom(localId, fecha)
-                    db.inventarioCacheDao().guardar(diaVacio.toEntity(localId, fecha.toString()))
-                    return Result.success(diaVacio)
-                }
+            // Si es hoy y no hay filtro de turnos, usar get_inventario_turno (basado en turno, no en fecha)
+            val resultado = if (fecha == LocalDate.now() && turnoIds.isNullOrEmpty()) {
+                val turnoActivoId = db.turnoDao().obtenerActivo(localId)?.id
+                    ?: return Result.failure(IllegalStateException("No hay turno abierto"))
+                SupabaseClientProvider.client.postgrest
+                    .rpc("get_inventario_turno", buildJsonObject {
+                        put("p_android_id", androidId); put("p_local_id", localId); put("p_turno_id", turnoActivoId)
+                    })
+                    .decodeAs<InventarioDia>()
+            } else {
+                SupabaseClientProvider.client.postgrest
+                    .rpc("get_inventario_dia", buildJsonObject {
+                        put("p_android_id", androidId); put("p_local_id", localId); put("p_fecha", fecha.toString())
+                        if (!turnoIds.isNullOrEmpty()) {
+                            put("p_turno_ids", buildJsonArray { turnoIds.forEach { add(JsonPrimitive(it)) } })
+                        }
+                    })
+                    .decodeAs<InventarioDia>()
             }
 
             if (turnoIds.isNullOrEmpty() || fecha == LocalDate.now()) {
