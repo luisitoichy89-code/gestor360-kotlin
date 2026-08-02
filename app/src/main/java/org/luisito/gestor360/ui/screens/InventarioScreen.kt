@@ -27,13 +27,15 @@ import org.luisito.gestor360.utils.ReporteExporter
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import org.luisito.gestor360.ui.theme.NeuCard
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 
 private const val VENTAS_POR_PAGINA = 20
 
 private data class TarjetaResumen(val nombre: String, val numero: String, val titular: String?, val total: Double)
 private data class VendedorFiltro(val nombre: String, val turnoIds: List<Long>)
 
-private enum class PasoCierreTurno { NINGUNO, CONFIRMAR, PIN, MONTO }
+private enum class PasoCierreTurno { NINGUNO, CONFIRMAR, PIN, MONTO, PROCESANDO }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -230,7 +232,21 @@ fun InventarioScreen(
             (turno?.apertura ?: 0.0) + dia.totalEsperadoEnCaja(),
             uiState.isSaving,
             { pasoCierreTurno = PasoCierreTurno.NINGUNO }
-        ) { viewModel.cerrarTurno(it); pasoCierreTurno = PasoCierreTurno.NINGUNO }
+        ) {
+            pasoCierreTurno = PasoCierreTurno.PROCESANDO
+            viewModel.cerrarTurno(it)
+        }
+    }
+
+    if (pasoCierreTurno == PasoCierreTurno.PROCESANDO) {
+        CerrandoTurnoDialog()
+        LaunchedEffect(Unit) {
+            withTimeoutOrNull(15_000) {
+                snapshotFlow { uiState.isSaving }.first { it }
+                snapshotFlow { uiState.isSaving }.first { !it }
+            }
+            pasoCierreTurno = PasoCierreTurno.NINGUNO
+        }
     }
 
     if (mostrarDatePicker) {
@@ -443,10 +459,38 @@ private fun CerrarTurnoDialog(efectivoEsperado: Double, isSaving: Boolean, onDis
             TextButton(
                 enabled = (monto.toDoubleOrNull() ?: -1.0) >= 0 && !isSaving,
                 onClick = { onCerrar(monto.toDoubleOrNull() ?: 0.0) }
-            ) { Text(if (isSaving) "Cerrando..." else "Cerrar") }
+            ) { Text("Cerrar") }
         },
         dismissButton = { TextButton(onClick = onDismiss, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }
     )
+}
+
+@Composable
+private fun CerrandoTurnoDialog() {
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = {},
+        properties = androidx.compose.ui.window.DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false
+        )
+    ) {
+        NeuCard(shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth(0.82f)) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 36.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.primary,
+                    strokeWidth = 4.dp,
+                    modifier = Modifier.size(56.dp)
+                )
+                Spacer(Modifier.height(20.dp))
+                Text("Cerrando turno...", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                Spacer(Modifier.height(6.dp))
+                Text("No cierres la app ni cambies de pantalla", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            }
+        }
+    }
 }
 
 @Composable
