@@ -8,6 +8,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonElement
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.local.AppDatabase
 import org.luisito.gestor360.data.local.entities.VentaEntity
@@ -361,6 +362,50 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             db.inventarioCacheDao().guardar(diaEnCero.toEntity(localId, fechaHoy.toString()))
             Result.success(diaEnCero)
         } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Paso 1 de la verificación de cierre: cuenta las órdenes pendientes en la
+     * cola de sincronización jerárquica del local activo.
+     *
+     * Asume que get_sync_queue_jerarquico devuelve un arreglo con una fila por
+     * cada orden pendiente (como el resto de los RPC de este archivo que
+     * devuelven listas, p. ej. get_turnos_dia). Si en realidad devuelve un
+     * conteo ya agregado o un objeto anidado por tabla, ajustar el decode de
+     * abajo (por ejemplo decodeAs<JsonObject>() y leer el campo que corresponda)
+     * en vez de contar el tamaño de la lista.
+     */
+    suspend fun contarColaPendiente(androidId: String): Result<Int> {
+        if (!NetworkMonitor.hayInternet(context)) {
+            return Result.failure(IllegalStateException("Necesitas conexión para revisar la cola de sincronización"))
+        }
+        return try {
+            val localId = localIdActivo()
+            val cola = SupabaseClientProvider.client.postgrest
+                .rpc("get_sync_queue_jerarquico", buildJsonObject {
+                    put("p_android_id", androidId); put("p_local_id", localId)
+                })
+                .decodeList<JsonElement>()
+            Result.success(cola.size)
+        } catch (e: Exception) {
+            Log.e("InventarioRepo", "Error consultando cola de sincronización", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Paso 2 de la verificación de cierre: cuenta, sobre los datos locales en
+     * Room, las ventas del local activo que quedaron sin turno_id asignado.
+     */
+    suspend fun contarVentasSinTurno(): Result<Int> {
+        return try {
+            val localId = localIdActivo()
+            val sinTurno = db.ventaDao().obtenerTodas(localId).count { it.turnoId == null }
+            Result.success(sinTurno)
+        } catch (e: Exception) {
+            Log.e("InventarioRepo", "Error analizando ventas sin turno", e)
             Result.failure(e)
         }
     }

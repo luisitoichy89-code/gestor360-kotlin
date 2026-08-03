@@ -22,10 +22,21 @@ data class InventarioUiState(
     val dia: InventarioDia? = null,
     val error: String? = null,
     val turnosDelDia: List<TurnoInfo> = emptyList(),
-    val turnosSeleccionadosIds: Set<Long> = emptySet()
+    val turnosSeleccionadosIds: Set<Long> = emptySet(),
+    val pasosCierre: List<CierrePaso> = emptyList()
 ) {
     val esHoy: Boolean get() = fecha == LocalDate.now()
 }
+
+enum class EstadoPaso { PENDIENTE, EN_PROGRESO, COMPLETADO, ERROR }
+
+data class CierrePaso(
+    val nombre: String,
+    val estado: EstadoPaso = EstadoPaso.PENDIENTE,
+    val detalle: String? = null
+)
+
+private val NOMBRES_PASOS_CIERRE = listOf("Revisando órdenes de cola", "Analizando ventas")
 
 class InventarioViewModel(
     private val repository: InventarioRepository = InventarioRepository()
@@ -110,5 +121,39 @@ class InventarioViewModel(
                 .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo cerrar el turno")) }
             _uiState.value = _uiState.value.copy(isSaving = false)
         }
+    }
+
+    fun verificarCierre() {
+        if (androidIdActual.isBlank()) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                pasosCierre = NOMBRES_PASOS_CIERRE.map { CierrePaso(nombre = it) }
+            )
+
+            actualizarPaso(0, EstadoPaso.EN_PROGRESO)
+            repository.contarColaPendiente(androidIdActual)
+                .onSuccess { pendientes ->
+                    actualizarPaso(0, EstadoPaso.COMPLETADO, detalle = "$pendientes pendiente${if (pendientes == 1) "" else "s"}")
+                }
+                .onFailure { e ->
+                    actualizarPaso(0, EstadoPaso.ERROR, detalle = e.mensajeAmigable("No se pudo revisar la cola"))
+                }
+
+            actualizarPaso(1, EstadoPaso.EN_PROGRESO)
+            repository.contarVentasSinTurno()
+                .onSuccess { huerfanas ->
+                    actualizarPaso(1, EstadoPaso.COMPLETADO, detalle = "$huerfanas venta${if (huerfanas == 1) "" else "s"} sin turno")
+                }
+                .onFailure { e ->
+                    actualizarPaso(1, EstadoPaso.ERROR, detalle = e.mensajeAmigable("No se pudo analizar las ventas"))
+                }
+        }
+    }
+
+    private fun actualizarPaso(indice: Int, estado: EstadoPaso, detalle: String? = null) {
+        val actuales = _uiState.value.pasosCierre.toMutableList()
+        if (indice !in actuales.indices) return
+        actuales[indice] = actuales[indice].copy(estado = estado, detalle = detalle)
+        _uiState.value = _uiState.value.copy(pasosCierre = actuales)
     }
 }
