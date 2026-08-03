@@ -284,10 +284,22 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
     suspend fun refrescarDesdeServidor(androidId: String, fecha: LocalDate, turnoIds: List<Long>? = null): Result<InventarioDia> {
         val localId = localIdActivo()
         return try {
-            // Si es hoy y no hay filtro de turnos, usar get_inventario_turno (basado en turno, no en fecha)
-            val resultado = if (fecha == LocalDate.now() && turnoIds.isNullOrEmpty()) {
-                val turnoActivoId = db.turnoDao().obtenerActivo(localId)?.id
-                    ?: return Result.failure(IllegalStateException("No hay turno abierto"))
+            // Si es hoy, no hay filtro de turnos, y Room ya conoce el turno activo local,
+            // usamos get_inventario_turno (basado en turno, no en fecha). Si no hay turno
+            // activo en Room (local nuevo que nunca abrió turno, o turno abierto desde otro
+            // dispositivo que aún no sincronizó), NO fallamos: caemos a get_inventario_dia
+            // por fecha, igual que cuando se pide un día pasado. Así el inventario sale
+            // vacío cuando de verdad no hay nada (antes tiraba "No hay turno abierto" y se
+            // veía como error rojo), y con datos reales si el turno sí existe en el servidor.
+            val turnoActivoId = if (fecha == LocalDate.now() && turnoIds.isNullOrEmpty()) {
+                db.turnoDao().obtenerActivo(localId)?.id
+            } else null
+
+            if (fecha == LocalDate.now() && turnoIds.isNullOrEmpty() && turnoActivoId == null) {
+                Log.w("InventarioRepo", "Sin turno activo local para hoy (local=$localId); uso get_inventario_dia como respaldo")
+            }
+
+            val resultado = if (turnoActivoId != null) {
                 SupabaseClientProvider.client.postgrest
                     .rpc("get_inventario_turno", buildJsonObject {
                         put("p_android_id", androidId); put("p_local_id", localId); put("p_turno_id", turnoActivoId)
