@@ -184,10 +184,11 @@ class InventarioViewModel(
                 actualizarPaso(2, EstadoPaso.ERROR, detalle = "No hay turno cargado")
             } else {
                 try {
+                    val localId = session.getLocalId() ?: 0L
                     val respuesta = httpClient.post(URL_VALIDAR_STOCK) {
                         header("Authorization", "Bearer ${BuildConfig.SUPABASE_KEY}")
                         contentType(ContentType.Application.Json)
-                        setBody(Json.encodeToString(ValidarStockRequest(localId = turno.localId, turnoId = turno.id)))
+                        setBody(Json.encodeToString(ValidarStockRequest(localId = localId, turnoId = turno.id)))
                     }
                     if (respuesta.status.isSuccess()) {
                         actualizarPaso(2, EstadoPaso.COMPLETADO, detalle = respuesta.bodyAsText())
