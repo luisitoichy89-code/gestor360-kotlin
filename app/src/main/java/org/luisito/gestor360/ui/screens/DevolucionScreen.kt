@@ -17,7 +17,6 @@ import org.luisito.gestor360.data.models.Devolucion
 import org.luisito.gestor360.ui.components.*
 import org.luisito.gestor360.ui.viewmodels.DevolucionViewModel
 
-/** Pantalla de admin: aprobar/rechazar devoluciones que los vendedores solicitaron. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DevolucionScreen(androidId: String, onBack: (() -> Unit)? = null, viewModel: DevolucionViewModel = viewModel()) {
@@ -37,7 +36,7 @@ fun DevolucionScreen(androidId: String, onBack: (() -> Unit)? = null, viewModel:
                 uiState.pendientes.isEmpty() -> EstadoVacio("No hay devoluciones pendientes")
                 else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(uiState.pendientes, key = { it.id }) { dev ->
-                        DevolucionCard(dev, uiState.isSaving, onAprobar = { devolucionAAprobar = dev }, onRechazar = { viewModel.rechazar(dev.id) })
+                        DevolucionCard(dev, uiState.isSaving, onAprobar = { devolucionAAprobar = dev })
                     }
                     item { Spacer(Modifier.height(72.dp)) }
                 }
@@ -58,7 +57,7 @@ fun DevolucionScreen(androidId: String, onBack: (() -> Unit)? = null, viewModel:
 }
 
 @Composable
-private fun DevolucionCard(dev: Devolucion, isSaving: Boolean, onAprobar: () -> Unit, onRechazar: () -> Unit) {
+private fun DevolucionCard(dev: Devolucion, isSaving: Boolean, onAprobar: () -> Unit) {
     ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -73,10 +72,7 @@ private fun DevolucionCard(dev: Devolucion, isSaving: Boolean, onAprobar: () -> 
             Text("Solicitado por: ${dev.solicitado_por_nombre ?: "Usuario #${dev.solicitado_por}"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (!dev.created_at.isNullOrBlank()) Text(dev.created_at.take(16).replace("T", " "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onAprobar, enabled = !isSaving, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) { Icon(Icons.Default.Check, null); Spacer(Modifier.width(6.dp)); Text("Aprobar") }
-                OutlinedButton(onClick = onRechazar, enabled = !isSaving, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Icon(Icons.Default.Close, null); Spacer(Modifier.width(6.dp)); Text("Rechazar") }
-            }
+            Button(onClick = onAprobar, enabled = !isSaving, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) { Icon(Icons.Default.Check, null); Spacer(Modifier.width(6.dp)); Text("Aprobar") }
         }
     }
 }

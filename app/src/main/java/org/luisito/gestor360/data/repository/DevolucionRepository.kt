@@ -81,6 +81,21 @@ class DevolucionRepository(private val context: Context = AppContextHolder.conte
         return Result.success(Unit)
     }
 
+    suspend fun registrarDirecta(androidId: String, productoId: String, cantidad: Double, destino: String, motivo: String): Result<Unit> {
+        val localId = localIdActivo()
+        val id = UUID.randomUUID().toString()
+        val accionId = UUID.randomUUID().toString()
+
+        val payload = buildJsonObject {
+            put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id)
+            put("p_producto_id", productoId); put("p_cantidad", cantidad)
+            put("p_destino", destino); put("p_motivo", motivo)
+            put("p_accion_id", accionId)
+        }
+        encolarYSincronizar("registrar_devolucion_directa", payload)
+        return Result.success(Unit)
+    }
+
     suspend fun resolver(androidId: String, id: String, estado: String, destino: String? = null): Result<Unit> {
         if (!NetworkMonitor.hayInternet(context)) {
             return Result.failure(IllegalStateException("Necesitas conexión para resolver una devolución"))

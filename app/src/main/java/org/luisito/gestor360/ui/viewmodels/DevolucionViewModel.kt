@@ -47,6 +47,20 @@ class DevolucionViewModel(
         }
     }
 
+    fun registrarDirecta(androidId: String, productoId: String, productoNombre: String, cantidad: Double, destino: String, motivo: String, onListo: () -> Unit = {}) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isSaving = true, error = null)
+            repository.registrarDirecta(androidId, productoId, cantidad, destino, motivo)
+                .onSuccess {
+                    val msg = if (destino == "stock") "\"$productoNombre\" devuelto a stock" else "\"$productoNombre\" registrado como merma"
+                    _uiState.value = _uiState.value.copy(mensaje = msg)
+                    onListo()
+                }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo registrar la devolución")) }
+            _uiState.value = _uiState.value.copy(isSaving = false)
+        }
+    }
+
     fun aprobar(id: String, destino: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
