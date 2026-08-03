@@ -2,10 +2,24 @@ package org.luisito.gestor360.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.android.Android
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import org.luisito.gestor360.BuildConfig
 import org.luisito.gestor360.data.models.InventarioDia
 import org.luisito.gestor360.data.models.TurnoInfo
 import org.luisito.gestor360.utils.SessionManager
@@ -36,7 +50,15 @@ data class CierrePaso(
     val detalle: String? = null
 )
 
-private val NOMBRES_PASOS_CIERRE = listOf("Revisando órdenes de cola", "Analizando ventas")
+private val NOMBRES_PASOS_CIERRE = listOf("Revisando órdenes de cola", "Analizando ventas", "Verificando stock")
+
+private const val URL_VALIDAR_STOCK = "https://duspeazziwxptcrignju.supabase.co/functions/v1/validar-punto5"
+
+@Serializable
+private data class ValidarStockRequest(
+    @SerialName("local_id") val localId: Long,
+    @SerialName("turno_id") val turnoId: Long
+)
 
 class InventarioViewModel(
     private val repository: InventarioRepository = InventarioRepository()
@@ -46,6 +68,7 @@ class InventarioViewModel(
     private var androidIdActual = ""
     private val session = SessionManager(AppContextHolder.context)
     private val esAdminActual: Boolean get() = session.getRol() == "admin"
+    private val httpClient by lazy { HttpClient(Android) }
 
     fun cargar(androidId: String) {
         androidIdActual = androidId
@@ -147,6 +170,27 @@ class InventarioViewModel(
                 .onFailure { e ->
                     actualizarPaso(1, EstadoPaso.ERROR, detalle = e.mensajeAmigable("No se pudo analizar las ventas"))
                 }
+
+            actualizarPaso(2, EstadoPaso.EN_PROGRESO)
+            val turno = _uiState.value.dia?.turno
+            if (turno == null) {
+                actualizarPaso(2, EstadoPaso.ERROR, detalle = "No hay turno cargado")
+            } else {
+                try {
+                    val respuesta = httpClient.post(URL_VALIDAR_STOCK) {
+                        header("Authorization", "Bearer ${BuildConfig.SUPABASE_KEY}")
+                        contentType(ContentType.Application.Json)
+                        setBody(Json.encodeToString(ValidarStockRequest(localId = turno.localId, turnoId = turno.id)))
+                    }
+                    if (respuesta.status.isSuccess()) {
+                        actualizarPaso(2, EstadoPaso.COMPLETADO, detalle = respuesta.bodyAsText())
+                    } else {
+                        actualizarPaso(2, EstadoPaso.ERROR, detalle = "Error ${respuesta.status.value}")
+                    }
+                } catch (e: Exception) {
+                    actualizarPaso(2, EstadoPaso.ERROR, detalle = e.mensajeAmigable("No se pudo verificar el stock"))
+                }
+            }
         }
     }
 
@@ -155,5 +199,10 @@ class InventarioViewModel(
         if (indice !in actuales.indices) return
         actuales[indice] = actuales[indice].copy(estado = estado, detalle = detalle)
         _uiState.value = _uiState.value.copy(pasosCierre = actuales)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        httpClient.close()
     }
 }
