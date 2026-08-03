@@ -22,6 +22,8 @@ import org.luisito.gestor360.data.models.*
 import org.luisito.gestor360.ui.components.*
 import org.luisito.gestor360.ui.viewmodels.AccesoViewModel
 import org.luisito.gestor360.ui.viewmodels.InventarioViewModel
+import org.luisito.gestor360.ui.viewmodels.CierrePaso
+import org.luisito.gestor360.ui.viewmodels.EstadoPaso
 import org.luisito.gestor360.utils.CsvExporter
 import org.luisito.gestor360.utils.ReporteExporter
 import java.time.LocalDate
@@ -35,7 +37,7 @@ private const val VENTAS_POR_PAGINA = 20
 private data class TarjetaResumen(val nombre: String, val numero: String, val titular: String?, val total: Double)
 private data class VendedorFiltro(val nombre: String, val turnoIds: List<Long>)
 
-private enum class PasoCierreTurno { NINGUNO, CONFIRMAR, PIN, MONTO, PROCESANDO }
+private enum class PasoCierreTurno { NINGUNO, CONFIRMAR, PIN, VERIFICANDO, MONTO, PROCESANDO }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -222,8 +224,31 @@ fun InventarioScreen(
         ConfirmarPinDialog(
             accesoViewModel = accesoViewModel,
             onCancelar = { pasoCierreTurno = PasoCierreTurno.NINGUNO },
-            onPinCorrecto = { pasoCierreTurno = PasoCierreTurno.MONTO }
+            onPinCorrecto = {
+                pasoCierreTurno = PasoCierreTurno.VERIFICANDO
+                viewModel.verificarCierre()
+            }
         )
+    }
+
+    if (pasoCierreTurno == PasoCierreTurno.VERIFICANDO) {
+        val pasos = uiState.pasosCierre
+        val verificacionTerminada = pasos.isNotEmpty() && pasos.all { it.estado == EstadoPaso.COMPLETADO || it.estado == EstadoPaso.ERROR }
+        val hayErrores = pasos.any { it.estado == EstadoPaso.ERROR }
+
+        VerificandoCierreDialog(
+            pasos = pasos,
+            terminado = verificacionTerminada,
+            hayErrores = hayErrores,
+            onCancelar = { pasoCierreTurno = PasoCierreTurno.NINGUNO },
+            onReintentar = { viewModel.verificarCierre() }
+        )
+
+        LaunchedEffect(verificacionTerminada, hayErrores) {
+            if (verificacionTerminada && !hayErrores) {
+                pasoCierreTurno = PasoCierreTurno.MONTO
+            }
+        }
     }
 
     if (pasoCierreTurno == PasoCierreTurno.MONTO && dia != null) {
@@ -488,6 +513,87 @@ private fun CerrandoTurnoDialog() {
                 Text("Cerrando turno...", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(Modifier.height(6.dp))
                 Text("No cierres la app ni cambies de pantalla", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            }
+        }
+    }
+}
+
+@Composable
+private fun VerificandoCierreDialog(
+    pasos: List<CierrePaso>,
+    terminado: Boolean,
+    hayErrores: Boolean,
+    onCancelar: () -> Unit,
+    onReintentar: () -> Unit
+) {
+    val errores = pasos.count { it.estado == EstadoPaso.ERROR }
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = {},
+        properties = androidx.compose.ui.window.DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false
+        )
+    ) {
+        NeuCard(shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth(0.9f)) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 28.dp)) {
+                Text("Verificando cierre de turno", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    if (terminado && hayErrores) "Encontramos algunos problemas" else "No cierres la app ni cambies de pantalla",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(20.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    pasos.forEach { paso -> FilaPasoCierre(paso) }
+                }
+                if (terminado && hayErrores) {
+                    Spacer(Modifier.height(20.dp))
+                    NeuCard(shape = RoundedCornerShape(14.dp), containerColor = MaterialTheme.colorScheme.errorContainer) {
+                        Text(
+                            "$errores de ${pasos.size} verificaciones no se pudieron completar. Revisa la conexión e inténtalo de nuevo.",
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = onCancelar, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") }
+                        Spacer(Modifier.width(4.dp))
+                        TextButton(onClick = onReintentar) { Text("Reintentar") }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FilaPasoCierre(paso: CierrePaso) {
+    Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier.size(22.dp), contentAlignment = Alignment.Center) {
+            when (paso.estado) {
+                EstadoPaso.COMPLETADO -> Icon(Icons.Default.CheckCircle, null, tint = androidx.compose.ui.graphics.Color(0xFF43A047), modifier = Modifier.size(22.dp))
+                EstadoPaso.ERROR -> Icon(Icons.Default.Cancel, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(22.dp))
+                EstadoPaso.EN_PROGRESO -> CircularProgressIndicator(strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                EstadoPaso.PENDIENTE -> Icon(Icons.Default.RadioButtonUnchecked, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), modifier = Modifier.size(22.dp))
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text(
+                paso.nombre,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = if (paso.estado == EstadoPaso.PENDIENTE) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+            )
+            paso.detalle?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (paso.estado == EstadoPaso.ERROR) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

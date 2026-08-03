@@ -50,7 +50,14 @@ data class CierrePaso(
     val detalle: String? = null
 )
 
-private val NOMBRES_PASOS_CIERRE = listOf("Revisando órdenes de cola", "Analizando ventas", "Verificando stock")
+private val NOMBRES_PASOS_CIERRE = listOf(
+    "Revisando órdenes de cola",
+    "Analizando ventas",
+    "Verificando stock",
+    "Revisando devoluciones",
+    "Revisando mermas",
+    "Verificando aprobaciones pendientes"
+)
 
 private const val URL_VALIDAR_STOCK = "https://duspeazziwxptcrignju.supabase.co/functions/v1/validar-punto5"
 
@@ -191,6 +198,33 @@ class InventarioViewModel(
                     actualizarPaso(2, EstadoPaso.ERROR, detalle = e.mensajeAmigable("No se pudo verificar el stock"))
                 }
             }
+
+            actualizarPaso(3, EstadoPaso.EN_PROGRESO)
+            repository.contarDevolucionesPendientes()
+                .onSuccess { pendientes ->
+                    actualizarPaso(3, EstadoPaso.COMPLETADO, detalle = "$pendientes devolución${if (pendientes == 1) "" else "es"} pendiente${if (pendientes == 1) "" else "s"}")
+                }
+                .onFailure { e ->
+                    actualizarPaso(3, EstadoPaso.ERROR, detalle = e.mensajeAmigable("No se pudieron revisar las devoluciones"))
+                }
+
+            actualizarPaso(4, EstadoPaso.EN_PROGRESO)
+            repository.contarMermasPendientes()
+                .onSuccess { pendientes ->
+                    actualizarPaso(4, EstadoPaso.COMPLETADO, detalle = "$pendientes merma${if (pendientes == 1) "" else "s"} pendiente${if (pendientes == 1) "" else "s"}")
+                }
+                .onFailure { e ->
+                    actualizarPaso(4, EstadoPaso.ERROR, detalle = e.mensajeAmigable("No se pudieron revisar las mermas"))
+                }
+
+            actualizarPaso(5, EstadoPaso.EN_PROGRESO)
+            repository.haySolicitudesPendientes()
+                .onSuccess { pendientes ->
+                    actualizarPaso(5, EstadoPaso.COMPLETADO, detalle = "$pendientes aprobación${if (pendientes == 1) "" else "es"} pendiente${if (pendientes == 1) "" else "s"}")
+                }
+                .onFailure { e ->
+                    actualizarPaso(5, EstadoPaso.ERROR, detalle = e.mensajeAmigable("No se pudieron revisar las aprobaciones"))
+                }
         }
     }
 

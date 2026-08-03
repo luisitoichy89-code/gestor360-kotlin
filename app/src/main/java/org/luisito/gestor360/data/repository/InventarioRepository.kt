@@ -410,6 +410,64 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         }
     }
 
+    /**
+     * Paso 4 de la verificación de cierre: cuenta, sobre los datos locales en
+     * Room, las devoluciones del local activo que aún no están resueltas
+     * (mismo criterio que EstadoDevolucionChip en InventarioScreen: estado
+     * distinto de aprobada_stock / aprobada_merma / rechazada).
+     */
+    suspend fun contarDevolucionesPendientes(): Result<Int> {
+        return try {
+            val localId = localIdActivo()
+            val resueltos = setOf("aprobada_stock", "aprobada_merma", "rechazada")
+            val pendientes = db.devolucionCacheDao().obtener(localId)
+                ?.toModel()
+                ?.count { it.estado !in resueltos } ?: 0
+            Result.success(pendientes)
+        } catch (e: Exception) {
+            Log.e("InventarioRepo", "Error analizando devoluciones pendientes", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Paso 5 de la verificación de cierre: cuenta las mermas pendientes del
+     * local activo. mermaDao().obtenerPendientes ya filtra por estado.
+     */
+    suspend fun contarMermasPendientes(): Result<Int> {
+        return try {
+            val localId = localIdActivo()
+            Result.success(db.mermaDao().obtenerPendientes(localId).size)
+        } catch (e: Exception) {
+            Log.e("InventarioRepo", "Error analizando mermas pendientes", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Paso 6 de la verificación de cierre: cuenta las solicitudes de
+     * aprobación pendientes (aumentos de stock / productos solicitados) del
+     * local activo.
+     *
+     * ASUME que aprobacionStockCacheDao().obtener(localId) sigue el mismo
+     * patrón que devolucionCacheDao (entidad cacheada nullable + toModel()
+     * con campo `estado`, valor "pendiente" para no resueltas). Si el DAO
+     * real expone otra forma (p. ej. un obtenerPendientes() directo como
+     * mermaDao, o nombres de campo distintos), ajusta solo este bloque.
+     */
+    suspend fun haySolicitudesPendientes(): Result<Int> {
+        return try {
+            val localId = localIdActivo()
+            val pendientes = db.aprobacionStockCacheDao().obtener(localId)
+                ?.toModel()
+                ?.count { it.estado == "pendiente" } ?: 0
+            Result.success(pendientes)
+        } catch (e: Exception) {
+            Log.e("InventarioRepo", "Error analizando aprobaciones pendientes", e)
+            Result.failure(e)
+        }
+    }
+
     suspend fun precargarLocal(androidId: String, localId: Long, fecha: LocalDate = LocalDate.now()): Result<Unit> {
         return try {
             val resultado = SupabaseClientProvider.client.postgrest
