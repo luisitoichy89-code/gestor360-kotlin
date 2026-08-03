@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class InventarioDia(
-    val fecha: String,
+    val fecha: String? = null,
     val solo_lectura: Boolean = false,
     val turno: TurnoInfo? = null,
     val productos_nuevos: List<ProductoInfo> = emptyList(),
