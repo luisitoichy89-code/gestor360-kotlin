@@ -1,5 +1,6 @@
 package org.luisito.gestor360.data.models
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
