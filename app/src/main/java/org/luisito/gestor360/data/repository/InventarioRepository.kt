@@ -284,13 +284,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
     suspend fun refrescarDesdeServidor(androidId: String, fecha: LocalDate, turnoIds: List<Long>? = null): Result<InventarioDia> {
         val localId = localIdActivo()
         return try {
-            // Si es hoy, no hay filtro de turnos, y Room ya conoce el turno activo local,
-            // usamos get_inventario_turno (basado en turno, no en fecha). Si no hay turno
-            // activo en Room (local nuevo que nunca abrió turno, o turno abierto desde otro
-            // dispositivo que aún no sincronizó), NO fallamos: caemos a get_inventario_dia
-            // por fecha, igual que cuando se pide un día pasado. Así el inventario sale
-            // vacío cuando de verdad no hay nada (antes tiraba "No hay turno abierto" y se
-            // veía como error rojo), y con datos reales si el turno sí existe en el servidor.
             val turnoActivoId = if (fecha == LocalDate.now() && turnoIds.isNullOrEmpty()) {
                 db.turnoDao().obtenerActivo(localId)?.id
             } else null
@@ -299,12 +292,13 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 Log.w("InventarioRepo", "Sin turno activo local para hoy (local=$localId); uso get_inventario_dia como respaldo")
             }
 
-            val resultado = if (turnoActivoId != null) {
-                SupabaseClientProvider.client.postgrest
+            val resultado: InventarioDia = if (turnoActivoId != null) {
+                val inventarioTurno = SupabaseClientProvider.client.postgrest
                     .rpc("get_inventario_turno", buildJsonObject {
                         put("p_android_id", androidId); put("p_local_id", localId); put("p_turno_id", turnoActivoId)
                     })
-                    .decodeAs<InventarioDia>()
+                    .decodeAs<InventarioTurno>()
+                inventarioTurno.toInventarioDiaCompat(fecha)
             } else {
                 SupabaseClientProvider.client.postgrest
                     .rpc("get_inventario_dia", buildJsonObject {
@@ -337,6 +331,23 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             Log.e("InventarioRepo", "Error refrescando servidor para fecha=$fecha", e)
             Result.failure(e)
         }
+    }
+
+    private fun InventarioTurno.toInventarioDiaCompat(fecha: LocalDate): InventarioDia {
+        return InventarioDia(
+            fecha = fecha.toString(),
+            ventas = this.ventas,
+            productos_vendidos = this.productos_vendidos,
+            productos_nuevos = this.productos_nuevos,
+            productos_modificados = this.productos_modificados,
+            productos_eliminados = this.productos_eliminados,
+            mermas = this.mermas,
+            devueltos = this.devueltos,
+            totales_ventas = this.totales_ventas,
+            turno = this.turno?.let { t ->
+                t.copy(diferencia = t.diferenciaCalculada)
+            }
+        )
     }
 
     suspend fun cerrarTurno(androidId: String, turnoId: Long, cierre: Double): Result<InventarioDia> {
@@ -374,108 +385,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             db.inventarioCacheDao().guardar(diaEnCero.toEntity(localId, fechaHoy.toString()))
             Result.success(diaEnCero)
         } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Paso 1 de la verificación de cierre: cuenta las órdenes pendientes en la
-     * cola de sincronización jerárquica del local activo.
-     *
-     * Asume que get_sync_queue_jerarquico devuelve un arreglo con una fila por
-     * cada orden pendiente (como el resto de los RPC de este archivo que
-     * devuelven listas, p. ej. get_turnos_dia). Si en realidad devuelve un
-     * conteo ya agregado o un objeto anidado por tabla, ajustar el decode de
-     * abajo (por ejemplo decodeAs<JsonObject>() y leer el campo que corresponda)
-     * en vez de contar el tamaño de la lista.
-     */
-    suspend fun contarColaPendiente(androidId: String): Result<Int> {
-        if (!NetworkMonitor.hayInternet(context)) {
-            return Result.failure(IllegalStateException("Necesitas conexión para revisar la cola de sincronización"))
-        }
-        return try {
-            val localId = localIdActivo()
-            val cola = SupabaseClientProvider.client.postgrest
-                .rpc("get_sync_queue_jerarquico", buildJsonObject {
-                    put("p_android_id", androidId); put("p_local_id", localId)
-                })
-                .decodeList<JsonElement>()
-            Result.success(cola.size)
-        } catch (e: Exception) {
-            Log.e("InventarioRepo", "Error consultando cola de sincronización", e)
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Paso 2 de la verificación de cierre: cuenta, sobre los datos locales en
-     * Room, las ventas del local activo que quedaron sin turno_id asignado.
-     */
-    suspend fun contarVentasSinTurno(): Result<Int> {
-        return try {
-            val localId = localIdActivo()
-            val sinTurno = db.ventaDao().obtenerTodas(localId).count { it.turnoId == null }
-            Result.success(sinTurno)
-        } catch (e: Exception) {
-            Log.e("InventarioRepo", "Error analizando ventas sin turno", e)
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Paso 4 de la verificación de cierre: cuenta, sobre los datos locales en
-     * Room, las devoluciones del local activo que aún no están resueltas
-     * (mismo criterio que EstadoDevolucionChip en InventarioScreen: estado
-     * distinto de aprobada_stock / aprobada_merma / rechazada).
-     */
-    suspend fun contarDevolucionesPendientes(): Result<Int> {
-        return try {
-            val localId = localIdActivo()
-            val resueltos = setOf("aprobada_stock", "aprobada_merma", "rechazada")
-            val pendientes = db.devolucionCacheDao().obtener(localId)
-                ?.toModel()
-                ?.count { it.estado !in resueltos } ?: 0
-            Result.success(pendientes)
-        } catch (e: Exception) {
-            Log.e("InventarioRepo", "Error analizando devoluciones pendientes", e)
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Paso 5 de la verificación de cierre: cuenta las mermas pendientes del
-     * local activo. mermaDao().obtenerPendientes ya filtra por estado.
-     */
-    suspend fun contarMermasPendientes(): Result<Int> {
-        return try {
-            val localId = localIdActivo()
-            Result.success(db.mermaDao().obtenerPendientes(localId).size)
-        } catch (e: Exception) {
-            Log.e("InventarioRepo", "Error analizando mermas pendientes", e)
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Paso 6 de la verificación de cierre: cuenta las solicitudes de
-     * aprobación pendientes (aumentos de stock / productos solicitados) del
-     * local activo.
-     *
-     * ASUME que aprobacionStockCacheDao().obtener(localId) sigue el mismo
-     * patrón que devolucionCacheDao (entidad cacheada nullable + toModel()
-     * con campo `estado`, valor "pendiente" para no resueltas). Si el DAO
-     * real expone otra forma (p. ej. un obtenerPendientes() directo como
-     * mermaDao, o nombres de campo distintos), ajusta solo este bloque.
-     */
-    suspend fun haySolicitudesPendientes(): Result<Int> {
-        return try {
-            val localId = localIdActivo()
-            val pendientes = db.aprobacionStockCacheDao().obtener(localId)
-                ?.toModel()
-                ?.count { it.estado == "pendiente" } ?: 0
-            Result.success(pendientes)
-        } catch (e: Exception) {
-            Log.e("InventarioRepo", "Error analizando aprobaciones pendientes", e)
             Result.failure(e)
         }
     }

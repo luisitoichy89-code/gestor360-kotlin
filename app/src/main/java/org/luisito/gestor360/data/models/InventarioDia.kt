@@ -19,6 +19,19 @@ data class InventarioDia(
 )
 
 @Serializable
+data class InventarioTurno(
+    val turno: TurnoInfo? = null,
+    val productos_nuevos: List<ProductoInfo> = emptyList(),
+    val productos_modificados: List<ProductoInfo> = emptyList(),
+    val productos_eliminados: List<ProductoEliminadoInfo> = emptyList(),
+    val devueltos: List<DevueltoInfo> = emptyList(),
+    val mermas: List<MermaInfo> = emptyList(),
+    val ventas: List<VentaInfo> = emptyList(),
+    val productos_vendidos: List<ProductoVendidoInfo> = emptyList(),
+    val totales_ventas: TotalesVentas = TotalesVentas()
+)
+
+@Serializable
 data class TotalTarjetaInfo(
     val nombre: String,
     val total: Double = 0.0
@@ -30,6 +43,8 @@ data class TurnoInfo(
     val apertura: Double = 0.0,
     val cierre: Double? = null,
     val diferencia: Double? = null,
+    @SerialName("diferencia_calculada")
+    val diferenciaCalculada: Double? = null,
     val created_at: String? = null,
     val usuario_nombre: String? = null,
     val usuario_rol: String? = null
