@@ -136,3 +136,8 @@ data class TotalesVentas(
     val total: Double = 0.0,
     val cantidad_ventas: Long = 0
 )
+
+@Serializable
+data class RpcEnvelope<T>(
+    val result: T
+)
