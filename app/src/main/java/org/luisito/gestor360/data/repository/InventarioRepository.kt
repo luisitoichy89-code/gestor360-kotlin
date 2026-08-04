@@ -288,27 +288,18 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 db.turnoDao().obtenerActivo(localId)?.id
             } else null
 
-            if (fecha == LocalDate.now() && turnoIds.isNullOrEmpty() && turnoActivoId == null) {
-                Log.w("InventarioRepo", "Sin turno activo local para hoy (local=$localId); uso get_inventario_dia como respaldo")
+            if (turnoActivoId == null) {
+                val diaVacio = construirDesdeRoom(localId, fecha)
+                db.inventarioCacheDao().guardar(diaVacio.toEntity(localId, fecha.toString()))
+                return Result.success(diaVacio)
             }
 
-            val resultado: InventarioDia = if (turnoActivoId != null) {
-                val inventarioTurno = SupabaseClientProvider.client.postgrest
-                    .rpc("get_inventario_turno", buildJsonObject {
-                        put("p_android_id", androidId); put("p_local_id", localId); put("p_turno_id", turnoActivoId)
-                    })
-                    .decodeAs<InventarioTurno>()
-                inventarioTurno.toInventarioDiaCompat(fecha)
-            } else {
-                SupabaseClientProvider.client.postgrest
-                    .rpc("get_inventario_dia", buildJsonObject {
-                        put("p_android_id", androidId); put("p_local_id", localId); put("p_fecha", fecha.toString())
-                        if (!turnoIds.isNullOrEmpty()) {
-                            put("p_turno_ids", buildJsonArray { turnoIds.forEach { add(JsonPrimitive(it)) } })
-                        }
-                    })
-                    .decodeAs<InventarioDia>()
-            }
+            val inventarioTurno = SupabaseClientProvider.client.postgrest
+                .rpc("get_inventario_turno", buildJsonObject {
+                    put("p_android_id", androidId); put("p_local_id", localId); put("p_turno_id", turnoActivoId)
+                })
+                .decodeAs<InventarioTurno>()
+            val resultado = inventarioTurno.toInventarioDiaCompat(fecha)
 
             if (turnoIds.isNullOrEmpty() || fecha == LocalDate.now()) {
                 db.inventarioCacheDao().guardar(resultado.toEntity(localId, fecha.toString()))
@@ -391,11 +382,16 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
 
     suspend fun precargarLocal(androidId: String, localId: Long, fecha: LocalDate = LocalDate.now()): Result<Unit> {
         return try {
-            val resultado = SupabaseClientProvider.client.postgrest
-                .rpc("get_inventario_dia", buildJsonObject {
-                    put("p_android_id", androidId); put("p_local_id", localId); put("p_fecha", fecha.toString())
+            val turnoActivoId = db.turnoDao().obtenerActivo(localId)?.id
+            if (turnoActivoId == null) {
+                return Result.success(Unit)
+            }
+            val inventarioTurno = SupabaseClientProvider.client.postgrest
+                .rpc("get_inventario_turno", buildJsonObject {
+                    put("p_android_id", androidId); put("p_local_id", localId); put("p_turno_id", turnoActivoId)
                 })
-                .decodeAs<InventarioDia>()
+                .decodeAs<InventarioTurno>()
+            val resultado = inventarioTurno.toInventarioDiaCompat(fecha)
             db.inventarioCacheDao().guardar(resultado.toEntity(localId, fecha.toString()))
             if (fecha == LocalDate.now()) {
                 resultado.turno?.let { t ->
