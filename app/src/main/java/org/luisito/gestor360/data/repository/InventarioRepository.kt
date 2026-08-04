@@ -415,11 +415,8 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             return Result.failure(IllegalStateException("Necesitas conexión para revisar la cola"))
         }
         return try {
-            val localId = localIdActivo()
             val cola = SupabaseClientProvider.client.postgrest
-                .rpc("get_sync_queue_jerarquico", buildJsonObject {
-                    put("p_android_id", androidId); put("p_local_id", localId)
-                })
+                .rpc("get_sync_queue_jerarquico")
                 .decodeList<JsonElement>()
             Result.success(cola.size)
         } catch (e: Exception) {
