@@ -413,4 +413,70 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             Result.failure(e)
         }
     }
+
+    suspend fun contarColaPendiente(androidId: String): Result<Int> {
+        if (!NetworkMonitor.hayInternet(context)) {
+            return Result.failure(IllegalStateException("Necesitas conexión para revisar la cola"))
+        }
+        return try {
+            val localId = localIdActivo()
+            val cola = SupabaseClientProvider.client.postgrest
+                .rpc("get_sync_queue_jerarquico", buildJsonObject {
+                    put("p_android_id", androidId); put("p_local_id", localId)
+                })
+                .decodeList<JsonElement>()
+            Result.success(cola.size)
+        } catch (e: Exception) {
+            Log.e("InventarioRepo", "Error consultando cola", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun contarVentasSinTurno(): Result<Int> {
+        return try {
+            val localId = localIdActivo()
+            val sinTurno = db.ventaDao().obtenerTodas(localId).count { it.turnoId == null }
+            Result.success(sinTurno)
+        } catch (e: Exception) {
+            Log.e("InventarioRepo", "Error analizando ventas sin turno", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun contarDevolucionesPendientes(): Result<Int> {
+        return try {
+            val localId = localIdActivo()
+            val resueltos = setOf("aprobada_stock", "aprobada_merma", "rechazada")
+            val pendientes = db.devolucionCacheDao().obtener(localId)
+                ?.toModel()
+                ?.count { it.estado !in resueltos } ?: 0
+            Result.success(pendientes)
+        } catch (e: Exception) {
+            Log.e("InventarioRepo", "Error analizando devoluciones", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun contarMermasPendientes(): Result<Int> {
+        return try {
+            val localId = localIdActivo()
+            Result.success(db.mermaDao().obtenerPendientes(localId).size)
+        } catch (e: Exception) {
+            Log.e("InventarioRepo", "Error analizando mermas", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun haySolicitudesPendientes(): Result<Int> {
+        return try {
+            val localId = localIdActivo()
+            val pendientes = db.aprobacionStockCacheDao().obtener(localId)
+                ?.toModel()
+                ?.count { it.estado == "pendiente" } ?: 0
+            Result.success(pendientes)
+        } catch (e: Exception) {
+            Log.e("InventarioRepo", "Error analizando aprobaciones", e)
+            Result.failure(e)
+        }
+    }
 }
