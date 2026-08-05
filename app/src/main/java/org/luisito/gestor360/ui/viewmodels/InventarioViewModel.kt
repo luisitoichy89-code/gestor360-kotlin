@@ -25,6 +25,7 @@ import org.luisito.gestor360.data.models.TurnoInfo
 import org.luisito.gestor360.utils.SessionManager
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.data.repository.InventarioRepository
+import org.luisito.gestor360.data.repository.TurnoRepository
 import java.time.LocalDate
 import org.luisito.gestor360.ui.util.mensajeAmigable
 
@@ -76,6 +77,7 @@ class InventarioViewModel(
     private val session = SessionManager(AppContextHolder.context)
     private val esAdminActual: Boolean get() = session.getRol() == "admin"
     private val httpClient by lazy { HttpClient(Android) }
+    private val turnoRepository = TurnoRepository()
 
     fun cargar(androidId: String) {
         androidIdActual = androidId
@@ -179,7 +181,21 @@ class InventarioViewModel(
                 }
 
             actualizarPaso(2, EstadoPaso.EN_PROGRESO)
-            val turno = _uiState.value.dia?.turno
+            var turno = _uiState.value.dia?.turno
+            if (turno == null) {
+                val turnoRemoto = turnoRepository.obtenerTurnoActivo(androidIdActual).getOrNull()
+                if (turnoRemoto != null) {
+                    turno = TurnoInfo(
+                        id = turnoRemoto.id,
+                        apertura = turnoRemoto.apertura,
+                        cierre = turnoRemoto.cierre,
+                        diferencia = turnoRemoto.diferencia,
+                        created_at = turnoRemoto.created_at,
+                        usuario_nombre = turnoRemoto.usuario_nombre,
+                        usuario_rol = turnoRemoto.usuario_rol
+                    )
+                }
+            }
             if (turno == null) {
                 actualizarPaso(2, EstadoPaso.ERROR, detalle = "No hay turno cargado")
             } else {
