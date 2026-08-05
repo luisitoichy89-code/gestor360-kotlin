@@ -13,6 +13,7 @@ import org.luisito.gestor360.data.local.dao.DevolucionCacheDao
 import org.luisito.gestor360.data.local.dao.InventarioCacheDao
 import org.luisito.gestor360.data.local.dao.LocalDao
 import org.luisito.gestor360.data.local.dao.MermaDao
+import org.luisito.gestor360.data.local.dao.MovimientoInventarioDao
 import org.luisito.gestor360.data.local.dao.ProductoDao
 import org.luisito.gestor360.data.local.dao.ProductoEliminadoCacheDao
 import org.luisito.gestor360.data.local.dao.TarjetaDao
@@ -26,6 +27,7 @@ import org.luisito.gestor360.data.local.entities.DevolucionCacheEntity
 import org.luisito.gestor360.data.local.entities.InventarioCacheEntity
 import org.luisito.gestor360.data.local.entities.LocalEntity
 import org.luisito.gestor360.data.local.entities.MermaEntity
+import org.luisito.gestor360.data.local.entities.MovimientoInventarioEntity
 import org.luisito.gestor360.data.local.entities.ProductoEntity
 import org.luisito.gestor360.data.local.entities.ProductoEliminadoCacheEntity
 import org.luisito.gestor360.data.local.entities.TarjetaEntity
@@ -189,11 +191,28 @@ val MIGRATION_13_14 = object : Migration(13, 14) {
 
 val MIGRATION_14_15 = object : Migration(14, 15) {
     override fun migrate(db: SupportSQLiteDatabase) {
-        // Simple ADD COLUMN alcanza acá (columna nueva, nullable, sin
-        // constraints) — no hace falta el patrón de tabla-nueva que usa
-        // MIGRATION_13_14 arriba, porque no se está tocando ninguna columna
-        // existente.
         db.execSQL("ALTER TABLE ventas_cache ADD COLUMN turnoId INTEGER")
+    }
+}
+
+val MIGRATION_15_16 = object : Migration(15, 16) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS movimientos_inventario_cache (
+                id TEXT NOT NULL PRIMARY KEY,
+                productoId TEXT NOT NULL,
+                turnoId INTEGER NOT NULL,
+                localId INTEGER NOT NULL,
+                tipo TEXT NOT NULL,
+                cantidad REAL NOT NULL,
+                stockAnterior REAL NOT NULL,
+                stockNuevo REAL NOT NULL,
+                createdAt TEXT,
+                sincronizada INTEGER NOT NULL DEFAULT 0
+            )
+            """.trimIndent()
+        )
     }
 }
 
@@ -203,9 +222,9 @@ val MIGRATION_14_15 = object : Migration(14, 15) {
         ProductoEliminadoCacheEntity::class,
         TurnoEntity::class, MermaEntity::class,
         UserEntity::class, LocalEntity::class, InventarioCacheEntity::class, DevolucionCacheEntity::class,
-        AprobacionStockCacheEntity::class
+        AprobacionStockCacheEntity::class, MovimientoInventarioEntity::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -222,6 +241,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun inventarioCacheDao(): InventarioCacheDao
     abstract fun devolucionCacheDao(): DevolucionCacheDao
     abstract fun aprobacionStockCacheDao(): AprobacionStockCacheDao
+    abstract fun movimientoInventarioDao(): MovimientoInventarioDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -233,7 +253,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "gestor360.db"
                 )
-                    .addMigrations(MIGRACION_8_9, MIGRACION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
+                    .addMigrations(MIGRACION_8_9, MIGRACION_10_11, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16)
                     .fallbackToDestructiveMigration()
                     .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                     .build().also { db ->
