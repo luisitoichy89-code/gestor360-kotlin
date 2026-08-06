@@ -92,35 +92,29 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
     }
 
     private suspend fun construirDesdeRoom(localId: Long, fecha: LocalDate): InventarioDia {
-        val fechaStr = fecha.toString()
         val nombreUsuarioLocal = session.getNombre().takeIf { it.isNotBlank() }
 
-        val eliminados = db.productoEliminadoCacheDao().obtenerPorFecha(localId, fechaStr)
+        val eliminados = db.productoEliminadoCacheDao().obtenerTodos(localId)
             .map { e ->
                 ProductoEliminadoInfo(id = e.id, nombre = e.nombre, stock = e.stock, fecha = e.fecha, resuelto_por_nombre = null)
             }
-        val eliminadosPorId = db.productoEliminadoCacheDao().obtenerTodos(localId)
-            .associate { e -> e.id to ProductoEliminadoInfo(id = e.id, nombre = e.nombre, stock = e.stock, fecha = e.fecha, resuelto_por_nombre = null) }
+        val eliminadosPorId = eliminados.associate { it.id to it }
 
         val turnoActivo = db.turnoDao().obtenerActivo(localId)
         val turnoActivoId = turnoActivo?.id
-        val turnoDesde = turnoActivo?.createdAt
 
-        val ventasHoy = db.ventaDao().obtenerTodas(localId)
-            .filter { it.createdAt?.startsWith(fechaStr) == true }
-            .filter { venta ->
-                when {
-                    turnoActivoId == null -> true
-                    venta.turnoId != null -> venta.turnoId == turnoActivoId
-                    else -> turnoDesde == null || (venta.createdAt != null && venta.createdAt!! >= turnoDesde)
+        val ventasHoy = if (turnoActivoId != null) {
+            db.ventaDao().obtenerTodas(localId)
+                .filter { it.turnoId == turnoActivoId }
+                .filter { venta ->
+                    when (session.getRol()) {
+                        "seller" -> venta.usuarioId == session.getUserId()
+                        else -> true
+                    }
                 }
-            }
-            .filter { venta ->
-                when (session.getRol()) {
-                    "seller" -> venta.usuarioId == session.getUserId()
-                    else -> true
-                }
-            }
+        } else {
+            emptyList()
+        }
 
         val ventasInfo = ventasHoy.map { it.toVentaInfo(localId, nombreUsuarioLocal, eliminadosPorId) }
 
@@ -133,7 +127,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         )
 
         val nuevos = db.productoDao().obtenerTodos(localId).filter { p ->
-            p.createdAt?.startsWith(fechaStr) == true
+            p.createdAt?.startsWith(fecha.toString()) == true
         }.map { p ->
             ProductoInfo(
                 id = p.id, nombre = p.nombre, precio = p.precio, stock = p.stock,
@@ -143,7 +137,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         }
 
         val modificados = db.productoDao().obtenerTodos(localId).filter { p ->
-            p.updatedAt?.startsWith(fechaStr) == true && p.createdAt?.startsWith(fechaStr) != true
+            p.updatedAt?.startsWith(fecha.toString()) == true && p.createdAt?.startsWith(fecha.toString()) != true
         }.map { p ->
             ProductoInfo(
                 id = p.id, nombre = p.nombre, precio = p.precio, stock = p.stock,
@@ -155,7 +149,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         val devolucionesCache = db.devolucionCacheDao().obtener(localId)
         val devueltos = if (devolucionesCache != null) {
             devolucionesCache.toModel().filter { d ->
-                d.created_at?.startsWith(fechaStr) == true || d.resuelto_at?.startsWith(fechaStr) == true
+                d.created_at?.startsWith(fecha.toString()) == true || d.resuelto_at?.startsWith(fecha.toString()) == true
             }.map { d ->
                 DevueltoInfo(
                     id = d.id ?: "", producto_nombre = d.producto_nombre, cantidad = d.cantidad,
@@ -170,7 +164,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         val mermasLocales = db.mermaDao().obtenerPendientes(localId).map { m -> MermaInfo(id = m.id, producto_nombre = m.productoNombre, cantidad = m.cantidad, motivo = m.motivo ?: "", estado = m.estado, solicitado_por_nombre = m.solicitadoPorNombre, resuelto_por_nombre = null, fecha = null) }
 
         return InventarioDia(
-            fecha = fechaStr,
+            fecha = fecha.toString(),
             ventas = ventasInfo,
             productos_vendidos = productosVendidos,
             productos_nuevos = nuevos,
@@ -239,28 +233,23 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
     }
 
     private suspend fun fusionarConVentasPendientes(cacheado: InventarioDia, localId: Long, fecha: LocalDate): InventarioDia {
-        val fechaStr = fecha.toString()
         val turnoActivo = db.turnoDao().obtenerActivo(localId)
         val turnoActivoId = turnoActivo?.id
-        val turnoDesde = turnoActivo?.createdAt
 
         val idsEnCache = cacheado.ventas.map { it.id }.toSet()
-        val pendientes = db.ventaDao().obtenerTodas(localId)
-            .filter { it.createdAt?.startsWith(fechaStr) == true }
-            .filter { venta ->
-                when {
-                    turnoActivoId == null -> true
-                    venta.turnoId != null -> venta.turnoId == turnoActivoId
-                    else -> turnoDesde == null || (venta.createdAt != null && venta.createdAt!! >= turnoDesde)
+        val pendientes = if (turnoActivoId != null) {
+            db.ventaDao().obtenerTodas(localId)
+                .filter { it.turnoId == turnoActivoId }
+                .filter { venta ->
+                    when (session.getRol()) {
+                        "seller" -> venta.usuarioId == session.getUserId()
+                        else -> true
+                    }
                 }
-            }
-            .filter { venta ->
-                when (session.getRol()) {
-                    "seller" -> venta.usuarioId == session.getUserId()
-                    else -> true
-                }
-            }
-            .filter { it.id !in idsEnCache }
+                .filter { it.id !in idsEnCache }
+        } else {
+            emptyList()
+        }
 
         if (pendientes.isEmpty()) return cacheado
 
