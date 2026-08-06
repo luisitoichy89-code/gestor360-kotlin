@@ -11,16 +11,14 @@ interface VentaDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertarUna(venta: VentaEntity)
 
-    @Query("SELECT * FROM ventas_cache WHERE localId = :localId ORDER BY createdAt DESC")
+    @Query("SELECT * FROM ventas_cache WHERE localId = :localId ORDER BY id DESC")
     suspend fun obtenerTodas(localId: Long): List<VentaEntity>
 
-    @Query(
-        """
+    @Query("""
         SELECT * FROM ventas_cache
         WHERE localId = :localId AND turnoId = :turnoId AND usuarioId = :usuarioId
-        ORDER BY createdAt DESC
-        """
-    )
+        ORDER BY id DESC
+    """)
     suspend fun obtenerPorTurnoYUsuario(localId: Long, turnoId: Long, usuarioId: Long): List<VentaEntity>
 
     @Query("UPDATE ventas_cache SET sincronizada = 1 WHERE id = :id")
