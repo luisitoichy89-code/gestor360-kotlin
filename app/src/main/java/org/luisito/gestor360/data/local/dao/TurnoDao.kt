@@ -5,7 +5,7 @@ import org.luisito.gestor360.data.local.entities.TurnoEntity
 
 @Dao
 interface TurnoDao {
-    @Query("SELECT * FROM turno_cache WHERE cierre IS NULL AND localId = :localId ORDER BY id DESC LIMIT 1")
+    @Query("SELECT * FROM turno_cache WHERE cierre IS NULL AND localId = :localId ORDER BY numeroTurno DESC LIMIT 1")
     suspend fun obtenerActivo(localId: Long): TurnoEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
