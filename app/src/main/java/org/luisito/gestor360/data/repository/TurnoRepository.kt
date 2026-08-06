@@ -14,7 +14,6 @@ import org.luisito.gestor360.data.sync.SyncWorker
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 
-/** RPC: abrir_turno, obtener_turno_abierto, cerrar_turno, get_turnos. Offline-first, filtrado por local_id. */
 class TurnoRepository(
     private val context: Context = AppContextHolder.context,
 ) {
@@ -24,7 +23,6 @@ class TurnoRepository(
     private fun localIdActivo(): Long =
         session.getLocalId() ?: throw IllegalStateException("No hay un local activo seleccionado")
 
-    /** Siempre lee primero del caché local (así "¿tengo turno abierto?" nunca depende de la red). */
     suspend fun obtenerTurnoActivo(androidId: String): Result<Turno?> {
         val localId = localIdActivo()
         val activoLocal = db.turnoDao().obtenerActivo(localId)
@@ -40,7 +38,6 @@ class TurnoRepository(
         }
     }
 
-    /** Trae el turno activo real del servidor (ya filtrado por local_id) y actualiza el caché. */
     suspend fun refrescarDesdeServidor(androidId: String): Result<Turno?> {
         val localId = localIdActivo()
         return try {
@@ -50,7 +47,7 @@ class TurnoRepository(
                 .firstOrNull()
             if (turno != null) {
                 db.turnoDao().insertar(
-                    TurnoEntity(turno.id, turno.usuario_id, turno.apertura, turno.cierre, turno.diferencia, turno.created_at, localId)
+                    TurnoEntity(turno.id, turno.usuario_id, turno.apertura, turno.cierre, turno.diferencia, turno.created_at, localId, turno.numero_turno)
                 )
             }
             db.turnoDao().limpiarDuplicadosAbiertos(localId, turno?.id)
@@ -60,43 +57,35 @@ class TurnoRepository(
         }
     }
 
-    /**
-     * Cerrar turno necesita el total de efectivo vendido para calcular la
-     * diferencia, y eso requiere las ventas ya sincronizadas del servidor —
-     * por eso, a diferencia de abrir_turno, esto SÍ requiere conexión.
-     */
     suspend fun cerrarTurno(androidId: String, turnoId: Long, cierre: Double): Result<Long> {
         val localId = localIdActivo()
 
-        // 1. Cerrar turno viejo en Room AHORA (offline-first)
         db.turnoDao().cerrar(turnoId, cierre, 0.0, localId)
 
-        // 2. Crear turno local con id=0 (marcador de turno nuevo sin ventas)
-        db.turnoDao().insertar(
-            TurnoEntity(id = 0, usuarioId = null, apertura = 0.0, cierre = null, diferencia = null, createdAt = java.time.LocalDateTime.now().toString(), localId = localId)
-        )
-
-        // El id del turno nuevo con el que se debe recargar el inventario.
-        // Si no hay red o falla la sincronización, se queda en el marcador
-        // local 0 recién insertado (Room ya lo conoce como turno activo).
-        var idTurnoNuevo = 0L
-
-        // 3. Intentar sincronizar con servidor (no bloquea)
         if (NetworkMonitor.hayInternet(context)) {
             try {
                 val params = buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId); put("p_turno_id", turnoId); put("p_cierre", cierre) }
-                val nuevoTurnoId = SupabaseClientProvider.client.postgrest.rpc("cerrar_turno", params).decodeAs<Long>()
-                // Reemplazar turno id=0 por el real
-                db.turnoDao().reemplazarIdTemporal(0, nuevoTurnoId, localId)
+                val respuesta = SupabaseClientProvider.client.postgrest.rpc("cerrar_turno", params).decodeAs<TurnoCierreResponse>()
+                val nuevoTurno = TurnoEntity(
+                    id = respuesta.turno_id,
+                    usuarioId = null,
+                    apertura = 0.0,
+                    cierre = null,
+                    diferencia = null,
+                    createdAt = java.time.LocalDateTime.now().toString(),
+                    localId = localId,
+                    numeroTurno = respuesta.numero_turno
+                )
+                db.turnoDao().insertar(nuevoTurno)
+                db.turnoDao().limpiarDuplicadosAbiertos(localId, respuesta.turno_id)
                 refrescarDesdeServidor(androidId)
-                idTurnoNuevo = nuevoTurnoId
+                return Result.success(respuesta.turno_id)
             } catch (e: Exception) {
-                // No hay internet o falló el servidor, el turno id=0 queda como marcador
-                // El Worker lo sincronizará cuando haya conexión
+                return Result.failure(e)
             }
         }
 
-        return Result.success(idTurnoNuevo)
+        return Result.failure(IllegalStateException("Necesitas conexión para cerrar el turno"))
     }
 
     suspend fun getTurnos(androidId: String): Result<List<Turno>> {
@@ -111,7 +100,6 @@ class TurnoRepository(
         }
     }
 
-    /** Precarga el turno activo de UN local específico, sin depender del local activo en sesión. */
     suspend fun precargarLocal(androidId: String, localId: Long): Result<Unit> {
         return try {
             val turno = SupabaseClientProvider.client.postgrest
@@ -120,7 +108,7 @@ class TurnoRepository(
                 .firstOrNull()
             if (turno != null) {
                 db.turnoDao().insertar(
-                    TurnoEntity(turno.id, turno.usuario_id, turno.apertura, turno.cierre, turno.diferencia, turno.created_at, localId)
+                    TurnoEntity(turno.id, turno.usuario_id, turno.apertura, turno.cierre, turno.diferencia, turno.created_at, localId, turno.numero_turno)
                 )
             }
             Result.success(Unit)
