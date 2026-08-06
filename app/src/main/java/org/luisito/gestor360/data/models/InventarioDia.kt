@@ -148,3 +148,4 @@ data class TurnoCierreResponse(
     @SerialName("numero_turno") val numeroTurno: Int
 )
  
+ 
