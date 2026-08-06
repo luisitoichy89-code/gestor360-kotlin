@@ -2,7 +2,6 @@ package org.luisito.gestor360.data.models
 
 import kotlinx.serialization.Serializable
 
-/** Arqueo de caja: se abre con un monto inicial y se cierra contando el efectivo real. */
 @Serializable
 data class Turno(
     val id: Long,
@@ -12,7 +11,10 @@ data class Turno(
     val diferencia: Double? = null,
     val cliente_id: String? = null,
     val local_id: Long? = null,
-    val created_at: String? = null
+    val created_at: String? = null,
+    val numero_turno: Int = 0,
+    val usuario_nombre: String? = null,
+    val usuario_rol: String? = null
 ) {
     val estaAbierto: Boolean get() = cierre == null
 }
