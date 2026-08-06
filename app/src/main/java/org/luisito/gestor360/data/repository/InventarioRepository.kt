@@ -337,28 +337,12 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         refreshJob?.cancel()
         return try {
             val localId = localIdActivo()
-            val nuevoTurnoId = SupabaseClientProvider.client.postgrest.rpc("cerrar_turno", buildJsonObject {
-                put("p_android_id", androidId); put("p_local_id", localId); put("p_turno_id", turnoId); put("p_cierre", cierre)
-            }).decodeAs<Long>()
-
-            val now = java.time.LocalDateTime.now().toString()
-            val dbHelper = db.openHelper.writableDatabase
-            dbHelper.execSQL(
-                "UPDATE turno_cache SET cierre = ?, diferencia = ? WHERE id = ? AND localId = ?",
-                arrayOf<Any>(cierre, 0.0, turnoId, localId)
-            )
-            dbHelper.execSQL(
-                "INSERT OR REPLACE INTO turno_cache (id, localId, apertura, cierre, diferencia, createdAt) VALUES (?, ?, 0.0, NULL, NULL, ?)",
-                arrayOf<Any>(nuevoTurnoId, localId, now)
-            )
-            dbHelper.execSQL(
-                "DELETE FROM ventas_cache WHERE localId = ?",
-                arrayOf<Any>(localId)
-            )
-            dbHelper.execSQL(
-                "DELETE FROM inventario_cache WHERE localId = ?",
-                arrayOf<Any>(localId)
-            )
+            val respuesta = SupabaseClientProvider.client.postgrest.rpc("fn_cerrar_y_reciclar_turno_v2", buildJsonObject {
+                put("p_turno_viejo_id", turnoId)
+                put("p_turno_nuevo_id", turnoId + 1)
+                put("p_local_id", localId)
+                put("p_cierre_valor", cierre)
+            }).decodeAs<Int>()
 
             val fechaHoy = LocalDate.now()
             val diaEnCero = construirDesdeRoom(localId, fechaHoy)
