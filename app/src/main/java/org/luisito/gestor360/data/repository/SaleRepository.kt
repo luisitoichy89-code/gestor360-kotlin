@@ -70,7 +70,7 @@ class SaleRepository(
                     tarjeta_id = cliente?.tarjetaId,
                     created_at = java.time.LocalDateTime.now().toString()
                 )
-                db.ventaDao().insertarUna(ventaLocal.toEntity(localId, sincronizada = false, turnoId = turnoActivoId))
+                db.ventaDao().insertarUna(ventaLocal.toEntity(localId, sincronizada = false, turnoId = turnoActivoId ?: 0))
 
                 val payload = buildJsonObject {
                     put("p_android_id", androidId); put("p_local_id", localId); put("p_id", id)

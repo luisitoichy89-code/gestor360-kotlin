@@ -59,27 +59,15 @@ class TurnoRepository(
 
     suspend fun cerrarTurno(androidId: String, turnoId: Long, cierre: Double): Result<Long> {
         val localId = localIdActivo()
-
         db.turnoDao().cerrar(turnoId, cierre, 0.0, localId)
 
         if (NetworkMonitor.hayInternet(context)) {
             try {
                 val params = buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId); put("p_turno_id", turnoId); put("p_cierre", cierre) }
-                val respuesta = SupabaseClientProvider.client.postgrest.rpc("cerrar_turno", params).decodeAs<TurnoCierreResponse>()
-                val nuevoTurno = TurnoEntity(
-                    id = respuesta.turno_id,
-                    usuarioId = null,
-                    apertura = 0.0,
-                    cierre = null,
-                    diferencia = null,
-                    createdAt = java.time.LocalDateTime.now().toString(),
-                    localId = localId,
-                    numeroTurno = respuesta.numero_turno
-                )
-                db.turnoDao().insertar(nuevoTurno)
-                db.turnoDao().limpiarDuplicadosAbiertos(localId, respuesta.turno_id)
+                val nuevoTurnoId = SupabaseClientProvider.client.postgrest.rpc("cerrar_turno", params).decodeAs<Long>()
+                db.turnoDao().reemplazarIdTemporal(0, nuevoTurnoId, localId)
                 refrescarDesdeServidor(androidId)
-                return Result.success(respuesta.turno_id)
+                return Result.success(nuevoTurnoId)
             } catch (e: Exception) {
                 return Result.failure(e)
             }
