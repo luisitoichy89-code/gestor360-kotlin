@@ -23,7 +23,7 @@ data class VentaEntity(
     val tarjetaId: String?,
     val createdAt: String?,
     val sincronizada: Boolean = true,
-    val turnoId: Long
+    val turnoId: Long = 0
 )
 
 fun VentaEntity.toModel() = Sale(
@@ -34,7 +34,7 @@ fun VentaEntity.toModel() = Sale(
     tarjeta_id = tarjetaId, created_at = createdAt
 )
 
-fun Sale.toEntity(localId: Long, sincronizada: Boolean = true, turnoId: Long) = VentaEntity(
+fun Sale.toEntity(localId: Long, sincronizada: Boolean = true, turnoId: Long = 0) = VentaEntity(
     id = id ?: "local_${UUID.randomUUID()}", productoId = producto_id,
     productoNombre = producto_nombre, cantidad = cantidad, total = total,
     metodo = metodo, efectivo = efectivo, transferencia = transferencia,
