@@ -109,7 +109,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
 
         val ventasHoy = if (turnoActivoId != null) {
             db.ventaDao().obtenerTodas(localId)
-                
+                .filter { it.turnoId == turnoActivoId }
                 .filter { venta ->
                     when (session.getRol()) {
                         "seller" -> venta.usuarioId == session.getUserId()
@@ -129,24 +129,20 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             cantidad_ventas = ventasHoy.size.toLong()
         )
 
-        val nuevos = if (turnoActivoId != null) {
-            db.productoDao().obtenerTodos(localId)
-                
-                .map { p ->
-                    ProductoInfo(
-                        id = p.id, nombre = p.nombre, precio = p.precio, stock = p.stock,
-                        ubicacion = p.ubicacion, fecha = null,
-                        solicitado_por_nombre = null, resuelto_por_nombre = null
-                    )
-                }
-        } else emptyList()
+        val nuevos = db.productoDao().obtenerTodos(localId)
+            .map { p ->
+                ProductoInfo(
+                    id = p.id, nombre = p.nombre, precio = p.precio, stock = p.stock,
+                    ubicacion = p.ubicacion, fecha = null,
+                    solicitado_por_nombre = null, resuelto_por_nombre = null
+                )
+            }
 
         val modificados = emptyList<ProductoInfo>()
 
         val devolucionesCache = db.devolucionCacheDao().obtener(localId)
         val devueltos = if (devolucionesCache != null) {
             devolucionesCache.toModel()
-                
                 .map { d ->
                     DevueltoInfo(
                         id = d.id ?: "", producto_nombre = d.producto_nombre, cantidad = d.cantidad,
@@ -252,7 +248,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         val idsEnCache = cacheado.ventas.map { it.id }.toSet()
         val pendientes = if (turnoActivoId != null) {
             db.ventaDao().obtenerTodas(localId)
-                
+                .filter { it.turnoId == turnoActivoId }
                 .filter { venta ->
                     when (session.getRol()) {
                         "seller" -> venta.usuarioId == session.getUserId()
@@ -317,9 +313,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                     put("p_local_id", localId)
                     put("p_turno_id", turnoActivoId)
                 })
-                .decodeList<InventarioTurno>()
-                .firstOrNull()
-                ?: return Result.failure(IllegalStateException("RPC get_inventario_turno devolvió vacío"))
+                .decodeAs<InventarioTurno>()
 
             val resultado = inventarioTurno.toInventarioDiaCompat()
 
@@ -402,9 +396,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                     put("p_local_id", localId)
                     put("p_turno_id", turnoActivoId)
                 })
-                .decodeList<InventarioTurno>()
-                .firstOrNull()
-                ?: return Result.success(Unit)
+                .decodeAs<InventarioTurno>()
 
             val resultado = inventarioTurno.toInventarioDiaCompat()
             db.inventarioCacheDao().guardar(resultado.toEntity(localId, turnoActivoId))
