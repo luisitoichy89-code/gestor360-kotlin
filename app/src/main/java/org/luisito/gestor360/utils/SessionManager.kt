@@ -115,19 +115,6 @@ class SessionManager(context: Context) {
 
     fun verificarLocalExiste(): Boolean {
         val localId = getLocalId() ?: return false
-        return try {
-            val db = org.luisito.gestor360.data.local.AppDatabase.obtener(
-                org.luisito.gestor360.utils.AppContextHolder.context
-            )
-            val count = db.productoDao().obtenerTodos(localId).size
-            if (count == 0) {
-                setLocalId(null)
-                false
-            } else {
-                true
-            }
-        } catch (e: Exception) {
-            true
-        }
+        return true
     }
 }
