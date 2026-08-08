@@ -293,7 +293,9 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 .rpc("get_inventario_turno", buildJsonObject {
                     put("p_android_id", androidId); put("p_local_id", localId); put("p_turno_id", turnoActivoId)
                 })
-                .decodeAs<InventarioTurno>()
+                .decodeList<InventarioTurno>()
+                .firstOrNull()
+                ?: return Result.failure(IllegalStateException("RPC get_inventario_turno devolvió vacío"))
             val resultado = inventarioTurno.toInventarioDiaCompat(fecha)
 
             if (turnoIds.isNullOrEmpty() || fecha == LocalDate.now()) {
@@ -373,7 +375,9 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 .rpc("get_inventario_turno", buildJsonObject {
                     put("p_android_id", androidId); put("p_local_id", localId); put("p_turno_id", turnoActivoId)
                 })
-                .decodeAs<InventarioTurno>()
+                .decodeList<InventarioTurno>()
+                .firstOrNull()
+                ?: return Result.success(Unit)
             val resultado = inventarioTurno.toInventarioDiaCompat(fecha)
             db.inventarioCacheDao().guardar(resultado.toEntity(localId, fecha.toString()))
             if (fecha == LocalDate.now()) {
