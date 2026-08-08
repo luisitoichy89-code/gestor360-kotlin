@@ -112,18 +112,15 @@ class SessionManager(context: Context) {
      *
      * @return true si el local existe, false si fue eliminado.
      */
-    suspend fun verificarLocalExiste(): Boolean {
+
+    fun verificarLocalExiste(): Boolean {
         val localId = getLocalId() ?: return false
         return try {
-            val clienteId = getClienteId()
-            if (clienteId.isBlank()) return false
-            val locales = org.luisito.gestor360.data.SupabaseClientProvider.client.postgrest
-                .from("locales")
-                .select("id")
-                .eq("id", localId)
-                .eq("cliente_id", clienteId)
-                .decodeList<org.luisito.gestor360.data.models.Local>()
-            if (locales.isEmpty()) {
+            val db = org.luisito.gestor360.data.local.AppDatabase.obtener(
+                org.luisito.gestor360.utils.AppContextHolder.context
+            )
+            val count = db.productoDao().obtenerTodos(localId).size
+            if (count == 0) {
                 setLocalId(null)
                 false
             } else {
