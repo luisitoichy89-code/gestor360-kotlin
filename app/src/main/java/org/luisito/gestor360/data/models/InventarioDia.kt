@@ -121,7 +121,11 @@ data class VentaInfo(
 @Serializable
 data class ProductoVendidoInfo(
     val nombre: String,
+    @SerialName("producto_id")
+    val productoId: String? = null,
     val total_vendido: Double = 0.0,
+    @SerialName("cantidad_vendida")
+    val cantidadVendida: Double = 0.0,
     val total_actual: Double = 0.0,
     val total_agregado: Double = 0.0,
     val total_merma: Double = 0.0,
@@ -147,5 +151,3 @@ data class TurnoCierreResponse(
     @SerialName("turno_id") val turnoId: Long,
     @SerialName("numero_turno") val numeroTurno: Int
 )
- 
- 
