@@ -24,6 +24,7 @@ import java.time.LocalDate
 class InventarioRepository(private val context: Context = AppContextHolder.context) {
     private val db = AppDatabase.obtener(context)
     private val session = SessionManager(context)
+    private val turnoRepository = TurnoRepository(context)
     private var refreshJob: Job? = null
 
     private fun localIdActivo(): Long =
@@ -273,9 +274,14 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
     suspend fun refrescarDesdeServidor(androidId: String, fecha: LocalDate, turnoIds: List<Long>? = null): Result<InventarioDia> {
         val localId = localIdActivo()
         return try {
-            val turnoActivoId = if (fecha == LocalDate.now() && turnoIds.isNullOrEmpty()) {
+            val esHoySinSeleccion = fecha == LocalDate.now() && turnoIds.isNullOrEmpty()
+            var turnoActivoId = if (esHoySinSeleccion) {
                 db.turnoDao().obtenerActivo(localId)?.id
             } else null
+
+            if (turnoActivoId == null && esHoySinSeleccion) {
+                turnoActivoId = turnoRepository.obtenerTurnoActivo(androidId).getOrNull()?.id
+            }
 
             if (turnoActivoId == null) {
                 val diaVacio = construirDesdeRoom(localId, fecha)
@@ -355,7 +361,11 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
 
     suspend fun precargarLocal(androidId: String, localId: Long, fecha: LocalDate = LocalDate.now()): Result<Unit> {
         return try {
-            val turnoActivoId = db.turnoDao().obtenerActivo(localId)?.id
+            var turnoActivoId = db.turnoDao().obtenerActivo(localId)?.id
+            if (turnoActivoId == null) {
+                turnoRepository.precargarLocal(androidId, localId)
+                turnoActivoId = db.turnoDao().obtenerActivo(localId)?.id
+            }
             if (turnoActivoId == null) {
                 return Result.success(Unit)
             }
