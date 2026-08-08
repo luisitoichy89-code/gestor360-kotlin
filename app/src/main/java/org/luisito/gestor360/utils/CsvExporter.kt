@@ -37,7 +37,7 @@ object CsvExporter {
 
         val filas = mutableListOf(
             listOf("Gestor360 · Inventario"),
-            listOf("Fecha", dia.fecha ?: ""),
+            listOf("Fecha", "sin_fecha"),
             listOf("Generado el", generadoEl),
             listOf("")
         )

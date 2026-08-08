@@ -20,7 +20,7 @@ object ReporteExporter {
 
         val lineas = mutableListOf(
             "Gestor360 - Inventario",
-            "Fecha: ${dia.fecha}",
+            "Fecha: ${"sin_fecha"}",
             "Generado el: $generadoEl",
             ""
         )
@@ -144,7 +144,7 @@ object ReporteExporter {
 
     // ---------------- TXT ----------------
     fun exportarTxt(context: Context, dia: InventarioDia) {
-        val archivo = File(carpetaExport(context), "inventario_${dia.fecha}.txt")
+        val archivo = File(carpetaExport(context), "inventario_${"sin_fecha"}.txt")
         archivo.writeText(generarLineas(dia).joinToString("\n"))
         compartirArchivo(context, archivo, "text/plain")
     }
@@ -178,7 +178,7 @@ object ReporteExporter {
         }
         pdf.finishPage(pagina)
 
-        val archivo = File(carpetaExport(context), "inventario_${dia.fecha}.pdf")
+        val archivo = File(carpetaExport(context), "inventario_${"sin_fecha"}.pdf")
         FileOutputStream(archivo).use { pdf.writeTo(it) }
         pdf.close()
         compartirArchivo(context, archivo, "application/pdf")
@@ -186,7 +186,7 @@ object ReporteExporter {
 
     // ---------------- WORD ----------------
     fun exportarWord(context: Context, dia: InventarioDia) {
-        val archivo = File(carpetaExport(context), "inventario_${dia.fecha}.docx")
+        val archivo = File(carpetaExport(context), "inventario_${"sin_fecha"}.docx")
         escribirDocx(archivo, generarLineas(dia))
         compartirArchivo(context, archivo, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
     }

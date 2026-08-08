@@ -109,7 +109,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
 
         val ventasHoy = if (turnoActivoId != null) {
             db.ventaDao().obtenerTodas(localId)
-                .filter { it.turnoId == turnoActivoId }
+                
                 .filter { venta ->
                     when (session.getRol()) {
                         "seller" -> venta.usuarioId == session.getUserId()
@@ -131,7 +131,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
 
         val nuevos = if (turnoActivoId != null) {
             db.productoDao().obtenerTodos(localId)
-                .filter { it.turnoId == turnoActivoId }
+                
                 .map { p ->
                     ProductoInfo(
                         id = p.id, nombre = p.nombre, precio = p.precio, stock = p.stock,
@@ -146,7 +146,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         val devolucionesCache = db.devolucionCacheDao().obtener(localId)
         val devueltos = if (devolucionesCache != null) {
             devolucionesCache.toModel()
-                .filter { it.turno_id == turnoActivoId || it.turno_id_resuelto == turnoActivoId }
+                
                 .map { d ->
                     DevueltoInfo(
                         id = d.id ?: "", producto_nombre = d.producto_nombre, cantidad = d.cantidad,
@@ -252,7 +252,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         val idsEnCache = cacheado.ventas.map { it.id }.toSet()
         val pendientes = if (turnoActivoId != null) {
             db.ventaDao().obtenerTodas(localId)
-                .filter { it.turnoId == turnoActivoId }
+                
                 .filter { venta ->
                     when (session.getRol()) {
                         "seller" -> venta.usuarioId == session.getUserId()
