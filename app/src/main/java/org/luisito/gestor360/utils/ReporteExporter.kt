@@ -20,7 +20,6 @@ object ReporteExporter {
 
         val lineas = mutableListOf(
             "Gestor360 - Inventario",
-            "Fecha: ${"sin_fecha"}",
             "Generado el: $generadoEl",
             ""
         )
@@ -105,7 +104,7 @@ object ReporteExporter {
             lineas.add("")
         }
 
-        // Ventas con datos de cliente (solo las que tienen tarjeta o datos de cliente)
+        // Ventas con datos de cliente
         val ventasConCliente = dia.ventas.filter { !it.cliente_nombre.isNullOrBlank() || !it.cliente_ci.isNullOrBlank() }
         if (ventasConCliente.isNotEmpty()) {
             lineas.add("PAGOS POR TARJETA")
@@ -142,14 +141,12 @@ object ReporteExporter {
         context.startActivity(Intent.createChooser(intent, "Compartir ${archivo.name}"))
     }
 
-    // ---------------- TXT ----------------
     fun exportarTxt(context: Context, dia: InventarioDia) {
-        val archivo = File(carpetaExport(context), "inventario_${"sin_fecha"}.txt")
+        val archivo = File(carpetaExport(context), "inventario_sin_fecha.txt")
         archivo.writeText(generarLineas(dia).joinToString("\n"))
         compartirArchivo(context, archivo, "text/plain")
     }
 
-    // ---------------- PDF ----------------
     fun exportarPdf(context: Context, dia: InventarioDia) {
         val lineas = generarLineas(dia)
         val pdf = PdfDocument()
@@ -178,15 +175,14 @@ object ReporteExporter {
         }
         pdf.finishPage(pagina)
 
-        val archivo = File(carpetaExport(context), "inventario_${"sin_fecha"}.pdf")
+        val archivo = File(carpetaExport(context), "inventario_sin_fecha.pdf")
         FileOutputStream(archivo).use { pdf.writeTo(it) }
         pdf.close()
         compartirArchivo(context, archivo, "application/pdf")
     }
 
-    // ---------------- WORD ----------------
     fun exportarWord(context: Context, dia: InventarioDia) {
-        val archivo = File(carpetaExport(context), "inventario_${"sin_fecha"}.docx")
+        val archivo = File(carpetaExport(context), "inventario_sin_fecha.docx")
         escribirDocx(archivo, generarLineas(dia))
         compartirArchivo(context, archivo, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
     }
@@ -215,7 +211,6 @@ object ReporteExporter {
             "<w:body>$cuerpo</w:body></w:document>"
     }
 
-    // ---------------- COMPARTIR ----------------
     fun compartirTexto(context: Context, dia: InventarioDia) {
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"

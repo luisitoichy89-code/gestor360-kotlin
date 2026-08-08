@@ -37,7 +37,6 @@ object CsvExporter {
 
         val filas = mutableListOf(
             listOf("Gestor360 · Inventario"),
-            listOf("Fecha", "sin_fecha"),
             listOf("Generado el", generadoEl),
             listOf("")
         )
@@ -132,7 +131,7 @@ object CsvExporter {
             filas.add(listOf(""))
         }
 
-        compartirCsv(context, "inventario_${dia.fecha ?: "sin_fecha"}.csv", filas)
+        compartirCsv(context, "inventario_sin_fecha.csv", filas)
     }
 
     private fun formatearNumero(valor: Double): String =
