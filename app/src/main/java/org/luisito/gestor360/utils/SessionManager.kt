@@ -7,52 +7,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.luisito.gestor360.security.EncryptedPrefs
 
-/**
- * Fuente de verdad LOCAL (en el dispositivo) de la sesión activa, incluyendo
- * el local_id activo. Es lo que cada repositorio lee para armar el
- * "p_local_id" de cada RPC — así ningún dato se pide o se guarda nunca sin
- * saber a qué local pertenece.
- *
- * IMPORTANTE: localId puede cambiar en caliente (un admin puede tener acceso
- * a varios locales y cambiar de local activo, ver LocalSeleccionViewModel).
- * Todo lo que dependa de localId debe leerlo en el momento de la llamada,
- * nunca cachearlo en un campo de clase.
- *
- * SEGURIDAD: esto se guarda en SharedPreferences CIFRADAS (ver
- * EncryptedPrefs), no planas. "rol" es el campo más sensible acá: si
- * viviera en un .xml plano, un vendedor con acceso root podría editarlo a
- * mano y cambiarse de "seller" a "admin" para saltarse el flujo de
- * aprobaciones. Cifrado, esa edición manual ya no es posible sin la llave
- * del Keystore.
- */
 class SessionManager(context: Context) {
 
     companion object {
-        /**
-         * Aviso EN VIVO (mismo proceso) de que la sesión fue revocada por el
-         * SyncManager (usuario desactivado o licencia no vigente detectada
-         * durante una sincronización). Es `companion` a propósito: cada
-         * pantalla instancia su propio SessionManager, pero todas deben
-         * enterarse del mismo evento sin depender de cuál instancia lo
-         * disparó. Si la app estaba cerrada/proceso muerto cuando ocurrió la
-         * revocación, este StateFlow no alcanza a avisar — para ese caso ver
-         * haySesionRevocadaPersistida(), que sí sobrevive reinicios.
-         */
         private val _sesionRevocada = MutableStateFlow(false)
         val sesionRevocada: StateFlow<Boolean> = _sesionRevocada.asStateFlow()
     }
 
     private val prefs: SharedPreferences = EncryptedPrefs.abrir(context, "gestor360_session")
-
-    /**
-     * Prefs APARTE de la sesión de login: acá vive solo la constancia de que
-     * este dispositivo + su licencia ya se verificaron contra el servidor, y
-     * hasta qué fecha es válida esa licencia. A propósito NO vive en `prefs`
-     * (la de arriba) para que clear()/cerrarSesion() NO la borre: que un
-     * vendedor cierre sesión no significa que el dispositivo deje de estar
-     * verificado. Solo se borra explícitamente desde "cambiar dispositivo"
-     * (ver limpiarLicenciaVerificada()).
-     */
     private val licenciaPrefs: SharedPreferences = EncryptedPrefs.abrir(context, "gestor360_licencia_dispositivo")
 
     fun saveSession(
@@ -73,11 +35,6 @@ class SessionManager(context: Context) {
             .putString("android_id", androidId)
             .putString("nombre", nombre ?: username)
             .apply()
-        // Solo se asigna el local por defecto del usuario si este dispositivo
-        // todavía no tiene ninguno elegido (primer login en el equipo). Si ya
-        // había un local activo (por ejemplo, el admin dejó este tablet en
-        // "Local 2"), se respeta: cerrar sesión y volver a entrar NO debe
-        // regresar al local por defecto del usuario en el servidor.
         if (getLocalId() == null) {
             setLocalId(localId)
         }
@@ -93,21 +50,6 @@ class SessionManager(context: Context) {
 
     fun getRol(): String = prefs.getString("rol", "seller") ?: "seller"
 
-    /**
-     * El local_id ACTIVO en este dispositivo ahora mismo. No hay default
-     * silencioso (antes existía un "1" por defecto que era la causa de que
-     * todos los locales terminaran compartiendo datos): si no hay local_id
-     * seleccionado, esto es null y el llamador debe manejarlo explícitamente
-     * (por ejemplo, mostrando el selector de local).
-     *
-     * IMPORTANTE: vive en `licenciaPrefs`, NO en `prefs`, a propósito — mismo
-     * motivo que la licencia de dispositivo de más abajo. El local activo es
-     * una propiedad del DISPOSITIVO físico (en qué local está esta tablet),
-     * no de la sesión de un usuario particular. Si viviera en `prefs`,
-     * clear()/cerrarSesion() lo borraría cada vez que alguien cierra sesión,
-     * y el admin tendría que volver a elegir "local 2" cada vez que
-     * reingresa — que era justo el bug reportado.
-     */
     fun getLocalId(): Long? {
         val valor = licenciaPrefs.getLong("local_id", -1L)
         return if (valor == -1L) null else valor
@@ -123,13 +65,6 @@ class SessionManager(context: Context) {
 
     fun getAndroidId(): String = prefs.getString("android_id", "") ?: ""
 
-    /**
-     * Marca de tiempo (epoch ms) de la última precarga EXITOSA del caché de
-     * un local específico. Sirve para: (1) no repetir descargas pesadas de
-     * datos si ya se sincronizó hace poco (ahorro de datos), y (2) poder
-     * mostrarle al admin "local 2 actualizado hace 3h" en vez de fallar en
-     * silencio cuando no hay internet.
-     */
     fun getUltimaPrecarga(localId: Long): Long =
         prefs.getLong("ultima_precarga_$localId", 0L)
 
@@ -141,14 +76,6 @@ class SessionManager(context: Context) {
         prefs.edit().clear().apply()
     }
 
-    /**
-     * Guarda que este androidId ya pasó la verificación de dispositivo +
-     * licencia, junto con la fecha de expiración de esa licencia. Mientras
-     * esa fecha no llegue, la app puede saltar la pantalla de verificación
-     * y entrar directo al PIN (con o sin internet) — pieza clave para poder
-     * operar offline hasta un año sin pedirle de nuevo la verificación al
-     * usuario cada vez que abre la app.
-     */
     fun guardarLicenciaVerificada(androidId: String, expiracion: String) {
         licenciaPrefs.edit()
             .putString("android_id_verificado", androidId)
@@ -156,46 +83,54 @@ class SessionManager(context: Context) {
             .apply()
     }
 
-    /**
-     * Fecha de expiración cacheada, solo si corresponde a ESTE mismo
-     * androidId (evita arrastrar una licencia vieja si el device id cambiara
-     * por algún motivo). Devuelve null si nunca se verificó o es de otro
-     * dispositivo.
-     */
     fun getLicenciaVerificadaVigente(androidId: String): String? {
         val guardado = licenciaPrefs.getString("android_id_verificado", null) ?: return null
         if (guardado != androidId) return null
         return licenciaPrefs.getString("licencia_expiracion", null)
     }
 
-    /** Se llama al pedir "cambiar dispositivo": fuerza una verificación online nueva. */
     fun limpiarLicenciaVerificada() {
         licenciaPrefs.edit().clear().apply()
     }
 
-    /**
-     * Llamado por SyncManager cuando, al sincronizar, detecta que el usuario
-     * ya no está activo o la licencia ya no es válida. Persiste en disco
-     * (para que sobreviva a que WorkManager haya corrido con la app cerrada)
-     * Y emite en `sesionRevocada` (para que, si la app está abierta en ese
-     * momento, MainActivity reaccione al instante sin esperar a reabrir).
-     */
     fun marcarSesionRevocada() {
         licenciaPrefs.edit().putBoolean("sesion_revocada", true).apply()
         _sesionRevocada.value = true
     }
 
-    /** Se llama tras procesar la revocación (forzar logout + limpiar caché de licencia). */
     fun limpiarSesionRevocada() {
         licenciaPrefs.edit().remove("sesion_revocada").apply()
         _sesionRevocada.value = false
     }
 
-    /**
-     * Chequeo persistido: cubre el caso en que la revocación ocurrió con la
-     * app cerrada (sync corrida por WorkManager en background/proceso
-     * nuevo). Se consulta al abrir la app, antes de decidir qué pantalla
-     * mostrar.
-     */
     fun haySesionRevocadaPersistida(): Boolean = licenciaPrefs.getBoolean("sesion_revocada", false)
+
+    /**
+     * Verifica contra Supabase que el local_id guardado en sesión
+     * todavía existe. Si no existe, limpia el local_id para que
+     * el usuario no siga operando sobre un local eliminado.
+     *
+     * @return true si el local existe, false si fue eliminado.
+     */
+    suspend fun verificarLocalExiste(): Boolean {
+        val localId = getLocalId() ?: return false
+        return try {
+            val clienteId = getClienteId()
+            if (clienteId.isBlank()) return false
+            val locales = org.luisito.gestor360.data.SupabaseClientProvider.client.postgrest
+                .from("locales")
+                .select("id")
+                .eq("id", localId)
+                .eq("cliente_id", clienteId)
+                .decodeList<org.luisito.gestor360.data.models.Local>()
+            if (locales.isEmpty()) {
+                setLocalId(null)
+                false
+            } else {
+                true
+            }
+        } catch (e: Exception) {
+            true
+        }
+    }
 }

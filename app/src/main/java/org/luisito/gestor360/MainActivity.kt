@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.MainScope
 import org.luisito.gestor360.data.local.FotoRepository
 import org.luisito.gestor360.data.local.AppDatabase
 import org.luisito.gestor360.data.models.User
@@ -51,11 +52,19 @@ import org.luisito.gestor360.utils.SessionManager
 import org.luisito.gestor360.utils.ThemeManager
 
 class MainActivity : ComponentActivity() {
+
+    private fun verificarLocalActivo() {
+        val session = SessionManager(this)
+        kotlinx.coroutines.MainScope().launch {
+            session.verificarLocalExiste()
+        }
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppContextHolder.init(applicationContext)
         SyncWorker.programarPeriodico(applicationContext)
         setContent { Gestor360App() }
+        verificarLocalActivo()
     }
 }
 
