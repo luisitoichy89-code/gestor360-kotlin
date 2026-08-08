@@ -5,8 +5,6 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class InventarioDia(
-    val fecha: String? = null,
-    val solo_lectura: Boolean = false,
     val turno: TurnoInfo? = null,
     val productos_nuevos: List<ProductoInfo> = emptyList(),
     val productos_modificados: List<ProductoInfo> = emptyList(),
@@ -29,7 +27,8 @@ data class InventarioTurno(
     val mermas: List<MermaInfo> = emptyList(),
     val ventas: List<VentaInfo> = emptyList(),
     val productos_vendidos: List<ProductoVendidoInfo> = emptyList(),
-    val totales_ventas: TotalesVentas = TotalesVentas()
+    val totales_ventas: TotalesVentas = TotalesVentas(),
+    val totales_por_tarjeta: List<TotalTarjetaInfo> = emptyList()
 )
 
 @Serializable

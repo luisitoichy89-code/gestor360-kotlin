@@ -26,8 +26,6 @@ import org.luisito.gestor360.ui.viewmodels.CierrePaso
 import org.luisito.gestor360.ui.viewmodels.EstadoPaso
 import org.luisito.gestor360.utils.CsvExporter
 import org.luisito.gestor360.utils.ReporteExporter
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import org.luisito.gestor360.ui.theme.NeuCard
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
@@ -52,15 +50,12 @@ fun InventarioScreen(
     val context = LocalContext.current
     val sessionManager = remember { SessionManager(context) }
     val esAdmin = sessionManager.getRol() == "admin"
-    var mostrarDatePicker by remember { mutableStateOf(false) }
     var pasoCierreTurno by remember { mutableStateOf(PasoCierreTurno.NINGUNO) }
     var mostrarMenuExportar by remember { mutableStateOf(false) }
     var paginaVentas by remember { mutableStateOf(0) }
-    val formatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
 
     LaunchedEffect(androidId) { viewModel.cargar(androidId) }
     LaunchedEffect(uiState.dia) { paginaVentas = 0 }
-
     val dia = uiState.dia
     val ventasNoAnuladas = dia?.ventas?.filter { !it.anulada } ?: emptyList()
     val totalPaginasVentas = maxOf(1, (ventasNoAnuladas.size + VENTAS_POR_PAGINA - 1) / VENTAS_POR_PAGINA)
@@ -87,13 +82,8 @@ fun InventarioScreen(
                         if (onBack != null) { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = MaterialTheme.colorScheme.onSurface) }; Spacer(Modifier.width(4.dp)) }
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Inventario", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(uiState.fecha.format(formatter), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                if (dia?.solo_lectura == true) { Spacer(Modifier.width(6.dp)); Icon(Icons.Default.Lock, "Solo lectura", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(12.dp)) }
-                            }
                         }
-                        if (esAdmin && uiState.esHoy) { IconButton(onClick = { pasoCierreTurno = PasoCierreTurno.CONFIRMAR }) { Icon(Icons.Default.LockOpen, "Cerrar turno", tint = MaterialTheme.colorScheme.error) } }
-                        IconButton(onClick = { mostrarDatePicker = true }) { Icon(Icons.Default.CalendarMonth, "Elegir día", tint = MaterialTheme.colorScheme.onSurface) }
+                        if (esAdmin) { IconButton(onClick = { pasoCierreTurno = PasoCierreTurno.CONFIRMAR }) { Icon(Icons.Default.LockOpen, "Cerrar turno", tint = MaterialTheme.colorScheme.error) } }
                         IconButton(onClick = { viewModel.refrescar() }) { Icon(Icons.Default.Refresh, null, tint = MaterialTheme.colorScheme.onSurface) }
                         if (dia != null && ventasNoAnuladas.isNotEmpty()) {
                             Box {
@@ -272,15 +262,6 @@ fun InventarioScreen(
             }
             pasoCierreTurno = PasoCierreTurno.NINGUNO
         }
-    }
-
-    if (mostrarDatePicker) {
-        val hoy = LocalDate.now()
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = uiState.fecha.atStartOfDay(java.time.ZoneId.of("UTC")).toInstant().toEpochMilli(),
-            selectableDates = object : SelectableDates { override fun isSelectableDate(utcTimeMillis: Long): Boolean = !java.time.Instant.ofEpochMilli(utcTimeMillis).atZone(java.time.ZoneId.of("UTC")).toLocalDate().isAfter(hoy) }
-        )
-        DatePickerDialog(onDismissRequest = { mostrarDatePicker = false }, confirmButton = { TextButton(onClick = { datePickerState.selectedDateMillis?.let { millis -> val fecha = java.time.Instant.ofEpochMilli(millis).atZone(java.time.ZoneId.of("UTC")).toLocalDate(); if (fecha == hoy || esAdmin) viewModel.seleccionarFecha(fecha) }; mostrarDatePicker = false }) { Text("Ver este día") } }, dismissButton = { TextButton(onClick = { mostrarDatePicker = false }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Cancelar") } }) { DatePicker(state = datePickerState) }
     }
 }
 

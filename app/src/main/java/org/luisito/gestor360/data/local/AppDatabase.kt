@@ -227,15 +227,30 @@ val MIGRATION_16_17 = object : Migration(16, 17) {
     }
 }
 
+val MIGRATION_17_18 = object : Migration(17, 18) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("DROP TABLE IF EXISTS inventario_cache")
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS inventario_cache (
+                localId INTEGER NOT NULL,
+                turnoId INTEGER NOT NULL,
+                json TEXT NOT NULL,
+                PRIMARY KEY(localId, turnoId)
+            )
+            """.trimIndent()
+        )
+    }
+}
+
 @Database(
     entities = [
         ProductoEntity::class, AccionPendienteEntity::class, TarjetaEntity::class, VentaEntity::class, ConflictoEntity::class,
-        ProductoEliminadoCacheEntity::class,
-        TurnoEntity::class, MermaEntity::class,
+        ProductoEliminadoCacheEntity::class, TurnoEntity::class, MermaEntity::class,
         UserEntity::class, LocalEntity::class, InventarioCacheEntity::class, DevolucionCacheEntity::class,
         AprobacionStockCacheEntity::class, MovimientoInventarioEntity::class
     ],
-    version = 17,
+    version = 18,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -264,7 +279,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "gestor360.db"
                 )
-                    .addMigrations(MIGRACION_8_9, MIGRACION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17)
+                    .addMigrations(MIGRACION_8_9, MIGRACION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18)
                     .fallbackToDestructiveMigration()
                     .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                     .build().also { db ->

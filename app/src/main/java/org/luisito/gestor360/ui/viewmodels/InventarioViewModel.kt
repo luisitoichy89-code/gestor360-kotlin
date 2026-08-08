@@ -26,22 +26,18 @@ import org.luisito.gestor360.utils.SessionManager
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.data.repository.InventarioRepository
 import org.luisito.gestor360.data.repository.TurnoRepository
-import java.time.LocalDate
 import org.luisito.gestor360.ui.util.mensajeAmigable
 
 data class InventarioUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val isLoadingTurnos: Boolean = false,
-    val fecha: LocalDate = LocalDate.now(),
     val dia: InventarioDia? = null,
     val error: String? = null,
     val turnosDelDia: List<TurnoInfo> = emptyList(),
     val turnosSeleccionadosIds: Set<Long> = emptySet(),
     val pasosCierre: List<CierrePaso> = emptyList()
-) {
-    val esHoy: Boolean get() = fecha == LocalDate.now()
-}
+)
 
 enum class EstadoPaso { PENDIENTE, EN_PROGRESO, COMPLETADO, ERROR }
 
@@ -81,19 +77,14 @@ class InventarioViewModel(
 
     fun cargar(androidId: String) {
         androidIdActual = androidId
-        cargarFecha(_uiState.value.fecha)
-    }
-
-    fun seleccionarFecha(fecha: LocalDate) {
-        _uiState.value = _uiState.value.copy(fecha = fecha, turnosDelDia = emptyList(), turnosSeleccionadosIds = emptySet())
-        cargarFecha(fecha)
+        cargarInventario()
     }
 
     fun toggleTurnoSeleccionado(turnoId: Long) {
         val actuales = _uiState.value.turnosSeleccionadosIds
         val nuevos = if (turnoId in actuales) actuales - turnoId else actuales + turnoId
         _uiState.value = _uiState.value.copy(turnosSeleccionadosIds = nuevos)
-        cargarFecha(_uiState.value.fecha, turnoIds = nuevos.toList())
+        cargarInventario(turnoIds = nuevos.toList())
     }
 
     fun toggleVendedorSeleccionado(turnoIds: List<Long>) {
@@ -101,37 +92,35 @@ class InventarioViewModel(
         val actuales = _uiState.value.turnosSeleccionadosIds
         val nuevos = if (actuales.containsAll(turnoIds)) actuales - turnoIds.toSet() else actuales + turnoIds.toSet()
         _uiState.value = _uiState.value.copy(turnosSeleccionadosIds = nuevos)
-        cargarFecha(_uiState.value.fecha, turnoIds = nuevos.toList())
+        cargarInventario(turnoIds = nuevos.toList())
     }
 
     fun seleccionarTodosLosTurnos() {
         val todos = _uiState.value.turnosDelDia.map { it.id }.toSet()
         _uiState.value = _uiState.value.copy(turnosSeleccionadosIds = todos)
-        cargarFecha(_uiState.value.fecha, turnoIds = emptyList())
+        cargarInventario(turnoIds = emptyList())
     }
 
-    private fun cargarFecha(fecha: LocalDate, turnoIds: List<Long> = emptyList(), forzarRefresh: Boolean = false) {
+    private fun cargarInventario(turnoIds: List<Long> = emptyList(), forzarRefresh: Boolean = false) {
         if (androidIdActual.isBlank()) return
         val esAdmin = esAdminActual
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             repository.getInventarioDia(
-                androidIdActual, fecha,
+                androidIdActual,
                 forzarRefresh = forzarRefresh,
                 turnoIds = turnoIds.ifEmpty { null },
                 vendedorId = if (esAdmin) null else session.getUserId(),
                 onActualizadoDesdeServidor = { actualizado ->
-                    if (_uiState.value.fecha == fecha) {
-                        _uiState.value = _uiState.value.copy(dia = actualizado)
-                    }
+                    _uiState.value = _uiState.value.copy(dia = actualizado)
                 }
             )
                 .onSuccess { dia -> _uiState.value = _uiState.value.copy(isLoading = false, dia = dia) }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.mensajeAmigable("No se pudo cargar el inventario del día")) }
+                .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.mensajeAmigable("No se pudo cargar el inventario")) }
 
             if (esAdmin && _uiState.value.turnosDelDia.isEmpty()) {
                 _uiState.value = _uiState.value.copy(isLoadingTurnos = true)
-                repository.getTurnosDelDia(androidIdActual, fecha)
+                repository.getTurnosDelDia(androidIdActual)
                     .onSuccess { turnos -> _uiState.value = _uiState.value.copy(turnosDelDia = turnos, isLoadingTurnos = false) }
                     .onFailure { _uiState.value = _uiState.value.copy(isLoadingTurnos = false) }
             }
@@ -139,7 +128,7 @@ class InventarioViewModel(
     }
 
     fun refrescar() {
-        cargarFecha(_uiState.value.fecha, turnoIds = _uiState.value.turnosSeleccionadosIds.toList(), forzarRefresh = true)
+        cargarInventario(turnoIds = _uiState.value.turnosSeleccionadosIds.toList(), forzarRefresh = true)
     }
 
     fun cerrarTurno(cierreContado: Double) {
