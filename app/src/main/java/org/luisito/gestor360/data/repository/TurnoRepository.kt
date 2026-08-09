@@ -1,6 +1,7 @@
 package org.luisito.gestor360.data.repository
 
 import android.content.Context
+import android.util.Log
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -26,25 +27,32 @@ class TurnoRepository(
     suspend fun obtenerTurnoActivo(androidId: String): Result<Turno?> {
         val localId = localIdActivo()
         val activoLocal = db.turnoDao().obtenerActivo(localId)
+        Log.d("TurnoRepo", "obtenerTurnoActivo: localId=$localId, activoLocal=${activoLocal?.id}")
         if (activoLocal != null) {
             if (NetworkMonitor.hayInternet(context)) refrescarDesdeServidor(androidId)
             return Result.success(activoLocal.toModel())
         }
-        if (!NetworkMonitor.hayInternet(context)) return Result.success(null)
+        if (!NetworkMonitor.hayInternet(context)) {
+            Log.d("TurnoRepo", "obtenerTurnoActivo: sin internet y sin cache local")
+            return Result.success(null)
+        }
         return try {
             refrescarDesdeServidor(androidId).map { it }
         } catch (e: Exception) {
+            Log.e("TurnoRepo", "obtenerTurnoActivo: excepción", e)
             Result.success(null)
         }
     }
 
     suspend fun refrescarDesdeServidor(androidId: String): Result<Turno?> {
         val localId = localIdActivo()
+        Log.d("TurnoRepo", "refrescarDesdeServidor: obtener_turno_abierto androidId=$androidId localId=$localId")
         return try {
             val turno = SupabaseClientProvider.client.postgrest
                 .rpc("obtener_turno_abierto", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
                 .decodeList<Turno>()
                 .firstOrNull()
+            Log.d("TurnoRepo", "refrescarDesdeServidor: RPC devolvió turno=${turno?.id}")
             if (turno != null) {
                 db.turnoDao().insertar(
                     TurnoEntity(turno.id, turno.usuario_id, turno.apertura, turno.cierre, turno.diferencia, turno.created_at, localId, turno.numero_turno)
@@ -53,6 +61,7 @@ class TurnoRepository(
             db.turnoDao().limpiarDuplicadosAbiertos(localId, turno?.id)
             Result.success(turno)
         } catch (e: Exception) {
+            Log.e("TurnoRepo", "refrescarDesdeServidor: error en RPC obtener_turno_abierto", e)
             Result.failure(e)
         }
     }

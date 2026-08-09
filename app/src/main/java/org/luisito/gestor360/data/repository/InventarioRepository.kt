@@ -336,12 +336,15 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             }
 
             resultado.turno?.let { t ->
+                val turnoExistente = db.turnoDao().obtenerActivo(localId)
+                val numeroTurno = turnoExistente?.numeroTurno ?: 0
                 db.turnoDao().limpiarCerrados(localId)
                 db.turnoDao().insertar(
                     TurnoEntity(
                         id = t.id, usuarioId = null, apertura = t.apertura,
                         cierre = t.cierre, diferencia = t.diferencia,
-                        createdAt = t.created_at, localId = localId
+                        createdAt = t.created_at, localId = localId,
+                        numeroTurno = numeroTurno
                     )
                 )
             }
@@ -416,11 +419,14 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             db.inventarioCacheDao().guardar(resultado.toEntity(localId, turnoActivoId))
 
             resultado.turno?.let { t ->
+                val turnoExistente = db.turnoDao().obtenerActivo(localId)
+                val numeroTurno = turnoExistente?.numeroTurno ?: 0
                 db.turnoDao().insertar(
                     TurnoEntity(
                         id = t.id, usuarioId = null, apertura = t.apertura,
                         cierre = t.cierre, diferencia = t.diferencia,
-                        createdAt = t.created_at, localId = localId
+                        createdAt = t.created_at, localId = localId,
+                        numeroTurno = numeroTurno
                     )
                 )
             }
