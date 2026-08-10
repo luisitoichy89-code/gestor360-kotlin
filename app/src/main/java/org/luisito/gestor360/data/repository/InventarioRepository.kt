@@ -318,12 +318,8 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 })
                 .bodyAsText()
 
-            Log.e("InventarioRepo", "JSON CRUDO: $jsonCrudo")
-
             val jsonParser = Json { ignoreUnknownKeys = true; coerceInputValues = true }
-            val lista = jsonParser.decodeFromString<List<RpcInventarioTurnoResponse>>(jsonCrudo)
-            val response = lista.firstOrNull()?.inventario
-                ?: return Result.failure(IllegalStateException("RPC get_inventario_turno devolvió vacío"))
+            val response = jsonParser.decodeFromString<InventarioTurno>(jsonCrudo)
 
             val resultado = response.toInventarioDiaCompat()
 
@@ -411,10 +407,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                     put("p_local_id", localId)
                     put("p_turno_id", turnoActivoId)
                 })
-                .decodeList<RpcInventarioTurnoResponse>()
-                .firstOrNull()
-                ?.inventario
-                ?: return Result.success(Unit)
+                .decodeAs<InventarioTurno>()
 
             val resultado = response.toInventarioDiaCompat()
             db.inventarioCacheDao().guardar(resultado.toEntity(localId, turnoActivoId))
