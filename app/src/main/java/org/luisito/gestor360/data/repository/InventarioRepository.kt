@@ -7,6 +7,7 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.JsonElement
+import org.luisito.gestor360.BuildConfig
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.local.AppDatabase
 import org.luisito.gestor360.data.local.entities.VentaEntity
@@ -307,12 +308,16 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 return Result.success(diaVacio)
             }
 
-            val response = SupabaseClientProvider.client.postgrest
+            val rpcResult = SupabaseClientProvider.client.postgrest
                 .rpc("get_inventario_turno", buildJsonObject {
                     put("p_android_id", androidId)
                     put("p_local_id", localId)
                     put("p_turno_id", turnoActivoId)
                 })
+            if (BuildConfig.DEBUG) {
+                Log.d("InventarioRepo", "RAW get_inventario_turno: ${rpcResult.data}")
+            }
+            val response = rpcResult
                 .decodeList<RpcInventarioTurnoResponse>()
                 .firstOrNull()
                 ?.inventario
@@ -352,8 +357,8 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             },
             ventas = this.ventas,
             productos_vendidos = this.productos_vendidos,
-            productos_nuevos = this.productos_nuevos,
-            productos_modificados = this.productos_modificados,
+            productos_nuevos = this.productos_nuevos.distinctBy { it.id },
+            productos_modificados = this.productos_modificados.distinctBy { it.id },
             productos_eliminados = this.productos_eliminados,
             mermas = this.mermas,
             devueltos = this.devueltos,
@@ -398,12 +403,16 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             if (turnoActivoId == null) {
                 return Result.success(Unit)
             }
-            val response = SupabaseClientProvider.client.postgrest
+            val rpcResult = SupabaseClientProvider.client.postgrest
                 .rpc("get_inventario_turno", buildJsonObject {
                     put("p_android_id", androidId)
                     put("p_local_id", localId)
                     put("p_turno_id", turnoActivoId)
                 })
+            if (BuildConfig.DEBUG) {
+                Log.d("InventarioRepo", "RAW get_inventario_turno (precarga): ${rpcResult.data}")
+            }
+            val response = rpcResult
                 .decodeList<RpcInventarioTurnoResponse>()
                 .firstOrNull()
                 ?.inventario

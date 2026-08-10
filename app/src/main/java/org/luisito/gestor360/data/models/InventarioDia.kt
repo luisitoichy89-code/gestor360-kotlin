@@ -80,10 +80,10 @@ data class ProductoEliminadoInfo(
 @Serializable
 data class MermaInfo(
     val id: String,
-    val producto_nombre: String,
+    val producto_nombre: String = "Producto eliminado",
     val cantidad: Double,
-    val motivo: String,
-    val estado: String,
+    val motivo: String = "",
+    val estado: String = "pendiente",
     val solicitado_por_nombre: String? = null,
     val resuelto_por_nombre: String? = null,
     val fecha: String? = null
@@ -92,10 +92,10 @@ data class MermaInfo(
 @Serializable
 data class DevueltoInfo(
     val id: String,
-    val producto_nombre: String,
+    val producto_nombre: String = "Producto eliminado",
     val cantidad: Double,
-    val metodo: String,
-    val estado: String,
+    val metodo: String = "",
+    val estado: String = "pendiente",
     val solicitado_por_nombre: String? = null,
     val resuelto_por_nombre: String? = null,
     val resuelto_por_rol: String? = null,
@@ -105,7 +105,7 @@ data class DevueltoInfo(
 @Serializable
 data class VentaInfo(
     val id: String,
-    val producto_nombre: String,
+    val producto_nombre: String = "Producto eliminado",
     val cantidad: Double,
     val total: Double,
     val metodo: String,
