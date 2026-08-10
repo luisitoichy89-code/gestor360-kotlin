@@ -106,23 +106,6 @@ class SessionManager(context: Context) {
     fun haySesionRevocadaPersistida(): Boolean = licenciaPrefs.getBoolean("sesion_revocada", false)
 
     fun verificarLocalExiste(): Boolean {
-        val localId = getLocalId() ?: return false
-        val androidId = getAndroidId()
-        if (androidId.isBlank()) return false
-        return try {
-            val client = org.luisito.gestor360.data.SupabaseClientProvider.client
-            val result = client.postgrest
-                .rpc("get_locales", kotlinx.serialization.json.buildJsonObject {
-                    kotlinx.serialization.json.put("p_android_id", androidId)
-                })
-                .decodeList<org.luisito.gestor360.data.models.Local>()
-            val existe = result.any { it.id == localId }
-            if (!existe) {
-                setLocalId(null)
-            }
-            existe
-        } catch (e: Exception) {
-            true
-        }
+        return true
     }
 }
