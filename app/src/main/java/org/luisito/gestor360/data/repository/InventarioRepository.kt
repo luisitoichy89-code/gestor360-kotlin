@@ -7,7 +7,6 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.Json
 import org.luisito.gestor360.BuildConfig
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.local.AppDatabase
@@ -310,16 +309,13 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 return Result.success(diaVacio)
             }
 
-            val jsonCrudo = SupabaseClientProvider.client.postgrest
+            val response = SupabaseClientProvider.client.postgrest
                 .rpc("get_inventario_turno", buildJsonObject {
                     put("p_android_id", androidId)
                     put("p_local_id", localId)
                     put("p_turno_id", turnoActivoId)
                 })
-                .bodyAsText()
-
-            val jsonParser = Json { ignoreUnknownKeys = true; coerceInputValues = true }
-            val response = jsonParser.decodeFromString<InventarioTurno>(jsonCrudo)
+                .decodeAs<InventarioTurno>()
 
             val resultado = response.toInventarioDiaCompat()
 
