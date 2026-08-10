@@ -15,7 +15,8 @@ object NetworkMonitor {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
         val red = cm.activeNetwork ?: return false
         val capacidades = cm.getNetworkCapabilities(red) ?: return false
-        return capacidades.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        return capacidades.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                capacidades.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
     fun observar(context: Context): Flow<Boolean> = callbackFlow {

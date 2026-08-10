@@ -43,6 +43,7 @@ fun InventarioScreen(
     androidId: String,
     onBack: (() -> Unit)? = null,
     onVerVentasRealizadas: () -> Unit = {},
+    onVerHistorialTurnos: () -> Unit = {},
     viewModel: InventarioViewModel = viewModel(),
     accesoViewModel: AccesoViewModel = viewModel()
 ) {
@@ -84,6 +85,7 @@ fun InventarioScreen(
                             Text("Inventario", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                         }
                         if (esAdmin) { IconButton(onClick = { pasoCierreTurno = PasoCierreTurno.CONFIRMAR }) { Icon(Icons.Default.LockOpen, "Cerrar turno", tint = MaterialTheme.colorScheme.error) } }
+                        IconButton(onClick = { onVerHistorialTurnos() }) { Icon(Icons.Default.History, "Historial de turnos", tint = MaterialTheme.colorScheme.onSurface) }
                         IconButton(onClick = { viewModel.refrescar() }) { Icon(Icons.Default.Refresh, null, tint = MaterialTheme.colorScheme.onSurface) }
                         if (dia != null && ventasNoAnuladas.isNotEmpty()) {
                             Box {
@@ -631,4 +633,8 @@ private fun ConfirmarPinDialog(accesoViewModel: AccesoViewModel, onCancelar: () 
         },
         dismissButton = { TextButton(onClick = onCancelar) { Text("Cancelar") } }
     )
+}
+
+private fun formatearMonto(valor: Double): String {
+    return if (valor == valor.toLong().toDouble()) valor.toLong().toString() else valor.toString()
 }

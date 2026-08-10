@@ -139,14 +139,3 @@ data class TotalesVentas(
     val total: Double = 0.0,
     val cantidad_ventas: Long = 0
 )
-
-@Serializable
-data class RpcEnvelope<T>(
-    val result: T
-)
-
-@Serializable
-data class TurnoCierreResponse(
-    @SerialName("turno_id") val turnoId: Long,
-    @SerialName("numero_turno") val numeroTurno: Int
-)

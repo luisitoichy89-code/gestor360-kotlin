@@ -31,23 +31,18 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         androidId: String,
         forzarRefresh: Boolean = false,
         turnoIds: List<Long>? = null,
-        vendedorId: Long? = null,
         onActualizadoDesdeServidor: (suspend (InventarioDia) -> Unit)? = null
     ): Result<InventarioDia> {
         val localId = localIdActivo()
-        Log.d("InventarioRepo", "getInventarioDia: localId=$localId, forzarRefresh=$forzarRefresh")
 
         if (!turnoIds.isNullOrEmpty()) {
             return refrescarDesdeServidor(androidId, turnoIds)
         }
 
         val turnoActivoId = db.turnoDao().obtenerActivo(localId)?.id
-        Log.d("InventarioRepo", "turnoActivoId desde Room: $turnoActivoId")
-
         val cacheado = if (turnoActivoId != null) {
             db.inventarioCacheDao().obtenerPorTurno(localId, turnoActivoId)
         } else null
-        Log.d("InventarioRepo", "cacheado: ${cacheado != null}")
 
         if (cacheado != null && !forzarRefresh) {
             if (NetworkMonitor.hayInternet(context)) {
@@ -61,12 +56,10 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         }
 
         if (NetworkMonitor.hayInternet(context)) {
-            Log.d("InventarioRepo", "Hay internet, llamando refrescarDesdeServidor")
             return refrescarDesdeServidor(androidId)
                 .onSuccess { onActualizadoDesdeServidor?.invoke(it) }
         }
 
-        Log.d("InventarioRepo", "Sin internet, construyendo desde Room")
         val desdeOffline = cacheado?.let { fusionarConVentasPendientes(it.toModel(), localId) }
             ?: construirDesdeRoom(localId)
         return Result.success(desdeOffline)
@@ -86,7 +79,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         val localId = localIdActivo()
         return try {
             val turnos = SupabaseClientProvider.client.postgrest
-                .rpc("get_turnos", buildJsonObject {
+                .rpc("get_turnos_local", buildJsonObject {
                     put("p_android_id", androidId)
                     put("p_local_id", localId)
                 })
@@ -99,7 +92,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
     }
 
     private suspend fun construirDesdeRoom(localId: Long): InventarioDia {
-        Log.d("InventarioRepo", "construirDesdeRoom: localId=$localId")
         val nombreUsuarioLocal = session.getNombre().takeIf { it.isNotBlank() }
 
         val eliminados = db.productoEliminadoCacheDao().obtenerTodos(localId)
@@ -113,7 +105,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
 
         val turnoActivo = db.turnoDao().obtenerActivo(localId)
         val turnoActivoId = turnoActivo?.id
-        Log.d("InventarioRepo", "construirDesdeRoom: turnoActivoId=$turnoActivoId")
 
         val ventasHoy = if (turnoActivoId != null) {
             db.ventaDao().obtenerTodas(localId)
@@ -127,7 +118,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         } else {
             emptyList()
         }
-        Log.d("InventarioRepo", "construirDesdeRoom: ventasHoy.size=${ventasHoy.size}")
 
         val ventasInfo = ventasHoy.map { it.toVentaInfo(localId, nombreUsuarioLocal, eliminadosPorId) }
         val productosVendidos = fusionarProductosVendidos(emptyList(), ventasHoy, localId, eliminadosPorId)
@@ -139,6 +129,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         )
 
         val nuevos = db.productoDao().obtenerTodos(localId)
+            .filter { it.turnoId == turnoActivoId }
             .map { p ->
                 ProductoInfo(
                     id = p.id, nombre = p.nombre, precio = p.precio, stock = p.stock,
@@ -300,7 +291,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         turnoIds: List<Long>? = null
     ): Result<InventarioDia> {
         val localId = localIdActivo()
-        Log.d("InventarioRepo", "refrescarDesdeServidor: localId=$localId")
         return try {
             val esSinSeleccion = turnoIds.isNullOrEmpty()
             var turnoActivoId = if (esSinSeleccion) {
@@ -310,16 +300,13 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             if (turnoActivoId == null && esSinSeleccion) {
                 turnoActivoId = turnoRepository.obtenerTurnoActivo(androidId).getOrNull()?.id
             }
-            Log.d("InventarioRepo", "turnoActivoId para RPC: $turnoActivoId")
 
             if (turnoActivoId == null) {
-                Log.d("InventarioRepo", "turnoActivoId es null, construyendo desde Room")
                 val diaVacio = construirDesdeRoom(localId)
                 db.inventarioCacheDao().guardar(diaVacio.toEntity(localId, 0))
                 return Result.success(diaVacio)
             }
 
-            Log.d("InventarioRepo", "Llamando RPC get_inventario_turno con turnoId=$turnoActivoId")
             val inventarioTurno = SupabaseClientProvider.client.postgrest
                 .rpc("get_inventario_turno", buildJsonObject {
                     put("p_android_id", androidId)
@@ -328,7 +315,6 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 })
                 .decodeAs<InventarioTurno>()
 
-            Log.d("InventarioRepo", "RPC exitoso. ventas=${inventarioTurno.ventas.size}, efectivo=${inventarioTurno.totales_ventas.efectivo}, transferencia=${inventarioTurno.totales_ventas.transferencia}")
             val resultado = inventarioTurno.toInventarioDiaCompat()
 
             if (turnoIds.isNullOrEmpty()) {
@@ -380,17 +366,19 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         refreshJob?.cancel()
         return try {
             val localId = localIdActivo()
-            SupabaseClientProvider.client.postgrest.rpc(
+            val nuevoTurnoId = SupabaseClientProvider.client.postgrest.rpc(
                 "fn_cerrar_y_reciclar_turno_v2", buildJsonObject {
                     put("p_turno_viejo_id", turnoId)
-                    put("p_turno_nuevo_id", turnoId + 1)
                     put("p_local_id", localId)
                     put("p_cierre_valor", cierre)
                 }
-            ).decodeAs<Int>()
+            ).decodeAs<Long>()
+
+            db.turnoDao().cerrar(turnoId, cierre, 0.0, localId)
+            turnoRepository.refrescarDesdeServidor(androidId)
 
             val diaEnCero = construirDesdeRoom(localId)
-            db.inventarioCacheDao().guardar(diaEnCero.toEntity(localId, turnoId + 1))
+            db.inventarioCacheDao().guardar(diaEnCero.toEntity(localId, nuevoTurnoId))
             Result.success(diaEnCero)
         } catch (e: Exception) {
             Result.failure(e)
@@ -441,8 +429,11 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             return Result.failure(IllegalStateException("Necesitas conexión para revisar la cola"))
         }
         return try {
+            val localId = localIdActivo()
             val cola = SupabaseClientProvider.client.postgrest
-                .rpc("get_sync_queue_jerarquico")
+                .rpc("get_sync_queue_jerarquico", buildJsonObject {
+                    put("p_local_id", localId)
+                })
                 .decodeList<JsonElement>()
             Result.success(cola.size)
         } catch (e: Exception) {
@@ -454,7 +445,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
     suspend fun contarVentasSinTurno(): Result<Int> {
         return try {
             val localId = localIdActivo()
-            val sinTurno = db.ventaDao().obtenerTodas(localId).count { it.turnoId == null }
+            val sinTurno = db.ventaDao().obtenerTodas(localId).count { it.turnoId == 0L }
             Result.success(sinTurno)
         } catch (e: Exception) {
             Log.e("InventarioRepo", "Error analizando ventas sin turno", e)

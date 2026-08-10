@@ -103,14 +103,12 @@ class InventarioViewModel(
 
     private fun cargarInventario(turnoIds: List<Long> = emptyList(), forzarRefresh: Boolean = false) {
         if (androidIdActual.isBlank()) return
-        val esAdmin = esAdminActual
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             repository.getInventarioDia(
                 androidIdActual,
                 forzarRefresh = forzarRefresh,
                 turnoIds = turnoIds.ifEmpty { null },
-                vendedorId = if (esAdmin) null else session.getUserId(),
                 onActualizadoDesdeServidor = { actualizado ->
                     _uiState.value = _uiState.value.copy(dia = actualizado)
                 }
@@ -118,7 +116,7 @@ class InventarioViewModel(
                 .onSuccess { dia -> _uiState.value = _uiState.value.copy(isLoading = false, dia = dia) }
                 .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.mensajeAmigable("No se pudo cargar el inventario")) }
 
-            if (esAdmin && _uiState.value.turnosDelDia.isEmpty()) {
+            if (esAdminActual && _uiState.value.turnosDelDia.isEmpty()) {
                 _uiState.value = _uiState.value.copy(isLoadingTurnos = true)
                 repository.getTurnosDelDia(androidIdActual)
                     .onSuccess { turnos -> _uiState.value = _uiState.value.copy(turnosDelDia = turnos, isLoadingTurnos = false) }
