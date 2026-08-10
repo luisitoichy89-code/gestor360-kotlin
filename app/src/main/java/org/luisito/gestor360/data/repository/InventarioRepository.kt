@@ -7,6 +7,7 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.Json
 import org.luisito.gestor360.BuildConfig
 import org.luisito.gestor360.data.SupabaseClientProvider
 import org.luisito.gestor360.data.local.AppDatabase
@@ -51,23 +52,15 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 refreshJob = CoroutineScope(Dispatchers.IO).launch {
                     refrescarDesdeServidor(androidId)
                         .onSuccess { servidor -> onActualizadoDesdeServidor?.invoke(servidor) }
-                        .onFailure { e -> Log.e("InventarioRepo", "Refresco en segundo plano falló, se queda con la caché", e) }
+                        .onFailure { e -> Log.e("InventarioRepo", "Refresco en segundo plano falló", e) }
                 }
             }
             return Result.success(cacheado.toModel())
         }
 
         if (NetworkMonitor.hayInternet(context)) {
-            val resultadoOnline = refrescarDesdeServidor(androidId)
-            if (resultadoOnline.isSuccess) {
-                resultadoOnline.getOrNull()?.let { onActualizadoDesdeServidor?.invoke(it) }
-                return resultadoOnline
-            }
-            Log.e(
-                "InventarioRepo",
-                "Refresco online falló, se arma con lo que hay en Room en vez de dejar la pantalla en blanco",
-                resultadoOnline.exceptionOrNull()
-            )
+            return refrescarDesdeServidor(androidId)
+                .onSuccess { onActualizadoDesdeServidor?.invoke(it) }
         }
 
         val desdeOffline = cacheado?.let { fusionarConVentasPendientes(it.toModel(), localId) }
@@ -317,19 +310,19 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 return Result.success(diaVacio)
             }
 
-            val rpcResult = SupabaseClientProvider.client.postgrest
+            val jsonCrudo = SupabaseClientProvider.client.postgrest
                 .rpc("get_inventario_turno", buildJsonObject {
                     put("p_android_id", androidId)
                     put("p_local_id", localId)
                     put("p_turno_id", turnoActivoId)
                 })
-            if (BuildConfig.DEBUG) {
-                Log.d("InventarioRepo", "RAW get_inventario_turno: ${rpcResult.data}")
-            }
-            val response = rpcResult
-                .decodeList<RpcInventarioTurnoResponse>()
-                .firstOrNull()
-                ?.inventario
+                .bodyAsText()
+
+            Log.e("InventarioRepo", "JSON CRUDO: $jsonCrudo")
+
+            val jsonParser = Json { ignoreUnknownKeys = true; coerceInputValues = true }
+            val lista = jsonParser.decodeFromString<List<RpcInventarioTurnoResponse>>(jsonCrudo)
+            val response = lista.firstOrNull()?.inventario
                 ?: return Result.failure(IllegalStateException("RPC get_inventario_turno devolvió vacío"))
 
             val resultado = response.toInventarioDiaCompat()
@@ -354,7 +347,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
 
             Result.success(resultado)
         } catch (e: Exception) {
-            Log.e("InventarioRepo", "Error refrescando servidor", e)
+            Log.e("InventarioRepo", "Error refrescando servidor: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -412,16 +405,12 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             if (turnoActivoId == null) {
                 return Result.success(Unit)
             }
-            val rpcResult = SupabaseClientProvider.client.postgrest
+            val response = SupabaseClientProvider.client.postgrest
                 .rpc("get_inventario_turno", buildJsonObject {
                     put("p_android_id", androidId)
                     put("p_local_id", localId)
                     put("p_turno_id", turnoActivoId)
                 })
-            if (BuildConfig.DEBUG) {
-                Log.d("InventarioRepo", "RAW get_inventario_turno (precarga): ${rpcResult.data}")
-            }
-            val response = rpcResult
                 .decodeList<RpcInventarioTurnoResponse>()
                 .firstOrNull()
                 ?.inventario
