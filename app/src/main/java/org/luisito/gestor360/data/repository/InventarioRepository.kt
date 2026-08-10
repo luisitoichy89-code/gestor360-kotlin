@@ -51,14 +51,23 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 refreshJob = CoroutineScope(Dispatchers.IO).launch {
                     refrescarDesdeServidor(androidId)
                         .onSuccess { servidor -> onActualizadoDesdeServidor?.invoke(servidor) }
+                        .onFailure { e -> Log.e("InventarioRepo", "Refresco en segundo plano falló, se queda con la caché", e) }
                 }
             }
             return Result.success(cacheado.toModel())
         }
 
         if (NetworkMonitor.hayInternet(context)) {
-            return refrescarDesdeServidor(androidId)
-                .onSuccess { onActualizadoDesdeServidor?.invoke(it) }
+            val resultadoOnline = refrescarDesdeServidor(androidId)
+            if (resultadoOnline.isSuccess) {
+                resultadoOnline.getOrNull()?.let { onActualizadoDesdeServidor?.invoke(it) }
+                return resultadoOnline
+            }
+            Log.e(
+                "InventarioRepo",
+                "Refresco online falló, se arma con lo que hay en Room en vez de dejar la pantalla en blanco",
+                resultadoOnline.exceptionOrNull()
+            )
         }
 
         val desdeOffline = cacheado?.let { fusionarConVentasPendientes(it.toModel(), localId) }
