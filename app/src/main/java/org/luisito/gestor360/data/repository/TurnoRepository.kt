@@ -11,7 +11,6 @@ import org.luisito.gestor360.data.local.entities.TurnoEntity
 import org.luisito.gestor360.data.local.entities.toModel
 import org.luisito.gestor360.data.models.Turno
 import org.luisito.gestor360.data.sync.NetworkMonitor
-import org.luisito.gestor360.data.sync.SyncWorker
 import org.luisito.gestor360.utils.AppContextHolder
 import org.luisito.gestor360.utils.SessionManager
 
@@ -46,20 +45,27 @@ class TurnoRepository(
 
     suspend fun refrescarDesdeServidor(androidId: String): Result<Turno?> {
         val localId = localIdActivo()
-        Log.d("TurnoRepo", "refrescarDesdeServidor: obtener_turno_abierto androidId=$androidId localId=$localId")
+        Log.d("TurnoRepo", "refrescarDesdeServidor: obtener_turno_abierto localId=$localId")
         return try {
-            val turno = SupabaseClientProvider.client.postgrest
-                .rpc("obtener_turno_abierto", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
-                .decodeList<Turno>()
-                .firstOrNull()
-            Log.d("TurnoRepo", "refrescarDesdeServidor: RPC devolvió turno=${turno?.id}")
-            if (turno != null) {
-                db.turnoDao().insertar(
-                    TurnoEntity(turno.id, turno.usuario_id, turno.apertura, turno.cierre, turno.diferencia, turno.created_at, localId, turno.numero_turno)
-                )
+            val turnoId = SupabaseClientProvider.client.postgrest
+                .rpc("obtener_turno_abierto", buildJsonObject { put("p_local_id", localId) })
+                .decodeAs<Long>()
+            Log.d("TurnoRepo", "refrescarDesdeServidor: RPC devolvió turnoId=$turnoId")
+            if (turnoId > 0) {
+                val turnos = SupabaseClientProvider.client.postgrest
+                    .rpc("get_turnos", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
+                    .decodeList<Turno>()
+                val turno = turnos.firstOrNull { it.id == turnoId }
+                if (turno != null) {
+                    db.turnoDao().insertar(
+                        TurnoEntity(turno.id, turno.usuario_id, turno.apertura, turno.cierre, turno.diferencia, turno.created_at, localId, turno.numero_turno)
+                    )
+                    db.turnoDao().limpiarDuplicadosAbiertos(localId, turno.id)
+                }
+                Result.success(turno)
+            } else {
+                Result.success(null)
             }
-            db.turnoDao().limpiarDuplicadosAbiertos(localId, turno?.id)
-            Result.success(turno)
         } catch (e: Exception) {
             Log.e("TurnoRepo", "refrescarDesdeServidor: error en RPC obtener_turno_abierto", e)
             Result.failure(e)
@@ -99,14 +105,19 @@ class TurnoRepository(
 
     suspend fun precargarLocal(androidId: String, localId: Long): Result<Unit> {
         return try {
-            val turno = SupabaseClientProvider.client.postgrest
-                .rpc("obtener_turno_abierto", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
-                .decodeList<Turno>()
-                .firstOrNull()
-            if (turno != null) {
-                db.turnoDao().insertar(
-                    TurnoEntity(turno.id, turno.usuario_id, turno.apertura, turno.cierre, turno.diferencia, turno.created_at, localId, turno.numero_turno)
-                )
+            val turnoId = SupabaseClientProvider.client.postgrest
+                .rpc("obtener_turno_abierto", buildJsonObject { put("p_local_id", localId) })
+                .decodeAs<Long>()
+            if (turnoId > 0) {
+                val turnos = SupabaseClientProvider.client.postgrest
+                    .rpc("get_turnos", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
+                    .decodeList<Turno>()
+                val turno = turnos.firstOrNull { it.id == turnoId }
+                if (turno != null) {
+                    db.turnoDao().insertar(
+                        TurnoEntity(turno.id, turno.usuario_id, turno.apertura, turno.cierre, turno.diferencia, turno.created_at, localId, turno.numero_turno)
+                    )
+                }
             }
             Result.success(Unit)
         } catch (e: Exception) {
