@@ -32,6 +32,12 @@ data class InventarioTurno(
 )
 
 @Serializable
+data class RpcInventarioTurnoResponse(
+    @SerialName("get_inventario_turno")
+    val inventario: InventarioTurno
+)
+
+@Serializable
 data class TotalTarjetaInfo(
     val nombre: String,
     val total: Double = 0.0

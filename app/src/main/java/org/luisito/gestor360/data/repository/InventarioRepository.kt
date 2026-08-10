@@ -307,15 +307,18 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 return Result.success(diaVacio)
             }
 
-            val inventarioTurno = SupabaseClientProvider.client.postgrest
+            val response = SupabaseClientProvider.client.postgrest
                 .rpc("get_inventario_turno", buildJsonObject {
                     put("p_android_id", androidId)
                     put("p_local_id", localId)
                     put("p_turno_id", turnoActivoId)
                 })
-                .decodeAs<InventarioTurno>()
+                .decodeList<RpcInventarioTurnoResponse>()
+                .firstOrNull()
+                ?.inventario
+                ?: return Result.failure(IllegalStateException("RPC get_inventario_turno devolvió vacío"))
 
-            val resultado = inventarioTurno.toInventarioDiaCompat()
+            val resultado = response.toInventarioDiaCompat()
 
             if (turnoIds.isNullOrEmpty()) {
                 db.inventarioCacheDao().guardar(resultado.toEntity(localId, turnoActivoId))
@@ -395,15 +398,18 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             if (turnoActivoId == null) {
                 return Result.success(Unit)
             }
-            val inventarioTurno = SupabaseClientProvider.client.postgrest
+            val response = SupabaseClientProvider.client.postgrest
                 .rpc("get_inventario_turno", buildJsonObject {
                     put("p_android_id", androidId)
                     put("p_local_id", localId)
                     put("p_turno_id", turnoActivoId)
                 })
-                .decodeAs<InventarioTurno>()
+                .decodeList<RpcInventarioTurnoResponse>()
+                .firstOrNull()
+                ?.inventario
+                ?: return Result.success(Unit)
 
-            val resultado = inventarioTurno.toInventarioDiaCompat()
+            val resultado = response.toInventarioDiaCompat()
             db.inventarioCacheDao().guardar(resultado.toEntity(localId, turnoActivoId))
 
             resultado.turno?.let { t ->
