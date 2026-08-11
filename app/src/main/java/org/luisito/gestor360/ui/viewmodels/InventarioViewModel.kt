@@ -2,24 +2,11 @@ package org.luisito.gestor360.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.android.Android
-import io.ktor.client.request.header
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
-import io.ktor.http.contentType
-import io.ktor.http.isSuccess
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import org.luisito.gestor360.BuildConfig
 import org.luisito.gestor360.data.models.InventarioDia
 import org.luisito.gestor360.data.models.TurnoInfo
 import org.luisito.gestor360.utils.SessionManager
@@ -50,18 +37,9 @@ data class CierrePaso(
 private val NOMBRES_PASOS_CIERRE = listOf(
     "Revisando órdenes de cola",
     "Analizando ventas",
-    "Verificando stock",
     "Revisando devoluciones",
     "Revisando mermas",
     "Verificando aprobaciones pendientes"
-)
-
-private const val URL_VALIDAR_STOCK = "https://duspeazziwxptcrignju.supabase.co/functions/v1/validar-punto5"
-
-@Serializable
-private data class ValidarStockRequest(
-    @SerialName("local_id") val localId: Long,
-    @SerialName("turno_id") val turnoId: Long
 )
 
 class InventarioViewModel(
@@ -72,7 +50,6 @@ class InventarioViewModel(
     private var androidIdActual = ""
     private val session = SessionManager(AppContextHolder.context)
     private val esAdminActual: Boolean get() = session.getRol() == "admin"
-    private val httpClient by lazy { HttpClient(Android) }
     private val turnoRepository = TurnoRepository()
 
     fun cargar(androidId: String) {
@@ -150,6 +127,7 @@ class InventarioViewModel(
             )
 
             actualizarPaso(0, EstadoPaso.EN_PROGRESO)
+            delay(2000)
             repository.contarColaPendiente(androidIdActual)
                 .onSuccess { pendientes ->
                     actualizarPaso(0, EstadoPaso.COMPLETADO, detalle = "$pendientes pendiente${if (pendientes == 1) "" else "s"}")
@@ -159,6 +137,7 @@ class InventarioViewModel(
                 }
 
             actualizarPaso(1, EstadoPaso.EN_PROGRESO)
+            delay(2000)
             repository.contarVentasSinTurno()
                 .onSuccess { huerfanas ->
                     actualizarPaso(1, EstadoPaso.COMPLETADO, detalle = "$huerfanas venta${if (huerfanas == 1) "" else "s"} sin turno")
@@ -168,66 +147,33 @@ class InventarioViewModel(
                 }
 
             actualizarPaso(2, EstadoPaso.EN_PROGRESO)
-            var turno = _uiState.value.dia?.turno
-            if (turno == null) {
-                val turnoRemoto = turnoRepository.obtenerTurnoActivo(androidIdActual).getOrNull()
-                if (turnoRemoto != null) {
-                    turno = TurnoInfo(
-                        id = turnoRemoto.id,
-                        apertura = turnoRemoto.apertura,
-                        cierre = turnoRemoto.cierre,
-                        diferencia = turnoRemoto.diferencia,
-                        created_at = turnoRemoto.created_at,
-                        usuario_nombre = turnoRemoto.usuario_nombre,
-                        usuario_rol = turnoRemoto.usuario_rol
-                    )
-                }
-            }
-            if (turno == null) {
-                actualizarPaso(2, EstadoPaso.ERROR, detalle = "No hay turno cargado")
-            } else {
-                try {
-                    val localId = session.getLocalId() ?: 0L
-                    val respuesta = httpClient.post(URL_VALIDAR_STOCK) {
-                        header("Authorization", "Bearer ${BuildConfig.SUPABASE_KEY}")
-                        contentType(ContentType.Application.Json)
-                        setBody(Json.encodeToString(ValidarStockRequest(localId = localId, turnoId = turno.id)))
-                    }
-                    if (respuesta.status.isSuccess()) {
-                        actualizarPaso(2, EstadoPaso.COMPLETADO, detalle = respuesta.bodyAsText())
-                    } else {
-                        actualizarPaso(2, EstadoPaso.ERROR, detalle = "Error ${respuesta.status.value}")
-                    }
-                } catch (e: Exception) {
-                    actualizarPaso(2, EstadoPaso.ERROR, detalle = e.mensajeAmigable("No se pudo verificar el stock"))
-                }
-            }
-
-            actualizarPaso(3, EstadoPaso.EN_PROGRESO)
+            delay(2000)
             repository.contarDevolucionesPendientes()
                 .onSuccess { pendientes ->
-                    actualizarPaso(3, EstadoPaso.COMPLETADO, detalle = "$pendientes devolución${if (pendientes == 1) "" else "es"} pendiente${if (pendientes == 1) "" else "s"}")
+                    actualizarPaso(2, EstadoPaso.COMPLETADO, detalle = "$pendientes devolución${if (pendientes == 1) "" else "es"} pendiente${if (pendientes == 1) "" else "s"}")
                 }
                 .onFailure { e ->
-                    actualizarPaso(3, EstadoPaso.ERROR, detalle = e.mensajeAmigable("No se pudieron revisar las devoluciones"))
+                    actualizarPaso(2, EstadoPaso.ERROR, detalle = e.mensajeAmigable("No se pudieron revisar las devoluciones"))
+                }
+
+            actualizarPaso(3, EstadoPaso.EN_PROGRESO)
+            delay(2000)
+            repository.contarMermasPendientes()
+                .onSuccess { pendientes ->
+                    actualizarPaso(3, EstadoPaso.COMPLETADO, detalle = "$pendientes merma${if (pendientes == 1) "" else "s"} pendiente${if (pendientes == 1) "" else "s"}")
+                }
+                .onFailure { e ->
+                    actualizarPaso(3, EstadoPaso.ERROR, detalle = e.mensajeAmigable("No se pudieron revisar las mermas"))
                 }
 
             actualizarPaso(4, EstadoPaso.EN_PROGRESO)
-            repository.contarMermasPendientes()
-                .onSuccess { pendientes ->
-                    actualizarPaso(4, EstadoPaso.COMPLETADO, detalle = "$pendientes merma${if (pendientes == 1) "" else "s"} pendiente${if (pendientes == 1) "" else "s"}")
-                }
-                .onFailure { e ->
-                    actualizarPaso(4, EstadoPaso.ERROR, detalle = e.mensajeAmigable("No se pudieron revisar las mermas"))
-                }
-
-            actualizarPaso(5, EstadoPaso.EN_PROGRESO)
+            delay(2000)
             repository.haySolicitudesPendientes()
                 .onSuccess { pendientes ->
-                    actualizarPaso(5, EstadoPaso.COMPLETADO, detalle = "$pendientes aprobación${if (pendientes == 1) "" else "es"} pendiente${if (pendientes == 1) "" else "s"}")
+                    actualizarPaso(4, EstadoPaso.COMPLETADO, detalle = "$pendientes aprobación${if (pendientes == 1) "" else "es"} pendiente${if (pendientes == 1) "" else "s"}")
                 }
                 .onFailure { e ->
-                    actualizarPaso(5, EstadoPaso.ERROR, detalle = e.mensajeAmigable("No se pudieron revisar las aprobaciones"))
+                    actualizarPaso(4, EstadoPaso.ERROR, detalle = e.mensajeAmigable("No se pudieron revisar las aprobaciones"))
                 }
         }
     }
@@ -241,6 +187,5 @@ class InventarioViewModel(
 
     override fun onCleared() {
         super.onCleared()
-        httpClient.close()
     }
 }
