@@ -34,6 +34,24 @@ class SaleRepository(
 
     data class DatosCliente(val ci: String, val telefono: String, val nombre: String, val banco: String? = null, val tarjetaId: String? = null)
 
+    private suspend fun asegurarTurnoActivo(localId: Long): Long? {
+        val turnoLocal = db.turnoDao().obtenerActivo(localId)?.id
+        if (turnoLocal != null) return turnoLocal
+        if (!NetworkMonitor.hayInternet(context)) return null
+        return try {
+            val turnoId = SupabaseClientProvider.client.postgrest
+                .rpc("obtener_turno_abierto", buildJsonObject { put("p_local_id", localId) })
+                .decodeAs<Long>()
+            if (turnoId > 0) {
+                val turnoRepository = TurnoRepository(context)
+                turnoRepository.refrescarDesdeServidor(session.getAndroidId())
+                turnoId
+            } else null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     suspend fun guardarVenta(
         androidId: String, carrito: List<CartItem>, metodo: String,
         montoEfectivo: Double, montoTransferencia: Double, cliente: DatosCliente? = null
@@ -41,7 +59,10 @@ class SaleRepository(
         if (carrito.isEmpty()) return Result.failure(IllegalStateException("El carrito está vacío"))
         val totalVenta = carrito.sumOf { it.subtotal }
         if (totalVenta <= 0.0) return Result.failure(IllegalStateException("El total de la venta debe ser mayor a 0"))
+
         val localId = try { localIdActivo() } catch (e: Exception) { return Result.failure(e) }
+
+        val turnoActivoId = asegurarTurnoActivo(localId)
 
         val fallos = mutableListOf<Pair<CartItem, Exception>>()
 
@@ -55,12 +76,7 @@ class SaleRepository(
                 val accionId = UUID.randomUUID().toString()
 
                 productRepository.descontarStockLocal(item.productId, item.cantidad)
-                // Turno activo conocido localmente (turno_cache, poblado cada
-                // vez que hay respuesta del servidor). Se usa tanto para
-                // marcar la venta local como para que "Mis Ventas" y el
-                // reporte offline puedan contarla en el turno correcto sin
-                // depender de comparar horas.
-                val turnoActivoId = db.turnoDao().obtenerActivo(localId)?.id
+
                 val ventaLocal = Sale(
                     id = id, producto_id = item.productId, producto_nombre = item.nombre,
                     cantidad = item.cantidad, total = item.subtotal,
@@ -121,10 +137,6 @@ class SaleRepository(
             val ventas = SupabaseClientProvider.client.postgrest
                 .rpc("get_ventas", buildJsonObject { put("p_android_id", androidId); put("p_local_id", localId) })
                 .decodeList<Sale>()
-            // BLINDAJE: limpiar + insertar ahora corre como una sola transacción
-            // atómica (reemplazarDeLocal en VentaDao) para que un corte de luz o
-            // de red a mitad de camino no deje ventas_cache vacía sin llegar a
-            // reinsertar las ventas ya sincronizadas.
             db.ventaDao().reemplazarDeLocal(localId, ventas.map { it.toEntity(localId, sincronizada = true) })
             Result.success(ventas)
         } catch (e: Exception) {
