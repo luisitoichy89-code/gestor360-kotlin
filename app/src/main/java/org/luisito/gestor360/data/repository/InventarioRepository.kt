@@ -370,6 +370,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             val localId = localIdActivo()
             val nuevoTurnoId = SupabaseClientProvider.client.postgrest.rpc(
                 "fn_cerrar_y_reciclar_turno_v2", buildJsonObject {
+                    put("p_android_id", androidId)
                     put("p_turno_viejo_id", turnoId)
                     put("p_local_id", localId)
                     put("p_cierre_valor", cierre)
