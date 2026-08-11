@@ -35,7 +35,7 @@ private const val VENTAS_POR_PAGINA = 20
 private data class TarjetaResumen(val nombre: String, val numero: String, val titular: String?, val total: Double)
 private data class VendedorFiltro(val nombre: String, val turnoIds: List<Long>)
 
-private enum class PasoCierreTurno { NINGUNO, CONFIRMAR, PIN, VERIFICANDO, MONTO, PROCESANDO }
+private enum class PasoCierreTurno { NINGUNO, CONFIRMAR, PIN, VERIFICANDO, PENDIENTES, MONTO, PROCESANDO, EXITOSO }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,6 +54,7 @@ fun InventarioScreen(
     var pasoCierreTurno by remember { mutableStateOf(PasoCierreTurno.NINGUNO) }
     var mostrarMenuExportar by remember { mutableStateOf(false) }
     var paginaVentas by remember { mutableStateOf(0) }
+    var pendientesCierre by remember { mutableStateOf<List<String>>(emptyList()) }
 
     LaunchedEffect(androidId) { viewModel.cargar(androidId) }
     LaunchedEffect(uiState.dia) { paginaVentas = 0 }
@@ -156,41 +157,41 @@ fun InventarioScreen(
 
                         item { TotalesGeneralesCard(dia.totales_ventas) }
                         item { SeccionTitulo("Tarjeta", Icons.Default.CreditCard) }
-                        if (tarjetasResumen.isEmpty()) item { TextoVacioSeccion("Sin cobros por tarjeta este día") }
+                        if (tarjetasResumen.isEmpty()) item { TextoVacioSeccion("Sin cobros por tarjeta") }
                         items(tarjetasResumen, key = { "tj_${it.nombre}_${it.numero}" }) { t -> TarjetaResumenRow(t) }
 
                         item { SeccionTitulo("Productos vendidos", Icons.Default.PointOfSale) }
-                        if (dia.productos_vendidos.isEmpty()) item { TextoVacioSeccion("Sin ventas este día") }
+                        if (dia.productos_vendidos.isEmpty()) item { TextoVacioSeccion("Sin ventas") }
                         items(dia.productos_vendidos, key = { "pv_${it.nombre}" }) { p -> ProductoVendidoRow(p) }
 
                         item { SeccionTitulo("Pagos por tarjetas", Icons.Default.CreditCard) }
-                        if (pagosPorTarjeta.isEmpty()) item { TextoVacioSeccion("Sin pagos por tarjeta este día") }
+                        if (pagosPorTarjeta.isEmpty()) item { TextoVacioSeccion("Sin pagos por tarjeta") }
                         items(pagosPorTarjeta, key = { "pg_${it.id}" }) { v -> PagoTarjetaRow(v) }
 
                         item { SeccionTitulo("Productos nuevos ingresados", Icons.Default.AddBox) }
-                        if (dia.productos_nuevos.isEmpty()) item { TextoVacioSeccion("Sin productos nuevos este día") }
+                        if (dia.productos_nuevos.isEmpty()) item { TextoVacioSeccion("Sin productos nuevos") }
                         items(dia.productos_nuevos, key = { "pn_${it.id}" }) { p -> ProductoNuevoRow(p) }
 
                         item { Spacer(Modifier.height(4.dp)); Divider(); Spacer(Modifier.height(4.dp)) }
                         item { SeccionTitulo("Productos modificados", Icons.Default.Edit) }
-                        if (dia.productos_modificados.isEmpty()) item { TextoVacioSeccion("Sin productos modificados este día") }
+                        if (dia.productos_modificados.isEmpty()) item { TextoVacioSeccion("Sin productos modificados") }
                         items(dia.productos_modificados, key = { "pm_${it.id}" }) { p -> ProductoInfoRow(p) }
 
                         item { SeccionTitulo("Productos eliminados", Icons.Default.Delete) }
-                        if (dia.productos_eliminados.isEmpty()) item { TextoVacioSeccion("Sin productos eliminados este día") }
+                        if (dia.productos_eliminados.isEmpty()) item { TextoVacioSeccion("Sin productos eliminados") }
                         items(dia.productos_eliminados, key = { "pe_${it.id}" }) { p -> ProductoEliminadoRow(p) }
 
                         item { SeccionTitulo("Devueltos", Icons.Default.AssignmentReturn) }
-                        if (dia.devueltos.isEmpty()) item { TextoVacioSeccion("Sin devoluciones este día") }
+                        if (dia.devueltos.isEmpty()) item { TextoVacioSeccion("Sin devoluciones") }
                         items(dia.devueltos, key = { "dv_${it.id}" }) { d -> DevueltoInfoRow(d) }
 
                         item { SeccionTitulo("Mermas", Icons.Default.Warning) }
-                        if (dia.mermas.isEmpty()) item { TextoVacioSeccion("Sin mermas este día") }
+                        if (dia.mermas.isEmpty()) item { TextoVacioSeccion("Sin mermas") }
                         items(dia.mermas, key = { "me_${it.id}" }) { m -> MermaInfoRow(m) }
 
                         item { Spacer(Modifier.height(4.dp)); Divider(); Spacer(Modifier.height(4.dp)) }
                         item { SeccionTitulo("Detalle de ventas", Icons.Default.Receipt) }
-                        if (ventasNoAnuladas.isEmpty()) item { TextoVacioSeccion("Sin ventas este día") }
+                        if (ventasNoAnuladas.isEmpty()) item { TextoVacioSeccion("Sin ventas") }
                         items(ventasPagina, key = { "vt_${it.id}" }) { v -> VentaInfoRow(v) }
                         if (ventasNoAnuladas.isNotEmpty()) item { PaginacionBar(pagina = paginaSegura, totalPaginas = totalPaginasVentas, onPaginaAnterior = { paginaVentas = paginaSegura - 1 }, onPaginaSiguiente = { paginaVentas = paginaSegura + 1 }) }
 
@@ -206,7 +207,7 @@ fun InventarioScreen(
             onDismissRequest = { pasoCierreTurno = PasoCierreTurno.NINGUNO },
             icon = { Icon(Icons.Default.WarningAmber, null, tint = MaterialTheme.colorScheme.error) },
             title = { Text("¿Cerrar turno de todo el local?") },
-            text = { Text("Esto reinicia a cero el inventario y las ventas de TODOS los vendedores de este local, no solo el tuyo. Úsalo solo cuando ya hayas recogido el dinero de todos.") },
+            text = { Text("Esto reinicia a cero el inventario y las ventas de TODOS los vendedores de este local.") },
             confirmButton = { TextButton(onClick = { pasoCierreTurno = PasoCierreTurno.PIN }) { Text("Continuar", color = MaterialTheme.colorScheme.error) } },
             dismissButton = { TextButton(onClick = { pasoCierreTurno = PasoCierreTurno.NINGUNO }) { Text("Cancelar") } }
         )
@@ -218,7 +219,7 @@ fun InventarioScreen(
             onCancelar = { pasoCierreTurno = PasoCierreTurno.NINGUNO },
             onPinCorrecto = {
                 pasoCierreTurno = PasoCierreTurno.VERIFICANDO
-                viewModel.verificarCierre()
+                pendientesCierre = viewModel.verificarCierre()
             }
         )
     }
@@ -233,14 +234,40 @@ fun InventarioScreen(
             terminado = verificacionTerminada,
             hayErrores = hayErrores,
             onCancelar = { pasoCierreTurno = PasoCierreTurno.NINGUNO },
-            onReintentar = { viewModel.verificarCierre() }
+            onReintentar = {
+                pasoCierreTurno = PasoCierreTurno.VERIFICANDO
+                pendientesCierre = viewModel.verificarCierre()
+            }
         )
 
-        LaunchedEffect(verificacionTerminada, hayErrores) {
-            if (verificacionTerminada && !hayErrores) {
-                pasoCierreTurno = PasoCierreTurno.MONTO
+        LaunchedEffect(verificacionTerminada) {
+            if (verificacionTerminada) {
+                if (hayErrores) {
+                    pasoCierreTurno = PasoCierreTurno.PENDIENTES
+                } else {
+                    pasoCierreTurno = PasoCierreTurno.MONTO
+                }
             }
         }
+    }
+
+    if (pasoCierreTurno == PasoCierreTurno.PENDIENTES) {
+        AlertDialog(
+            onDismissRequest = { pasoCierreTurno = PasoCierreTurno.NINGUNO },
+            icon = { Icon(Icons.Default.WarningAmber, null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Pendientes por resolver") },
+            text = {
+                Column {
+                    Text("Debes resolver lo siguiente antes de cerrar el turno:")
+                    Spacer(Modifier.height(8.dp))
+                    pendientesCierre.forEach { p ->
+                        Text("• $p", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { pasoCierreTurno = PasoCierreTurno.NINGUNO }) { Text("Entendido") } },
+            dismissButton = null
+        )
     }
 
     if (pasoCierreTurno == PasoCierreTurno.MONTO && dia != null) {
@@ -257,13 +284,28 @@ fun InventarioScreen(
 
     if (pasoCierreTurno == PasoCierreTurno.PROCESANDO) {
         CerrandoTurnoDialog()
-        LaunchedEffect(Unit) {
-            withTimeoutOrNull(15_000) {
-                snapshotFlow { uiState.isSaving }.first { it }
-                snapshotFlow { uiState.isSaving }.first { !it }
+        LaunchedEffect(uiState.cierreExitoso, uiState.error) {
+            if (uiState.cierreExitoso) {
+                pasoCierreTurno = PasoCierreTurno.EXITOSO
+            } else if (uiState.error != null) {
+                pasoCierreTurno = PasoCierreTurno.NINGUNO
             }
-            pasoCierreTurno = PasoCierreTurno.NINGUNO
         }
+    }
+
+    if (pasoCierreTurno == PasoCierreTurno.EXITOSO) {
+        AlertDialog(
+            onDismissRequest = { pasoCierreTurno = PasoCierreTurno.NINGUNO },
+            icon = { Icon(Icons.Default.CheckCircle, null, tint = androidx.compose.ui.graphics.Color(0xFF43A047)) },
+            title = { Text("Turno cerrado exitosamente") },
+            text = { Text("Se ha abierto un nuevo turno automáticamente.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    pasoCierreTurno = PasoCierreTurno.NINGUNO
+                    viewModel.refrescar()
+                }) { Text("Continuar") }
+            }
+        )
     }
 }
 

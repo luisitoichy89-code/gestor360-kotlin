@@ -23,7 +23,8 @@ data class InventarioUiState(
     val error: String? = null,
     val turnosDelDia: List<TurnoInfo> = emptyList(),
     val turnosSeleccionadosIds: Set<Long> = emptySet(),
-    val pasosCierre: List<CierrePaso> = emptyList()
+    val pasosCierre: List<CierrePaso> = emptyList(),
+    val cierreExitoso: Boolean = false
 )
 
 enum class EstadoPaso { PENDIENTE, EN_PROGRESO, COMPLETADO, ERROR }
@@ -112,15 +113,23 @@ class InventarioViewModel(
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             repository.cerrarTurno(androidIdActual, turno.id, cierreContado)
                 .onSuccess { diaEnCero ->
-                    _uiState.value = _uiState.value.copy(dia = diaEnCero)
+                    _uiState.value = _uiState.value.copy(
+                        dia = diaEnCero,
+                        isSaving = false,
+                        cierreExitoso = true
+                    )
                 }
-                .onFailure { e -> _uiState.value = _uiState.value.copy(error = e.mensajeAmigable("No se pudo cerrar el turno")) }
-            _uiState.value = _uiState.value.copy(isSaving = false)
+                .onFailure { e ->
+                    _uiState.value = _uiState.value.copy(
+                        isSaving = false,
+                        error = e.mensajeAmigable("No se pudo cerrar el turno")
+                    )
+                }
         }
     }
 
-    fun verificarCierre() {
-        if (androidIdActual.isBlank()) return
+    fun verificarCierre(): List<String> {
+        val pendientes = mutableListOf<String>()
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
                 pasosCierre = NOMBRES_PASOS_CIERRE.map { CierrePaso(nombre = it) }
@@ -129,53 +138,64 @@ class InventarioViewModel(
             actualizarPaso(0, EstadoPaso.EN_PROGRESO)
             delay(2000)
             repository.contarColaPendiente(androidIdActual)
-                .onSuccess { pendientes ->
-                    actualizarPaso(0, EstadoPaso.COMPLETADO, detalle = "$pendientes pendiente${if (pendientes == 1) "" else "s"}")
+                .onSuccess { p ->
+                    actualizarPaso(0, EstadoPaso.COMPLETADO, detalle = "$p pendiente${if (p == 1) "" else "s"}")
+                    if (p > 0) pendientes.add("$p órden${if (p == 1) "" else "es"} en cola de sincronización")
                 }
                 .onFailure { e ->
                     actualizarPaso(0, EstadoPaso.ERROR, detalle = e.mensajeAmigable("No se pudo revisar la cola"))
+                    pendientes.add("No se pudo revisar la cola de sincronización")
                 }
 
             actualizarPaso(1, EstadoPaso.EN_PROGRESO)
             delay(2000)
             repository.contarVentasSinTurno()
-                .onSuccess { huerfanas ->
-                    actualizarPaso(1, EstadoPaso.COMPLETADO, detalle = "$huerfanas venta${if (huerfanas == 1) "" else "s"} sin turno")
+                .onSuccess { h ->
+                    actualizarPaso(1, if (h > 0) EstadoPaso.ERROR else EstadoPaso.COMPLETADO, detalle = "$h venta${if (h == 1) "" else "s"} sin turno")
+                    if (h > 0) pendientes.add("$h venta${if (h == 1) "" else "s"} sin turno asignado")
                 }
                 .onFailure { e ->
                     actualizarPaso(1, EstadoPaso.ERROR, detalle = e.mensajeAmigable("No se pudo analizar las ventas"))
+                    pendientes.add("No se pudo analizar las ventas")
                 }
 
             actualizarPaso(2, EstadoPaso.EN_PROGRESO)
             delay(2000)
             repository.contarDevolucionesPendientes()
-                .onSuccess { pendientes ->
-                    actualizarPaso(2, EstadoPaso.COMPLETADO, detalle = "$pendientes devolución${if (pendientes == 1) "" else "es"} pendiente${if (pendientes == 1) "" else "s"}")
+                .onSuccess { d ->
+                    actualizarPaso(2, if (d > 0) EstadoPaso.ERROR else EstadoPaso.COMPLETADO, detalle = "$d devolución${if (d == 1) "" else "es"} pendiente${if (d == 1) "" else "s"}")
+                    if (d > 0) pendientes.add("$d devolución${if (d == 1) "" else "es"} pendiente${if (d == 1) "" else "s"}")
                 }
                 .onFailure { e ->
                     actualizarPaso(2, EstadoPaso.ERROR, detalle = e.mensajeAmigable("No se pudieron revisar las devoluciones"))
+                    pendientes.add("No se pudieron revisar las devoluciones")
                 }
 
             actualizarPaso(3, EstadoPaso.EN_PROGRESO)
             delay(2000)
             repository.contarMermasPendientes()
-                .onSuccess { pendientes ->
-                    actualizarPaso(3, EstadoPaso.COMPLETADO, detalle = "$pendientes merma${if (pendientes == 1) "" else "s"} pendiente${if (pendientes == 1) "" else "s"}")
+                .onSuccess { m ->
+                    actualizarPaso(3, if (m > 0) EstadoPaso.ERROR else EstadoPaso.COMPLETADO, detalle = "$m merma${if (m == 1) "" else "s"} pendiente${if (m == 1) "" else "s"}")
+                    if (m > 0) pendientes.add("$m merma${if (m == 1) "" else "s"} pendiente${if (m == 1) "" else "s"}")
                 }
                 .onFailure { e ->
                     actualizarPaso(3, EstadoPaso.ERROR, detalle = e.mensajeAmigable("No se pudieron revisar las mermas"))
+                    pendientes.add("No se pudieron revisar las mermas")
                 }
 
             actualizarPaso(4, EstadoPaso.EN_PROGRESO)
             delay(2000)
             repository.haySolicitudesPendientes()
-                .onSuccess { pendientes ->
-                    actualizarPaso(4, EstadoPaso.COMPLETADO, detalle = "$pendientes aprobación${if (pendientes == 1) "" else "es"} pendiente${if (pendientes == 1) "" else "s"}")
+                .onSuccess { a ->
+                    actualizarPaso(4, if (a > 0) EstadoPaso.ERROR else EstadoPaso.COMPLETADO, detalle = "$a aprobación${if (a == 1) "" else "es"} pendiente${if (a == 1) "" else "s"}")
+                    if (a > 0) pendientes.add("$a aprobación${if (a == 1) "" else "es"} de stock pendiente${if (a == 1) "" else "s"}")
                 }
                 .onFailure { e ->
                     actualizarPaso(4, EstadoPaso.ERROR, detalle = e.mensajeAmigable("No se pudieron revisar las aprobaciones"))
+                    pendientes.add("No se pudieron revisar las aprobaciones")
                 }
         }
+        return pendientes
     }
 
     private fun actualizarPaso(indice: Int, estado: EstadoPaso, detalle: String? = null) {
