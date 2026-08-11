@@ -111,14 +111,9 @@ class InventarioViewModel(
     }
 
     fun cerrarTurno(cierreContado: Double) {
+        val turnoId = _uiState.value.dia?.turno?.id ?: return
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
-            val turnoRemoto = turnoRepository.obtenerTurnoActivo(androidIdActual).getOrNull()
-            val turnoId = turnoRemoto?.id ?: _uiState.value.dia?.turno?.id
-            if (turnoId == null) {
-                _uiState.value = _uiState.value.copy(isSaving = false, error = "No hay turno activo")
-                return@launch
-            }
             repository.cerrarTurno(androidIdActual, turnoId, cierreContado)
                 .onSuccess { diaEnCero ->
                     _uiState.value = _uiState.value.copy(
