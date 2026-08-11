@@ -54,7 +54,6 @@ fun InventarioScreen(
     var pasoCierreTurno by remember { mutableStateOf(PasoCierreTurno.NINGUNO) }
     var mostrarMenuExportar by remember { mutableStateOf(false) }
     var paginaVentas by remember { mutableStateOf(0) }
-    var pendientesCierre by remember { mutableStateOf<List<String>>(emptyList()) }
 
     LaunchedEffect(androidId) { viewModel.cargar(androidId) }
     LaunchedEffect(uiState.dia) { paginaVentas = 0 }
@@ -219,7 +218,7 @@ fun InventarioScreen(
             onCancelar = { pasoCierreTurno = PasoCierreTurno.NINGUNO },
             onPinCorrecto = {
                 pasoCierreTurno = PasoCierreTurno.VERIFICANDO
-                pendientesCierre = viewModel.verificarCierre()
+                viewModel.verificarCierre()
             }
         )
     }
@@ -236,7 +235,7 @@ fun InventarioScreen(
             onCancelar = { pasoCierreTurno = PasoCierreTurno.NINGUNO },
             onReintentar = {
                 pasoCierreTurno = PasoCierreTurno.VERIFICANDO
-                pendientesCierre = viewModel.verificarCierre()
+                viewModel.verificarCierre()
             }
         )
 
@@ -260,7 +259,7 @@ fun InventarioScreen(
                 Column {
                     Text("Debes resolver lo siguiente antes de cerrar el turno:")
                     Spacer(Modifier.height(8.dp))
-                    pendientesCierre.forEach { p ->
+                     uiState.pendientesCierre.forEach { p ->
                         Text("• $p", style = MaterialTheme.typography.bodySmall)
                     }
                 }
