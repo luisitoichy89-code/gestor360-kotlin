@@ -37,7 +37,7 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
     val db = remember { AppDatabase.obtener(context) }
     val session = remember { SessionManager(context) }
     val saleRepository = remember { SaleRepository() }
-    
+
     var ventas by remember { mutableStateOf<List<VentaAgrupada>>(emptyList()) }
     var totalEfectivo by remember { mutableStateOf(0.0) }
     var totalTransferencia by remember { mutableStateOf(0.0) }
@@ -45,21 +45,10 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
     var isRefreshing by remember { mutableStateOf(false) }
     var trigger by remember { mutableStateOf(0) }
 
-    // Con internet: sincroniza contra el servidor antes de leer, así
-    // "Ventas realizadas" también refleja lo vendido en otros dispositivos
-    // del mismo local (antes SOLO leía de Room, sin importar la conexión).
-    // Sin internet: lee directo de Room, igual que siempre. El botón de
-    // refrescar dispara esta misma función.
     suspend fun cargarDesdeRoom() {
         val localId = session.getLocalId() ?: return
 
         if (NetworkMonitor.hayInternet(context)) {
-            // SaleRepository.getSales() ya existía en el proyecto pero
-            // ningún código lo llamaba. Hace upsert por id en ventas_cache
-            // (nunca borra), así que una venta local que este dispositivo
-            // guardó y todavía no confirma el servidor no se pierde aunque
-            // haya conexión. Si falla, se ignora a propósito: igual se sigue
-            // leyendo de Room justo abajo, como si no hubiera habido internet.
             try {
                 saleRepository.getSales(androidId)
             } catch (e: Exception) {
@@ -70,19 +59,16 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
         val usuarioId = session.getUserId()
         val turnoActivo = db.turnoDao().obtenerActivo(localId)
         val turnoActivoId = turnoActivo?.id
-        val aperturaStr = turnoActivo?.createdAt
 
         val todasVentas = db.ventaDao().obtenerTodas(localId)
-            // "Mis Ventas" es individual: cada vendedor tiene que ver SOLO lo
-            // suyo, es la única forma de saber cuánto vendió cada uno. Antes
-            // esto no filtraba por usuario y mezclaba las ventas de todo el
-            // local.
             .filter { it.usuarioId == usuarioId }
+
         val ventasTurno = if (turnoActivoId != null) {
             todasVentas.filter { v ->
-                when {
-                    v.turnoId != null -> v.turnoId == turnoActivoId // venta con turno real estampado: exacto
-                    else -> v.createdAt != null && aperturaStr != null && v.createdAt >= aperturaStr // venta vieja sin turnoId: fallback por hora, igual que antes
+                if (v.turnoId != 0L) v.turnoId == turnoActivoId
+                else {
+                    val aperturaStr = turnoActivo?.createdAt
+                    v.createdAt != null && aperturaStr != null && v.createdAt >= aperturaStr
                 }
             }
         } else {
@@ -167,13 +153,13 @@ fun MisVentasScreen(androidId: String, onBack: () -> Unit) {
                         }
                     }
                 }
-                
+
                 if (ventas.isEmpty()) {
                     item {
                         Text("Sin ventas en este turno", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                
+
                 items(ventas, key = { it.id }) { venta ->
                     NeuCard(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
                         Row(
