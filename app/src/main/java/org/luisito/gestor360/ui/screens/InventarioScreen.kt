@@ -44,6 +44,8 @@ fun InventarioScreen(
     onBack: (() -> Unit)? = null,
     onVerVentasRealizadas: () -> Unit = {},
     onVerHistorialTurnos: () -> Unit = {},
+    titulo: String = "Inventario",
+    mostrarBotonVentasRealizadas: Boolean = true,
     viewModel: InventarioViewModel = viewModel(),
     accesoViewModel: AccesoViewModel = viewModel()
 ) {
@@ -82,7 +84,7 @@ fun InventarioScreen(
                     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (onBack != null) { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = MaterialTheme.colorScheme.onSurface) }; Spacer(Modifier.width(4.dp)) }
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Inventario", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            Text(titulo, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                         }
                         if (esAdmin) { IconButton(onClick = { pasoCierreTurno = PasoCierreTurno.CONFIRMAR }) { Icon(Icons.Default.LockOpen, "Cerrar turno", tint = MaterialTheme.colorScheme.error) } }
                         IconButton(onClick = { onVerHistorialTurnos() }) { Icon(Icons.Default.History, "Historial de turnos", tint = MaterialTheme.colorScheme.onSurface) }
@@ -101,15 +103,17 @@ fun InventarioScreen(
                         }
                     }
                 }
-                Button(
-                    onClick = onVerVentasRealizadas,
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp)
-                ) {
-                    Icon(Icons.Default.ShoppingCart, null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("VENTAS REALIZADAS", fontWeight = FontWeight.Bold)
+                if (mostrarBotonVentasRealizadas) {
+                    Button(
+                        onClick = onVerVentasRealizadas,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp)
+                    ) {
+                        Icon(Icons.Default.ShoppingCart, null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("VENTAS REALIZADAS", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }

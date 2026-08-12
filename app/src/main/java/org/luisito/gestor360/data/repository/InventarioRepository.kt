@@ -112,10 +112,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             db.ventaDao().obtenerTodas(localId)
                 .filter { it.turnoId == turnoActivoId }
                 .filter { venta ->
-                    when (session.getRol()) {
-                        "seller" -> venta.usuarioId == session.getUserId()
-                        else -> true
-                    }
+                    if (session.getRol() == "admin") true else venta.usuarioId == session.getUserId()
                 }
         } else {
             emptyList()
@@ -252,10 +249,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             db.ventaDao().obtenerTodas(localId)
                 .filter { it.turnoId == turnoActivoId }
                 .filter { venta ->
-                    when (session.getRol()) {
-                        "seller" -> venta.usuarioId == session.getUserId()
-                        else -> true
-                    }
+                    if (session.getRol() == "admin") true else venta.usuarioId == session.getUserId()
                 }
                 .filter { it.id !in idsEnCache }
         } else {
