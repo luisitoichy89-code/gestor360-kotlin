@@ -112,7 +112,10 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             db.ventaDao().obtenerTodas(localId)
                 .filter { it.turnoId == turnoActivoId }
                 .filter { venta ->
-                    if (session.getRol() == "admin") true else venta.usuarioId == session.getUserId()
+                    when (session.getRol()) {
+                        "seller" -> venta.usuarioId == session.getUserId()
+                        else -> true
+                    }
                 }
         } else {
             emptyList()
@@ -249,7 +252,10 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             db.ventaDao().obtenerTodas(localId)
                 .filter { it.turnoId == turnoActivoId }
                 .filter { venta ->
-                    if (session.getRol() == "admin") true else venta.usuarioId == session.getUserId()
+                    when (session.getRol()) {
+                        "seller" -> venta.usuarioId == session.getUserId()
+                        else -> true
+                    }
                 }
                 .filter { it.id !in idsEnCache }
         } else {
@@ -340,6 +346,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
 
     private fun InventarioTurno.toInventarioDiaCompat(): InventarioDia {
         return InventarioDia(
+            fecha = this.fecha,
             turno = this.turno?.let { t ->
                 t.copy(diferencia = t.diferenciaCalculada)
             },

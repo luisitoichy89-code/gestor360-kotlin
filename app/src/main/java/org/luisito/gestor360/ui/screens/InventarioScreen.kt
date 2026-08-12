@@ -44,8 +44,6 @@ fun InventarioScreen(
     onBack: (() -> Unit)? = null,
     onVerVentasRealizadas: () -> Unit = {},
     onVerHistorialTurnos: () -> Unit = {},
-    titulo: String = "Inventario",
-    mostrarBotonVentasRealizadas: Boolean = true,
     viewModel: InventarioViewModel = viewModel(),
     accesoViewModel: AccesoViewModel = viewModel()
 ) {
@@ -84,7 +82,7 @@ fun InventarioScreen(
                     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (onBack != null) { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = MaterialTheme.colorScheme.onSurface) }; Spacer(Modifier.width(4.dp)) }
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(titulo, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            Text("Inventario", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                         }
                         if (esAdmin) { IconButton(onClick = { pasoCierreTurno = PasoCierreTurno.CONFIRMAR }) { Icon(Icons.Default.LockOpen, "Cerrar turno", tint = MaterialTheme.colorScheme.error) } }
                         IconButton(onClick = { onVerHistorialTurnos() }) { Icon(Icons.Default.History, "Historial de turnos", tint = MaterialTheme.colorScheme.onSurface) }
@@ -103,17 +101,15 @@ fun InventarioScreen(
                         }
                     }
                 }
-                if (mostrarBotonVentasRealizadas) {
-                    Button(
-                        onClick = onVerVentasRealizadas,
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp)
-                    ) {
-                        Icon(Icons.Default.ShoppingCart, null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("VENTAS REALIZADAS", fontWeight = FontWeight.Bold)
-                    }
+                Button(
+                    onClick = onVerVentasRealizadas,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp)
+                ) {
+                    Icon(Icons.Default.ShoppingCart, null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("VENTAS REALIZADAS", fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -339,10 +335,19 @@ private fun EstadoError(mensaje: String, onRetry: () -> Unit) {
 
 @Composable
 private fun ProductoNuevoRow(p: ProductoInfo) {
-    NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
+    val colorFondo = if (p.eliminado) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant
+    val colorTexto = if (p.eliminado) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant
+    NeuCard(shape = RoundedCornerShape(12.dp), containerColor = colorFondo, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
-            Text(p.nombre, fontWeight = FontWeight.Bold)
-            Text("Stock: ${p.stock.toInt()}  ·  Precio: ${formatearMonto(p.precio)} CUP", style = MaterialTheme.typography.bodySmall)
+            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text(p.nombre, fontWeight = FontWeight.Bold, color = colorTexto)
+                if (p.eliminado) Text("ELIMINADO", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+            }
+            if (p.eliminado) {
+                Text("Stock al eliminar: ${p.stock.toInt()}", style = MaterialTheme.typography.bodySmall)
+            } else {
+                Text("Stock: ${p.stock.toInt()}  ·  Precio: ${formatearMonto(p.precio)} CUP", style = MaterialTheme.typography.bodySmall)
+            }
             p.resuelto_por_nombre?.let { Text("Aprobado por: $it", style = MaterialTheme.typography.labelSmall) }
         }
     }
@@ -354,6 +359,7 @@ private fun ProductoInfoRow(p: ProductoInfo) {
         Column(Modifier.padding(12.dp)) {
             Text(p.nombre, fontWeight = FontWeight.Bold)
             Text("Stock: ${p.stock.toInt()}  ·  Precio: ${formatearMonto(p.precio)} CUP", style = MaterialTheme.typography.bodySmall)
+            p.resuelto_por_nombre?.let { Text("Modificado por: $it", style = MaterialTheme.typography.labelSmall) }
         }
     }
 }
