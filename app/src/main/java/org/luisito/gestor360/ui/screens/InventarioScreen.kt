@@ -41,6 +41,8 @@ private enum class PasoCierreTurno { NINGUNO, CONFIRMAR, PIN, VERIFICANDO, PENDI
 @Composable
 fun InventarioScreen(
     androidId: String,
+    titulo: String = "Inventario",
+    mostrarBotonVentasRealizadas: Boolean = true,
     onBack: (() -> Unit)? = null,
     onVerVentasRealizadas: () -> Unit = {},
     onVerHistorialTurnos: () -> Unit = {},
@@ -82,12 +84,12 @@ fun InventarioScreen(
                     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (onBack != null) { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = MaterialTheme.colorScheme.onSurface) }; Spacer(Modifier.width(4.dp)) }
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Inventario", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            Text(titulo, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                         }
                         if (esAdmin) { IconButton(onClick = { pasoCierreTurno = PasoCierreTurno.CONFIRMAR }) { Icon(Icons.Default.LockOpen, "Cerrar turno", tint = MaterialTheme.colorScheme.error) } }
                         IconButton(onClick = { onVerHistorialTurnos() }) { Icon(Icons.Default.History, "Historial de turnos", tint = MaterialTheme.colorScheme.onSurface) }
                         IconButton(onClick = { viewModel.refrescar() }) { Icon(Icons.Default.Refresh, null, tint = MaterialTheme.colorScheme.onSurface) }
-                        if (dia != null && ventasNoAnuladas.isNotEmpty()) {
+                        if (mostrarBotonVentasRealizadas && dia != null && ventasNoAnuladas.isNotEmpty()) {
                             Box {
                                 IconButton(onClick = { mostrarMenuExportar = true }) { Icon(Icons.Default.FileDownload, null, tint = MaterialTheme.colorScheme.onSurface) }
                                 DropdownMenu(expanded = mostrarMenuExportar, onDismissRequest = { mostrarMenuExportar = false }) {
