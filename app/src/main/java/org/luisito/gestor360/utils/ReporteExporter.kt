@@ -24,7 +24,6 @@ object ReporteExporter {
             ""
         )
 
-        // Totales
         lineas.add("TOTALES")
         lineas.add("  Efectivo: ${formatearNumero(tot.efectivo)} CUP")
         lineas.add("  Transferencia: ${formatearNumero(tot.transferencia)} CUP")
@@ -37,7 +36,6 @@ object ReporteExporter {
         }
         lineas.add("")
 
-        // Totales por tarjeta
         if (dia.totales_por_tarjeta.isNotEmpty()) {
             lineas.add("TOTALES POR TARJETA")
             dia.totales_por_tarjeta.forEach { t ->
@@ -46,7 +44,6 @@ object ReporteExporter {
             lineas.add("")
         }
 
-        // Productos vendidos
         if (dia.productos_vendidos.isNotEmpty()) {
             lineas.add("PRODUCTOS VENDIDOS")
             dia.productos_vendidos.forEach { p ->
@@ -59,7 +56,6 @@ object ReporteExporter {
             lineas.add("")
         }
 
-        // Productos nuevos
         if (dia.productos_nuevos.isNotEmpty()) {
             lineas.add("PRODUCTOS NUEVOS")
             dia.productos_nuevos.forEach { p ->
@@ -68,7 +64,6 @@ object ReporteExporter {
             lineas.add("")
         }
 
-        // Productos modificados
         if (dia.productos_modificados.isNotEmpty()) {
             lineas.add("PRODUCTOS MODIFICADOS")
             dia.productos_modificados.forEach { p ->
@@ -77,7 +72,6 @@ object ReporteExporter {
             lineas.add("")
         }
 
-        // Productos eliminados
         if (dia.productos_eliminados.isNotEmpty()) {
             lineas.add("PRODUCTOS ELIMINADOS")
             dia.productos_eliminados.forEach { p ->
@@ -86,25 +80,26 @@ object ReporteExporter {
             lineas.add("")
         }
 
-        // Mermas
         if (dia.mermas.isNotEmpty()) {
             lineas.add("MERMAS")
             dia.mermas.forEach { m ->
                 lineas.add("  ${m.producto_nombre}: ${formatearNumero(m.cantidad)} (${m.estado}) - ${m.motivo}")
+                lineas.add("    Solicitado por: ${m.solicitado_por_nombre ?: "—"}")
+                if (m.estado != "pendiente") lineas.add("    Aprobado por: ${m.resuelto_por_nombre ?: "—"}")
             }
             lineas.add("")
         }
 
-        // Devoluciones
         if (dia.devueltos.isNotEmpty()) {
             lineas.add("DEVOLUCIONES")
             dia.devueltos.forEach { d ->
                 lineas.add("  ${d.producto_nombre}: ${formatearNumero(d.cantidad)} (${d.estado}) - ${d.metodo}")
+                lineas.add("    Solicitado por: ${d.solicitado_por_nombre ?: "—"}")
+                if (d.estado != "pendiente") lineas.add("    Aprobado por: ${d.resuelto_por_nombre ?: "—"}")
             }
             lineas.add("")
         }
 
-        // Ventas con datos de cliente
         val ventasConCliente = dia.ventas.filter { !it.cliente_nombre.isNullOrBlank() || !it.cliente_ci.isNullOrBlank() }
         if (ventasConCliente.isNotEmpty()) {
             lineas.add("PAGOS POR TARJETA")
@@ -125,6 +120,11 @@ object ReporteExporter {
     private fun formatearNumero(valor: Double): String =
         if (valor == valor.toLong().toDouble()) valor.toLong().toString() else valor.toString()
 
+    private fun nombreBase(dia: InventarioDia): String {
+        val fecha = dia.fecha?.trim()?.takeIf { it.isNotEmpty() }?.replace("/", "-")?.replace(":", "-")
+        return "inventario_${fecha ?: "sin_fecha"}"
+    }
+
     private fun carpetaExport(context: Context): File {
         val carpeta = File(context.getExternalFilesDir(null), "csv")
         if (!carpeta.exists()) carpeta.mkdirs()
@@ -142,7 +142,7 @@ object ReporteExporter {
     }
 
     fun exportarTxt(context: Context, dia: InventarioDia) {
-        val archivo = File(carpetaExport(context), "inventario_sin_fecha.txt")
+        val archivo = File(carpetaExport(context), "${nombreBase(dia)}.txt")
         archivo.writeText(generarLineas(dia).joinToString("\n"))
         compartirArchivo(context, archivo, "text/plain")
     }
@@ -175,14 +175,14 @@ object ReporteExporter {
         }
         pdf.finishPage(pagina)
 
-        val archivo = File(carpetaExport(context), "inventario_sin_fecha.pdf")
+        val archivo = File(carpetaExport(context), "${nombreBase(dia)}.pdf")
         FileOutputStream(archivo).use { pdf.writeTo(it) }
         pdf.close()
         compartirArchivo(context, archivo, "application/pdf")
     }
 
     fun exportarWord(context: Context, dia: InventarioDia) {
-        val archivo = File(carpetaExport(context), "inventario_sin_fecha.docx")
+        val archivo = File(carpetaExport(context), "${nombreBase(dia)}.docx")
         escribirDocx(archivo, generarLineas(dia))
         compartirArchivo(context, archivo, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
     }

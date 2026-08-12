@@ -41,7 +41,6 @@ object CsvExporter {
             listOf("")
         )
 
-        // Totales
         filas.add(listOf("TOTALES", ""))
         filas.add(listOf("Efectivo", formatearNumero(tot.efectivo)))
         filas.add(listOf("Transferencia", formatearNumero(tot.transferencia)))
@@ -54,7 +53,6 @@ object CsvExporter {
         }
         filas.add(listOf(""))
 
-        // Totales por tarjeta
         if (dia.totales_por_tarjeta.isNotEmpty()) {
             filas.add(listOf("TOTALES POR TARJETA", ""))
             dia.totales_por_tarjeta.forEach { t ->
@@ -63,7 +61,6 @@ object CsvExporter {
             filas.add(listOf(""))
         }
 
-        // Productos vendidos
         if (dia.productos_vendidos.isNotEmpty()) {
             filas.add(listOf("PRODUCTOS VENDIDOS", "Total vendido", "Stock actual", "Agregado", "Merma", "Inicial"))
             dia.productos_vendidos.forEach { p ->
@@ -72,7 +69,6 @@ object CsvExporter {
             filas.add(listOf(""))
         }
 
-        // Productos nuevos
         if (dia.productos_nuevos.isNotEmpty()) {
             filas.add(listOf("PRODUCTOS NUEVOS", "Stock"))
             dia.productos_nuevos.forEach { p ->
@@ -81,7 +77,6 @@ object CsvExporter {
             filas.add(listOf(""))
         }
 
-        // Productos modificados
         if (dia.productos_modificados.isNotEmpty()) {
             filas.add(listOf("PRODUCTOS MODIFICADOS", "Stock"))
             dia.productos_modificados.forEach { p ->
@@ -90,7 +85,6 @@ object CsvExporter {
             filas.add(listOf(""))
         }
 
-        // Productos eliminados
         if (dia.productos_eliminados.isNotEmpty()) {
             filas.add(listOf("PRODUCTOS ELIMINADOS", "Stock"))
             dia.productos_eliminados.forEach { p ->
@@ -99,25 +93,22 @@ object CsvExporter {
             filas.add(listOf(""))
         }
 
-        // Mermas
         if (dia.mermas.isNotEmpty()) {
-            filas.add(listOf("MERMAS", "Cantidad", "Estado", "Motivo"))
+            filas.add(listOf("MERMAS", "Cantidad", "Estado", "Motivo", "Solicitado por", "Aprobado por"))
             dia.mermas.forEach { m ->
-                filas.add(listOf(m.producto_nombre, formatearNumero(m.cantidad), m.estado, m.motivo))
+                filas.add(listOf(m.producto_nombre, formatearNumero(m.cantidad), m.estado, m.motivo, m.solicitado_por_nombre ?: "", m.resuelto_por_nombre ?: ""))
             }
             filas.add(listOf(""))
         }
 
-        // Devoluciones
         if (dia.devueltos.isNotEmpty()) {
-            filas.add(listOf("DEVOLUCIONES", "Cantidad", "Estado", "Método"))
+            filas.add(listOf("DEVOLUCIONES", "Cantidad", "Estado", "Método", "Solicitado por", "Aprobado por"))
             dia.devueltos.forEach { d ->
-                filas.add(listOf(d.producto_nombre, formatearNumero(d.cantidad), d.estado, d.metodo))
+                filas.add(listOf(d.producto_nombre, formatearNumero(d.cantidad), d.estado, d.metodo, d.solicitado_por_nombre ?: "", d.resuelto_por_nombre ?: ""))
             }
             filas.add(listOf(""))
         }
 
-        // Pagos por tarjeta
         val ventasConCliente = dia.ventas.filter { !it.cliente_nombre.isNullOrBlank() || !it.cliente_ci.isNullOrBlank() }
         if (ventasConCliente.isNotEmpty()) {
             filas.add(listOf("PAGOS POR TARJETA", "Producto", "Total", "Cliente", "CI", "Teléfono", "Tarjeta"))
@@ -131,7 +122,12 @@ object CsvExporter {
             filas.add(listOf(""))
         }
 
-        compartirCsv(context, "inventario_sin_fecha.csv", filas)
+        compartirCsv(context, "${nombreBase(dia)}.csv", filas)
+    }
+
+    private fun nombreBase(dia: InventarioDia): String {
+        val fecha = dia.fecha?.trim()?.takeIf { it.isNotEmpty() }?.replace("/", "-")?.replace(":", "-")
+        return "inventario_${fecha ?: "sin_fecha"}"
     }
 
     private fun formatearNumero(valor: Double): String =
