@@ -79,8 +79,8 @@ private sealed class PantallaInterna {
     object Devolucion : PantallaInterna()
     object Conflictos : PantallaInterna()
     object MisVentas : PantallaInterna()
-}
     object HistorialTurnos : PantallaInterna()
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
