@@ -361,6 +361,7 @@ private fun ProductoInfoRow(p: ProductoInfo) {
         Column(Modifier.padding(12.dp)) {
             Text(p.nombre, fontWeight = FontWeight.Bold)
             Text("Stock: ${p.stock.toInt()}  ·  Precio: ${formatearMonto(p.precio)} CUP", style = MaterialTheme.typography.bodySmall)
+            p.categoria?.let { Text("Categoría: $it", style = MaterialTheme.typography.labelSmall) }
             p.resuelto_por_nombre?.let { Text("Modificado por: $it", style = MaterialTheme.typography.labelSmall) }
         }
     }

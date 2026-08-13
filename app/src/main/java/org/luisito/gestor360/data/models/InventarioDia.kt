@@ -65,6 +65,7 @@ data class ProductoInfo(
     val precio: Double = 0.0,
     val stock: Double = 0.0,
     val ubicacion: String? = null,
+    val categoria: String? = null,
     val fecha: String? = null,
     val solicitado_por_nombre: String? = null,
     val resuelto_por_nombre: String? = null,
