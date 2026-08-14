@@ -113,7 +113,14 @@ class InventarioViewModel(
     }
 
     fun cerrarTurno(cierreContado: Double) {
-        val turnoId = _uiState.value.dia?.turno?.id ?: return
+        val dia = _uiState.value.dia
+        if (dia == null || dia.ventas.isNullOrEmpty()) {
+            _uiState.value = _uiState.value.copy(
+                error = "No se puede cerrar un turno sin al menos una venta (efectivo, transferencia o mixto)"
+            )
+            return
+        }
+        val turnoId = dia.turno?.id ?: return
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             repository.cerrarTurno(androidIdActual, turnoId, cierreContado)
