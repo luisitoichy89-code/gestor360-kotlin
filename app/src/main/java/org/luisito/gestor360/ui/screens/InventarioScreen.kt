@@ -43,6 +43,7 @@ fun InventarioScreen(
     androidId: String,
     titulo: String = "Inventario",
     mostrarBotonVentasRealizadas: Boolean = true,
+    esVistaPersonal: Boolean = false,
     onBack: (() -> Unit)? = null,
     onVerVentasRealizadas: () -> Unit = {},
     onVerHistorialTurnos: () -> Unit = {},
@@ -53,11 +54,12 @@ fun InventarioScreen(
     val context = LocalContext.current
     val sessionManager = remember { SessionManager(context) }
     val esAdmin = sessionManager.getRol() == "admin"
+    val mostrarControlesDeLocal = esAdmin && !esVistaPersonal
     var pasoCierreTurno by remember { mutableStateOf(PasoCierreTurno.NINGUNO) }
     var mostrarMenuExportar by remember { mutableStateOf(false) }
     var paginaVentas by remember { mutableStateOf(0) }
 
-    LaunchedEffect(androidId) { viewModel.cargar(androidId) }
+    LaunchedEffect(androidId) { viewModel.cargar(androidId, esVistaPersonal) }
     LaunchedEffect(uiState.dia) { paginaVentas = 0 }
     val dia = uiState.dia
     val ventasNoAnuladas = dia?.ventas?.filter { !it.anulada } ?: emptyList()
@@ -86,7 +88,7 @@ fun InventarioScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(titulo, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                         }
-                        if (esAdmin) { IconButton(onClick = { pasoCierreTurno = PasoCierreTurno.CONFIRMAR }) { Icon(Icons.Default.LockOpen, "Cerrar turno", tint = MaterialTheme.colorScheme.error) } }
+                        if (mostrarControlesDeLocal) { IconButton(onClick = { pasoCierreTurno = PasoCierreTurno.CONFIRMAR }) { Icon(Icons.Default.LockOpen, "Cerrar turno", tint = MaterialTheme.colorScheme.error) } }
                         IconButton(onClick = { onVerHistorialTurnos() }) { Icon(Icons.Default.History, "Historial de turnos", tint = MaterialTheme.colorScheme.onSurface) }
                         IconButton(onClick = { viewModel.refrescar() }) { Icon(Icons.Default.Refresh, null, tint = MaterialTheme.colorScheme.onSurface) }
                         if (mostrarBotonVentasRealizadas && dia != null && ventasNoAnuladas.isNotEmpty()) {
@@ -126,7 +128,7 @@ fun InventarioScreen(
                     val dia = dia!!
                     LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
 
-                        if (esAdmin && uiState.turnosDelDia.isNotEmpty()) {
+                        if (mostrarControlesDeLocal && uiState.turnosDelDia.isNotEmpty()) {
                             item { SeccionTitulo("Vendedores", Icons.Default.Groups) }
                             item {
                                 val vendedores = remember(uiState.turnosDelDia) {
@@ -169,26 +171,35 @@ fun InventarioScreen(
                         if (pagosPorTarjeta.isEmpty()) item { TextoVacioSeccion("Sin pagos por tarjeta") }
                         items(pagosPorTarjeta, key = { "pg_${it.id}" }) { v -> PagoTarjetaRow(v) }
 
-                        item { SeccionTitulo("Productos nuevos ingresados", Icons.Default.AddBox) }
+                        item { SeccionTitulo(if (esVistaPersonal) "Productos ingresados" else "Productos nuevos ingresados", Icons.Default.AddBox) }
                         if (dia.productos_nuevos.isEmpty()) item { TextoVacioSeccion("Sin productos nuevos") }
-                        items(dia.productos_nuevos, key = { "pn_${it.id}" }) { p -> ProductoNuevoRow(p) }
+                        items(dia.productos_nuevos, key = { "pn_${it.id}" }) { p -> ProductoNuevoRow(p, mostrarSolicitadoPor = esVistaPersonal) }
 
-                        item { Spacer(Modifier.height(4.dp)); Divider(); Spacer(Modifier.height(4.dp)) }
-                        item { SeccionTitulo("Productos modificados", Icons.Default.Edit) }
-                        if (dia.productos_modificados.isEmpty()) item { TextoVacioSeccion("Sin productos modificados") }
-                        items(dia.productos_modificados, key = { "pm_${it.id}" }) { p -> ProductoInfoRow(p) }
+                        if (!esVistaPersonal) {
+                            item { Spacer(Modifier.height(4.dp)); Divider(); Spacer(Modifier.height(4.dp)) }
+                            item { SeccionTitulo("Productos modificados", Icons.Default.Edit) }
+                            if (dia.productos_modificados.isEmpty()) item { TextoVacioSeccion("Sin productos modificados") }
+                            items(dia.productos_modificados, key = { "pm_${it.id}" }) { p -> ProductoInfoRow(p) }
 
-                        item { SeccionTitulo("Productos eliminados", Icons.Default.Delete) }
-                        if (dia.productos_eliminados.isEmpty()) item { TextoVacioSeccion("Sin productos eliminados") }
-                        items(dia.productos_eliminados, key = { "pe_${it.id}" }) { p -> ProductoEliminadoRow(p) }
+                            item { SeccionTitulo("Productos eliminados", Icons.Default.Delete) }
+                            if (dia.productos_eliminados.isEmpty()) item { TextoVacioSeccion("Sin productos eliminados") }
+                            items(dia.productos_eliminados, key = { "pe_${it.id}" }) { p -> ProductoEliminadoRow(p) }
+                        }
+
+                        if (esVistaPersonal) {
+                            item { Spacer(Modifier.height(4.dp)); Divider(); Spacer(Modifier.height(4.dp)) }
+                            item { SeccionTitulo("Solicitudes y aumentos", Icons.Default.PendingActions) }
+                            if (dia.solicitudes.isEmpty()) item { TextoVacioSeccion("Sin solicitudes") }
+                            items(dia.solicitudes, key = { "sa_${it.id}" }) { s -> SolicitudRow(s) }
+                        }
 
                         item { SeccionTitulo("Devueltos", Icons.Default.AssignmentReturn) }
                         if (dia.devueltos.isEmpty()) item { TextoVacioSeccion("Sin devoluciones") }
-                        items(dia.devueltos, key = { "dv_${it.id}" }) { d -> DevueltoInfoRow(d) }
+                        items(dia.devueltos, key = { "dv_${it.id}" }) { d -> DevueltoInfoRow(d, mostrarSolicitadoPor = esVistaPersonal) }
 
                         item { SeccionTitulo("Mermas", Icons.Default.Warning) }
                         if (dia.mermas.isEmpty()) item { TextoVacioSeccion("Sin mermas") }
-                        items(dia.mermas, key = { "me_${it.id}" }) { m -> MermaInfoRow(m) }
+                        items(dia.mermas, key = { "me_${it.id}" }) { m -> MermaInfoRow(m, esVistaPersonal = esVistaPersonal) }
 
                         item { Spacer(Modifier.height(4.dp)); Divider(); Spacer(Modifier.height(4.dp)) }
                         item { SeccionTitulo("Detalle de ventas", Icons.Default.Receipt) }
@@ -261,7 +272,7 @@ fun InventarioScreen(
                 Column {
                     Text("Debes resolver lo siguiente antes de cerrar el turno:")
                     Spacer(Modifier.height(8.dp))
-                     uiState.pendientesCierre.forEach { p ->
+                    uiState.pendientesCierre.forEach { p ->
                         Text("• $p", style = MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -336,7 +347,7 @@ private fun EstadoError(mensaje: String, onRetry: () -> Unit) {
 }
 
 @Composable
-private fun ProductoNuevoRow(p: ProductoInfo) {
+private fun ProductoNuevoRow(p: ProductoInfo, mostrarSolicitadoPor: Boolean = false) {
     val colorFondo = if (p.eliminado) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant
     val colorTexto = if (p.eliminado) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant
     NeuCard(shape = RoundedCornerShape(12.dp), containerColor = colorFondo, modifier = Modifier.fillMaxWidth()) {
@@ -350,6 +361,7 @@ private fun ProductoNuevoRow(p: ProductoInfo) {
             } else {
                 Text("Stock: ${p.stock.toInt()}  ·  Precio: ${formatearMonto(p.precio)} CUP", style = MaterialTheme.typography.bodySmall)
             }
+            if (mostrarSolicitadoPor) p.solicitado_por_nombre?.let { Text("Solicitado por: $it", style = MaterialTheme.typography.labelSmall) }
             p.resuelto_por_nombre?.let { Text("Aprobado por: $it", style = MaterialTheme.typography.labelSmall) }
         }
     }
@@ -379,25 +391,58 @@ private fun ProductoEliminadoRow(p: ProductoEliminadoInfo) {
 }
 
 @Composable
-private fun DevueltoInfoRow(d: DevueltoInfo) {
+private fun DevueltoInfoRow(d: DevueltoInfo, mostrarSolicitadoPor: Boolean = false) {
     NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Text(d.producto_nombre, fontWeight = FontWeight.Bold)
             Text("Cantidad: ${d.cantidad.toInt()}  ·  Método: ${d.metodo}", style = MaterialTheme.typography.bodySmall)
             EstadoDevolucionChip(d.estado)
+            if (mostrarSolicitadoPor) {
+                d.solicitado_por_nombre?.let { Text("Solicitado por: $it", style = MaterialTheme.typography.labelSmall) }
+                d.resuelto_por_nombre?.let { Text("Aprobado por: $it", style = MaterialTheme.typography.labelSmall) }
+            }
         }
     }
 }
 
 @Composable
-private fun MermaInfoRow(m: MermaInfo) {
+private fun MermaInfoRow(m: MermaInfo, esVistaPersonal: Boolean = false) {
     NeuCard(shape = RoundedCornerShape(12.dp), containerColor = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Text(m.producto_nombre, fontWeight = FontWeight.Bold)
             Text("Cantidad: ${m.cantidad.toInt()}  ·  Estado: ${m.estado}", style = MaterialTheme.typography.bodySmall)
             Text("Motivo: ${m.motivo}", style = MaterialTheme.typography.bodySmall)
             m.solicitado_por_nombre?.let { Text("Solicitado por: $it", style = MaterialTheme.typography.labelSmall) }
-            m.resuelto_por_nombre?.let { Text("Resuelto por: $it", style = MaterialTheme.typography.labelSmall) }
+            m.resuelto_por_nombre?.let { Text("${if (esVistaPersonal) "Aprobado" else "Resuelto"} por: $it", style = MaterialTheme.typography.labelSmall) }
+        }
+    }
+}
+
+@Composable
+private fun SolicitudRow(s: SolicitudInfo) {
+    val aprobado = s.estado == "aprobado"
+    val colorAcento = if (aprobado) androidx.compose.ui.graphics.Color(0xFF43A047) else androidx.compose.ui.graphics.Color(0xFFFFA000)
+    val etiquetaEstado = when (s.estado) {
+        "aprobado" -> "APROBADO"
+        "rechazado" -> "RECHAZADO"
+        "cancelado" -> "CANCELADO"
+        else -> "PENDIENTE"
+    }
+    NeuCard(shape = RoundedCornerShape(12.dp), containerColor = colorAcento.copy(alpha = 0.14f), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text(s.producto_nombre, fontWeight = FontWeight.Bold)
+                Text(etiquetaEstado, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = colorAcento)
+            }
+            Text(
+                if (s.tipo == "aumento") "Cantidad: ${s.cantidad.toInt()}  ·  Nuevo precio: ${formatearMonto(s.precio)} CUP"
+                else "Cantidad: ${s.cantidad.toInt()}",
+                style = MaterialTheme.typography.bodySmall
+            )
+            s.solicitado_por_nombre?.let { Text("Solicitado por: $it", style = MaterialTheme.typography.labelSmall) }
+            if (aprobado) {
+                s.resuelto_por_nombre?.let { Text("Aprobado por: $it", style = MaterialTheme.typography.labelSmall, color = colorAcento, fontWeight = FontWeight.Medium) }
+            }
         }
     }
 }

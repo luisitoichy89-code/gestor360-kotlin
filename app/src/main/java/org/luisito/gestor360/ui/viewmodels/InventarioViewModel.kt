@@ -52,12 +52,14 @@ class InventarioViewModel(
     private val _uiState = MutableStateFlow(InventarioUiState())
     val uiState: StateFlow<InventarioUiState> = _uiState.asStateFlow()
     private var androidIdActual = ""
+    private var esVistaPersonalActual = false
     private val session = SessionManager(AppContextHolder.context)
     private val esAdminActual: Boolean get() = session.getRol() == "admin"
     private val turnoRepository = TurnoRepository()
 
-    fun cargar(androidId: String) {
+    fun cargar(androidId: String, esVistaPersonal: Boolean = false) {
         androidIdActual = androidId
+        esVistaPersonalActual = esVistaPersonal
         cargarInventario()
     }
 
@@ -97,7 +99,7 @@ class InventarioViewModel(
                 .onSuccess { dia -> _uiState.value = _uiState.value.copy(isLoading = false, dia = dia) }
                 .onFailure { e -> _uiState.value = _uiState.value.copy(isLoading = false, error = e.mensajeAmigable("No se pudo cargar el inventario")) }
 
-            if (esAdminActual && _uiState.value.turnosDelDia.isEmpty()) {
+            if (esAdminActual && !esVistaPersonalActual && _uiState.value.turnosDelDia.isEmpty()) {
                 _uiState.value = _uiState.value.copy(isLoadingTurnos = true)
                 repository.getTurnosDelDia(androidIdActual)
                     .onSuccess { turnos -> _uiState.value = _uiState.value.copy(turnosDelDia = turnos, isLoadingTurnos = false) }

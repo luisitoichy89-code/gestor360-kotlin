@@ -317,7 +317,9 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 })
                 .decodeAs<InventarioTurno>()
 
-            val resultado = response.toInventarioDiaCompat()
+            val solicitudes = obtenerSolicitudesTurno(androidId, localId, turnoActivoId)
+
+            val resultado = response.toInventarioDiaCompat().copy(solicitudes = solicitudes)
 
             if (turnoIds.isNullOrEmpty()) {
                 db.inventarioCacheDao().guardar(resultado.toEntity(localId, turnoActivoId))
@@ -360,6 +362,21 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
             totales_ventas = this.totales_ventas,
             totales_por_tarjeta = this.totales_por_tarjeta
         )
+    }
+
+    private suspend fun obtenerSolicitudesTurno(androidId: String, localId: Long, turnoId: Long): List<SolicitudInfo> {
+        return try {
+            SupabaseClientProvider.client.postgrest
+                .rpc("get_solicitudes_turno", buildJsonObject {
+                    put("p_android_id", androidId)
+                    put("p_local_id", localId)
+                    put("p_turno_id", turnoId)
+                })
+                .decodeList<SolicitudInfo>()
+        } catch (e: Exception) {
+            Log.e("InventarioRepo", "Error obteniendo solicitudes del turno", e)
+            emptyList()
+        }
     }
 
     suspend fun cerrarTurno(androidId: String, turnoId: Long, cierre: Double): Result<InventarioDia> {
@@ -407,7 +424,8 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
                 })
                 .decodeAs<InventarioTurno>()
 
-            val resultado = response.toInventarioDiaCompat()
+            val solicitudes = obtenerSolicitudesTurno(androidId, localId, turnoActivoId)
+            val resultado = response.toInventarioDiaCompat().copy(solicitudes = solicitudes)
             db.inventarioCacheDao().guardar(resultado.toEntity(localId, turnoActivoId))
 
             resultado.turno?.let { t ->

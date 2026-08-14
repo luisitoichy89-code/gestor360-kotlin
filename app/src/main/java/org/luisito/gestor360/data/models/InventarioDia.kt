@@ -12,6 +12,7 @@ data class InventarioDia(
     val productos_eliminados: List<ProductoEliminadoInfo> = emptyList(),
     val devueltos: List<DevueltoInfo> = emptyList(),
     val mermas: List<MermaInfo> = emptyList(),
+    val solicitudes: List<SolicitudInfo> = emptyList(),
     val ventas: List<VentaInfo> = emptyList(),
     val productos_vendidos: List<ProductoVendidoInfo> = emptyList(),
     val totales_ventas: TotalesVentas = TotalesVentas(),
@@ -27,6 +28,7 @@ data class InventarioTurno(
     val productos_eliminados: List<ProductoEliminadoInfo> = emptyList(),
     val devueltos: List<DevueltoInfo> = emptyList(),
     val mermas: List<MermaInfo> = emptyList(),
+    val solicitudes: List<SolicitudInfo> = emptyList(),
     val ventas: List<VentaInfo> = emptyList(),
     val productos_vendidos: List<ProductoVendidoInfo> = emptyList(),
     val totales_ventas: TotalesVentas = TotalesVentas(),
@@ -87,6 +89,19 @@ data class MermaInfo(
     val producto_nombre: String = "Producto eliminado",
     val cantidad: Double,
     val motivo: String = "",
+    val estado: String = "pendiente",
+    val solicitado_por_nombre: String? = null,
+    val resuelto_por_nombre: String? = null,
+    val fecha: String? = null
+)
+
+@Serializable
+data class SolicitudInfo(
+    val id: String,
+    val producto_nombre: String = "Producto eliminado",
+    val cantidad: Double = 0.0,
+    val precio: Double = 0.0,
+    val tipo: String = "producto",
     val estado: String = "pendiente",
     val solicitado_por_nombre: String? = null,
     val resuelto_por_nombre: String? = null,
