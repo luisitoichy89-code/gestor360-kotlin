@@ -80,7 +80,7 @@ private fun TurnoCard(turno: TurnoInfo) {
     ) {
         Column(Modifier.padding(16.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Turno #${turno.id}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                Text("Turno #${turno.numeroTurno}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = if (turno.cierre == null) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant

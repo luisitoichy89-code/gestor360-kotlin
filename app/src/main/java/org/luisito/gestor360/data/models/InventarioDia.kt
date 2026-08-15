@@ -50,6 +50,8 @@ data class TotalTarjetaInfo(
 @Serializable
 data class TurnoInfo(
     val id: Long,
+    @SerialName("numero_turno")
+    val numeroTurno: Int = 0,
     val apertura: Double = 0.0,
     val cierre: Double? = null,
     val diferencia: Double? = null,
