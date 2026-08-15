@@ -80,6 +80,7 @@ private sealed class PantallaInterna {
     object Conflictos : PantallaInterna()
     object MisVentas : PantallaInterna()
     object HistorialTurnos : PantallaInterna()
+    data class InventarioHistorico(val turnoId: Long) : PantallaInterna()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -286,7 +287,8 @@ private fun Gestor360AppContenido(temaOscuro: Boolean, onCambiarTema: () -> Unit
                         is PantallaInterna.Carrito -> CarritoScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Ventas }, onVentaConfirmada = { pantalla = PantallaInterna.Ventas })
                         is PantallaInterna.Productos -> ProductosScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home })
                         is PantallaInterna.Inventario -> InventarioScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }, onVerVentasRealizadas = { pantalla = PantallaInterna.MisVentas }, onVerHistorialTurnos = { pantalla = PantallaInterna.HistorialTurnos })
-                        is PantallaInterna.HistorialTurnos -> HistorialTurnosScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Inventario })
+                        is PantallaInterna.HistorialTurnos -> HistorialTurnosScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Inventario }, onTurnoClick = { turno -> pantalla = PantallaInterna.InventarioHistorico(turno.id) })
+                        is PantallaInterna.InventarioHistorico -> InventarioScreen(androidId = androidId, titulo = "Turno #${pantallaActual.turnoId}", turnoId = pantallaActual.turnoId, onBack = { pantalla = PantallaInterna.HistorialTurnos })
                         is PantallaInterna.Tarjetas -> if (esAdmin) TarjetasScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
                         is PantallaInterna.Aprobaciones -> if (esAdmin) AprobacionesScreen(androidId = androidId, rol = rol, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
                         is PantallaInterna.Devolucion -> if (esAdmin) DevolucionScreen(androidId = androidId, onBack = { pantalla = PantallaInterna.Home }) else LaunchedEffect(Unit) { pantalla = PantallaInterna.Home }
