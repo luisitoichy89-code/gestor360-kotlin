@@ -1,5 +1,6 @@
 package org.luisito.gestor360.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,6 +23,7 @@ import org.luisito.gestor360.ui.viewmodels.HistorialTurnosViewModel
 fun HistorialTurnosScreen(
     androidId: String,
     onBack: () -> Unit,
+    onTurnoClick: (TurnoInfo) -> Unit,
     viewModel: HistorialTurnosViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -64,7 +66,7 @@ fun HistorialTurnosScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(uiState.turnos, key = { it.id }) { turno ->
-                        TurnoCard(turno)
+                        TurnoCard(turno, onClick = { onTurnoClick(turno) })
                     }
                 }
             }
@@ -73,10 +75,10 @@ fun HistorialTurnosScreen(
 }
 
 @Composable
-private fun TurnoCard(turno: TurnoInfo) {
+private fun TurnoCard(turno: TurnoInfo, onClick: () -> Unit) {
     NeuCard(
         shape = RoundedCornerShape(16.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
     ) {
         Column(Modifier.padding(16.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {

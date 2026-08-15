@@ -126,6 +126,7 @@ data class DevueltoInfo(
 @Serializable
 data class VentaInfo(
     val id: String,
+    val usuario_id: Long? = null,
     val producto_nombre: String = "Producto eliminado",
     val cantidad: Double,
     val total: Double,

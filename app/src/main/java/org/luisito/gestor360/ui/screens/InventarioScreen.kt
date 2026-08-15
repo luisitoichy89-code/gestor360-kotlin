@@ -37,6 +37,34 @@ private data class VendedorFiltro(val nombre: String, val turnoIds: List<Long>)
 
 private enum class PasoCierreTurno { NINGUNO, CONFIRMAR, PIN, VERIFICANDO, PENDIENTES, MONTO, PROCESANDO, EXITOSO }
 
+private fun InventarioDia.filtradoPorUsuario(usuarioId: Long?): InventarioDia {
+    val ventasPropias = ventas.filter { it.usuario_id != null && it.usuario_id == usuarioId }
+    val productosVendidosPropios = ventasPropias
+        .groupBy { it.producto_nombre }
+        .map { (nombre, filas) ->
+            ProductoVendidoInfo(
+                nombre = nombre,
+                cantidadVendida = filas.sumOf { it.cantidad },
+                total_vendido = filas.sumOf { it.total }
+            )
+        }
+    val conTarjeta = ventasPropias.filter { !it.tarjeta_numero.isNullOrBlank() }
+    return copy(
+        ventas = ventasPropias,
+        productos_vendidos = productosVendidosPropios,
+        totales_ventas = TotalesVentas(
+            efectivo = ventasPropias.sumOf { it.efectivo },
+            transferencia = ventasPropias.sumOf { it.transferencia },
+            tarjeta = conTarjeta.sumOf { it.total },
+            total = ventasPropias.sumOf { it.total },
+            cantidad_ventas = ventasPropias.size.toLong()
+        ),
+        totales_por_tarjeta = conTarjeta
+            .groupBy { it.tarjeta_banco ?: "Tarjeta" }
+            .map { (nombre, filas) -> TotalTarjetaInfo(nombre = nombre, total = filas.sumOf { it.total }) }
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InventarioScreen(
@@ -44,6 +72,7 @@ fun InventarioScreen(
     titulo: String = "Inventario",
     mostrarBotonVentasRealizadas: Boolean = true,
     esVistaPersonal: Boolean = false,
+    turnoId: Long? = null,
     onBack: (() -> Unit)? = null,
     onVerVentasRealizadas: () -> Unit = {},
     onVerHistorialTurnos: () -> Unit = {},
@@ -54,14 +83,28 @@ fun InventarioScreen(
     val context = LocalContext.current
     val sessionManager = remember { SessionManager(context) }
     val esAdmin = sessionManager.getRol() == "admin"
-    val mostrarControlesDeLocal = esAdmin && !esVistaPersonal
+    val esHistorico = turnoId != null
+    var verMisVentasHistorico by remember(turnoId) { mutableStateOf(!esAdmin) }
+    val vistaPersonalEfectiva = if (esHistorico) verMisVentasHistorico else esVistaPersonal
+    val mostrarControlesDeLocal = esAdmin && !vistaPersonalEfectiva && !esHistorico
     var pasoCierreTurno by remember { mutableStateOf(PasoCierreTurno.NINGUNO) }
     var mostrarMenuExportar by remember { mutableStateOf(false) }
     var paginaVentas by remember { mutableStateOf(0) }
 
-    LaunchedEffect(androidId) { viewModel.cargar(androidId, esVistaPersonal) }
+    LaunchedEffect(androidId, turnoId) {
+        if (turnoId != null) {
+            viewModel.cargarTurnoHistorico(androidId, turnoId)
+        } else {
+            viewModel.cargar(androidId, esVistaPersonal)
+        }
+    }
     LaunchedEffect(uiState.dia) { paginaVentas = 0 }
-    val dia = uiState.dia
+    val diaCrudo = uiState.dia
+    val dia = remember(diaCrudo, esHistorico, vistaPersonalEfectiva) {
+        if (esHistorico && vistaPersonalEfectiva && diaCrudo != null) {
+            diaCrudo.filtradoPorUsuario(sessionManager.getUserId())
+        } else diaCrudo
+    }
     val ventasNoAnuladas = dia?.ventas?.filter { !it.anulada } ?: emptyList()
     val totalPaginasVentas = maxOf(1, (ventasNoAnuladas.size + VENTAS_POR_PAGINA - 1) / VENTAS_POR_PAGINA)
     val paginaSegura = paginaVentas.coerceIn(0, totalPaginasVentas - 1)
@@ -89,7 +132,9 @@ fun InventarioScreen(
                             Text(titulo, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                         }
                         if (mostrarControlesDeLocal) { IconButton(onClick = { pasoCierreTurno = PasoCierreTurno.CONFIRMAR }) { Icon(Icons.Default.LockOpen, "Cerrar turno", tint = MaterialTheme.colorScheme.error) } }
-                        IconButton(onClick = { onVerHistorialTurnos() }) { Icon(Icons.Default.History, "Historial de turnos", tint = MaterialTheme.colorScheme.onSurface) }
+                        if (!esHistorico) {
+                            IconButton(onClick = { onVerHistorialTurnos() }) { Icon(Icons.Default.History, "Historial de turnos", tint = MaterialTheme.colorScheme.onSurface) }
+                        }
                         IconButton(onClick = { viewModel.refrescar() }) { Icon(Icons.Default.Refresh, null, tint = MaterialTheme.colorScheme.onSurface) }
                         if (mostrarBotonVentasRealizadas && dia != null && ventasNoAnuladas.isNotEmpty()) {
                             Box {
@@ -105,15 +150,17 @@ fun InventarioScreen(
                         }
                     }
                 }
-                Button(
-                    onClick = onVerVentasRealizadas,
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp)
-                ) {
-                    Icon(Icons.Default.ShoppingCart, null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("VENTAS REALIZADAS", fontWeight = FontWeight.Bold)
+                if (!esHistorico) {
+                    Button(
+                        onClick = onVerVentasRealizadas,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp)
+                    ) {
+                        Icon(Icons.Default.ShoppingCart, null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("VENTAS REALIZADAS", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -158,6 +205,25 @@ fun InventarioScreen(
                             }
                         }
 
+                        if (esHistorico && esAdmin) {
+                            item {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    FilterChip(
+                                        selected = !verMisVentasHistorico,
+                                        onClick = { verMisVentasHistorico = false },
+                                        label = { Text("Inventario general") },
+                                        leadingIcon = if (!verMisVentasHistorico) { { Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp)) } } else null
+                                    )
+                                    FilterChip(
+                                        selected = verMisVentasHistorico,
+                                        onClick = { verMisVentasHistorico = true },
+                                        label = { Text("Mis ventas") },
+                                        leadingIcon = if (verMisVentasHistorico) { { Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp)) } } else null
+                                    )
+                                }
+                            }
+                        }
+
                         item { TotalesGeneralesCard(dia.totales_ventas) }
                         item { SeccionTitulo("Tarjeta", Icons.Default.CreditCard) }
                         if (tarjetasResumen.isEmpty()) item { TextoVacioSeccion("Sin cobros por tarjeta") }
@@ -171,11 +237,11 @@ fun InventarioScreen(
                         if (pagosPorTarjeta.isEmpty()) item { TextoVacioSeccion("Sin pagos por tarjeta") }
                         items(pagosPorTarjeta, key = { "pg_${it.id}" }) { v -> PagoTarjetaRow(v) }
 
-                        item { SeccionTitulo(if (esVistaPersonal) "Productos ingresados" else "Productos nuevos ingresados", Icons.Default.AddBox) }
+                        item { SeccionTitulo(if (vistaPersonalEfectiva) "Productos ingresados" else "Productos nuevos ingresados", Icons.Default.AddBox) }
                         if (dia.productos_nuevos.isEmpty()) item { TextoVacioSeccion("Sin productos nuevos") }
-                        items(dia.productos_nuevos, key = { "pn_${it.id}" }) { p -> ProductoNuevoRow(p, mostrarSolicitadoPor = esVistaPersonal) }
+                        items(dia.productos_nuevos, key = { "pn_${it.id}" }) { p -> ProductoNuevoRow(p, mostrarSolicitadoPor = vistaPersonalEfectiva) }
 
-                        if (!esVistaPersonal) {
+                        if (!vistaPersonalEfectiva) {
                             item { Spacer(Modifier.height(4.dp)); Divider(); Spacer(Modifier.height(4.dp)) }
                             item { SeccionTitulo("Productos modificados", Icons.Default.Edit) }
                             if (dia.productos_modificados.isEmpty()) item { TextoVacioSeccion("Sin productos modificados") }
@@ -186,7 +252,7 @@ fun InventarioScreen(
                             items(dia.productos_eliminados, key = { "pe_${it.id}" }) { p -> ProductoEliminadoRow(p) }
                         }
 
-                        if (esVistaPersonal) {
+                        if (vistaPersonalEfectiva) {
                             item { Spacer(Modifier.height(4.dp)); Divider(); Spacer(Modifier.height(4.dp)) }
                             item { SeccionTitulo("Solicitudes y aumentos", Icons.Default.PendingActions) }
                             if (dia.solicitudes.isEmpty()) item { TextoVacioSeccion("Sin solicitudes") }
@@ -195,11 +261,11 @@ fun InventarioScreen(
 
                         item { SeccionTitulo("Devueltos", Icons.Default.AssignmentReturn) }
                         if (dia.devueltos.isEmpty()) item { TextoVacioSeccion("Sin devoluciones") }
-                        items(dia.devueltos, key = { "dv_${it.id}" }) { d -> DevueltoInfoRow(d, mostrarSolicitadoPor = esVistaPersonal) }
+                        items(dia.devueltos, key = { "dv_${it.id}" }) { d -> DevueltoInfoRow(d, mostrarSolicitadoPor = vistaPersonalEfectiva) }
 
                         item { SeccionTitulo("Mermas", Icons.Default.Warning) }
                         if (dia.mermas.isEmpty()) item { TextoVacioSeccion("Sin mermas") }
-                        items(dia.mermas, key = { "me_${it.id}" }) { m -> MermaInfoRow(m, esVistaPersonal = esVistaPersonal) }
+                        items(dia.mermas, key = { "me_${it.id}" }) { m -> MermaInfoRow(m, esVistaPersonal = vistaPersonalEfectiva) }
 
                         item { Spacer(Modifier.height(4.dp)); Divider(); Spacer(Modifier.height(4.dp)) }
                         item { SeccionTitulo("Detalle de ventas", Icons.Default.Receipt) }

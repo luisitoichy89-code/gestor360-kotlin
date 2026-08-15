@@ -23,6 +23,7 @@ data class InventarioUiState(
     val error: String? = null,
     val turnosDelDia: List<TurnoInfo> = emptyList(),
     val turnosSeleccionadosIds: Set<Long> = emptySet(),
+    val turnoHistoricoId: Long? = null,
     val pasosCierre: List<CierrePaso> = emptyList(),
     val cierreExitoso: Boolean = false,
     val verificacionTerminada: Boolean = false,
@@ -60,7 +61,30 @@ class InventarioViewModel(
     fun cargar(androidId: String, esVistaPersonal: Boolean = false) {
         androidIdActual = androidId
         esVistaPersonalActual = esVistaPersonal
+        _uiState.value = _uiState.value.copy(turnoHistoricoId = null)
         cargarInventario()
+    }
+
+    fun cargarTurnoHistorico(androidId: String, turnoId: Long) {
+        androidIdActual = androidId
+        esVistaPersonalActual = false
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isLoading = true, error = null, turnoHistoricoId = turnoId
+            )
+            repository.getInventarioDia(
+                androidId,
+                turnoIds = listOf(turnoId),
+                soloLectura = true
+            )
+                .onSuccess { dia -> _uiState.value = _uiState.value.copy(isLoading = false, dia = dia) }
+                .onFailure { e ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = e.mensajeAmigable("No se pudo cargar ese turno")
+                    )
+                }
+        }
     }
 
     fun toggleTurnoSeleccionado(turnoId: Long) {
@@ -109,7 +133,12 @@ class InventarioViewModel(
     }
 
     fun refrescar() {
-        cargarInventario(turnoIds = _uiState.value.turnosSeleccionadosIds.toList(), forzarRefresh = true)
+        val historicoId = _uiState.value.turnoHistoricoId
+        if (historicoId != null) {
+            cargarTurnoHistorico(androidIdActual, historicoId)
+        } else {
+            cargarInventario(turnoIds = _uiState.value.turnosSeleccionadosIds.toList(), forzarRefresh = true)
+        }
     }
 
     fun cerrarTurno(cierreContado: Double) {

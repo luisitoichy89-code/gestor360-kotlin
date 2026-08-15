@@ -6,6 +6,8 @@ import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.JsonElement
 import org.luisito.gestor360.BuildConfig
 import org.luisito.gestor360.data.SupabaseClientProvider
@@ -32,12 +34,16 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
         androidId: String,
         forzarRefresh: Boolean = false,
         turnoIds: List<Long>? = null,
+        soloLectura: Boolean = false,
         onActualizadoDesdeServidor: (suspend (InventarioDia) -> Unit)? = null
     ): Result<InventarioDia> {
         val localId = localIdActivo()
 
         if (!turnoIds.isNullOrEmpty()) {
-            return refrescarDesdeServidor(androidId, turnoIds)
+            if (!NetworkMonitor.hayInternet(context)) {
+                return Result.failure(IllegalStateException("Necesitas conexión para ver ese turno"))
+            }
+            return refrescarDesdeServidor(androidId, turnoIds, soloLectura)
         }
 
         val turnoActivoId = db.turnoDao().obtenerActivo(localId)?.id
@@ -290,16 +296,30 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
 
     suspend fun refrescarDesdeServidor(
         androidId: String,
-        turnoIds: List<Long>? = null
+        turnoIds: List<Long>? = null,
+        soloLectura: Boolean = false
     ): Result<InventarioDia> {
         val localId = localIdActivo()
         return try {
-            val esSinSeleccion = turnoIds.isNullOrEmpty()
-            var turnoActivoId = if (esSinSeleccion) {
-                db.turnoDao().obtenerActivo(localId)?.id
-            } else null
+            if (!turnoIds.isNullOrEmpty()) {
+                val response = SupabaseClientProvider.client.postgrest
+                    .rpc("get_inventario_dia", buildJsonObject {
+                        put("p_android_id", androidId)
+                        put("p_local_id", localId)
+                        putJsonArray("p_turno_ids") { turnoIds.forEach { add(it) } }
+                        put("p_solo_lectura", soloLectura)
+                    })
+                    .decodeAs<InventarioDia>()
 
-            if (turnoActivoId == null && esSinSeleccion) {
+                val solicitudes = turnoIds.singleOrNull()
+                    ?.let { obtenerSolicitudesTurno(androidId, localId, it) }
+                    ?: emptyList()
+
+                return Result.success(response.copy(solicitudes = solicitudes))
+            }
+
+            var turnoActivoId = db.turnoDao().obtenerActivo(localId)?.id
+            if (turnoActivoId == null) {
                 turnoActivoId = turnoRepository.obtenerTurnoActivo(androidId).getOrNull()?.id
             }
 
@@ -321,9 +341,7 @@ class InventarioRepository(private val context: Context = AppContextHolder.conte
 
             val resultado = response.toInventarioDiaCompat().copy(solicitudes = solicitudes)
 
-            if (turnoIds.isNullOrEmpty()) {
-                db.inventarioCacheDao().guardar(resultado.toEntity(localId, turnoActivoId))
-            }
+            db.inventarioCacheDao().guardar(resultado.toEntity(localId, turnoActivoId))
 
             resultado.turno?.let { t ->
                 val turnoExistente = db.turnoDao().obtenerActivo(localId)
