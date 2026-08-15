@@ -2,6 +2,7 @@ package org.luisito.gestor360.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,7 +13,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.luisito.gestor360.data.models.TurnoInfo
 import org.luisito.gestor360.ui.theme.NeuCard
@@ -33,15 +36,26 @@ fun HistorialTurnosScreen(
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text("Historial de turnos", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, "Volver")
+            Column(modifier = Modifier.statusBarsPadding()) {
+                NeuCard(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.Default.ArrowBack, "Volver", tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+                        Spacer(Modifier.width(4.dp))
+                        BandejaTitulo("Historial de turnos")
                     }
                 }
-            )
+            }
         }
     ) { padding ->
         when {
@@ -75,6 +89,26 @@ fun HistorialTurnosScreen(
 }
 
 @Composable
+private fun BandejaTitulo(texto: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.primary
+    ) {
+        Text(
+            texto,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = 0.3.sp,
+            color = MaterialTheme.colorScheme.onPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
 private fun TurnoCard(turno: TurnoInfo, onClick: () -> Unit) {
     NeuCard(
         shape = RoundedCornerShape(16.dp),
@@ -82,7 +116,15 @@ private fun TurnoCard(turno: TurnoInfo, onClick: () -> Unit) {
     ) {
         Column(Modifier.padding(16.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Turno #${turno.numeroTurno}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.primaryContainer) {
+                    Text(
+                        "Turno #${turno.numeroTurno}",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = if (turno.cierre == null) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant

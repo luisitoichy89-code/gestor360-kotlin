@@ -13,9 +13,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.luisito.gestor360.utils.SessionManager
 import org.luisito.gestor360.data.models.*
@@ -36,6 +40,26 @@ private data class TarjetaResumen(val nombre: String, val numero: String, val ti
 private data class VendedorFiltro(val nombre: String, val turnoIds: List<Long>)
 
 private enum class PasoCierreTurno { NINGUNO, CONFIRMAR, PIN, VERIFICANDO, PENDIENTES, MONTO, PROCESANDO, EXITOSO }
+
+private data class TonoSeccion(val fondo: Color, val acento: Color)
+
+private val TonoVendedores = TonoSeccion(Color(0xFFE0F7FA), Color(0xFF00838F))
+private val TonoTarjeta = TonoSeccion(Color(0xFFE8EAF6), Color(0xFF3949AB))
+private val TonoProductosVendidos = TonoSeccion(Color(0xFFE0F2F1), Color(0xFF00695C))
+private val TonoPagosTarjeta = TonoSeccion(Color(0xFFEDE7F6), Color(0xFF512DA8))
+private val TonoProductosIngresados = TonoSeccion(Color(0xFFF1F8E9), Color(0xFF558B2F))
+private val TonoProductosModificados = TonoSeccion(Color(0xFFFFF3E0), Color(0xFFEF6C00))
+private val TonoProductosEliminados = TonoSeccion(Color(0xFFFFEBEE), Color(0xFFC62828))
+private val TonoSolicitudes = TonoSeccion(Color(0xFFF3E5F5), Color(0xFF8E24AA))
+private val TonoDevueltos = TonoSeccion(Color(0xFFFBE9E7), Color(0xFFD84315))
+private val TonoMermas = TonoSeccion(Color(0xFFFCE4EC), Color(0xFFAD1457))
+private val TonoDetalleVentas = TonoSeccion(Color(0xFFE1F5FE), Color(0xFF0277BD))
+private val TonoEfectivo = TonoSeccion(Color(0xFFE8F5E9), Color(0xFF2E7D32))
+private val TonoTransferencia = TonoSeccion(Color(0xFFE3F2FD), Color(0xFF1565C0))
+private val TonoTotalGenerado = TonoSeccion(Color(0xFFFFF8E1), Color(0xFFF57F17))
+
+private val ColorBandejaIconos = Color(0xFFFFCC80)
+private val ColorIconoAccion = Color(0xFF5D4037)
 
 private fun InventarioDia.filtradoPorUsuario(usuarioId: Long?): InventarioDia {
     val ventasPropias = ventas.filter { it.usuario_id != null && it.usuario_id == usuarioId }
@@ -125,26 +149,29 @@ fun InventarioScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             Column(modifier = Modifier.statusBarsPadding()) {
-                NeuCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), shape = RoundedCornerShape(20.dp)) {
+                NeuCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), shape = RoundedCornerShape(20.dp), containerColor = MaterialTheme.colorScheme.primaryContainer) {
                     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        if (onBack != null) { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = MaterialTheme.colorScheme.onSurface) }; Spacer(Modifier.width(4.dp)) }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(titulo, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                        }
-                        if (mostrarControlesDeLocal) { IconButton(onClick = { pasoCierreTurno = PasoCierreTurno.CONFIRMAR }) { Icon(Icons.Default.LockOpen, "Cerrar turno", tint = MaterialTheme.colorScheme.error) } }
-                        if (!esHistorico) {
-                            IconButton(onClick = { onVerHistorialTurnos() }) { Icon(Icons.Default.History, "Historial de turnos", tint = MaterialTheme.colorScheme.onSurface) }
-                        }
-                        IconButton(onClick = { viewModel.refrescar() }) { Icon(Icons.Default.Refresh, null, tint = MaterialTheme.colorScheme.onSurface) }
-                        if (mostrarBotonVentasRealizadas && dia != null && ventasNoAnuladas.isNotEmpty()) {
-                            Box {
-                                IconButton(onClick = { mostrarMenuExportar = true }) { Icon(Icons.Default.FileDownload, null, tint = MaterialTheme.colorScheme.onSurface) }
-                                DropdownMenu(expanded = mostrarMenuExportar, onDismissRequest = { mostrarMenuExportar = false }) {
-                                    DropdownMenuItem(text = { Text("PDF") }, leadingIcon = { Icon(Icons.Default.PictureAsPdf, null) }, onClick = { mostrarMenuExportar = false; ReporteExporter.exportarPdf(context, dia) })
-                                    DropdownMenuItem(text = { Text("TXT") }, leadingIcon = { Icon(Icons.Default.Description, null) }, onClick = { mostrarMenuExportar = false; ReporteExporter.exportarTxt(context, dia) })
-                                    DropdownMenuItem(text = { Text("Word") }, leadingIcon = { Icon(Icons.Default.Article, null) }, onClick = { mostrarMenuExportar = false; ReporteExporter.exportarWord(context, dia) })
-                                    DropdownMenuItem(text = { Text("CSV") }, leadingIcon = { Icon(Icons.Default.TableChart, null) }, onClick = { mostrarMenuExportar = false; CsvExporter.exportarInventario(context, dia) })
-                                    DropdownMenuItem(text = { Text("Compartir") }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = { mostrarMenuExportar = false; ReporteExporter.compartirTexto(context, dia) })
+                        if (onBack != null) { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = MaterialTheme.colorScheme.onPrimaryContainer) }; Spacer(Modifier.width(4.dp)) }
+                        BandejaTitulo(titulo)
+                        Spacer(Modifier.weight(1f))
+                        Surface(shape = RoundedCornerShape(50), color = ColorBandejaIconos) {
+                            Row(modifier = Modifier.padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                if (mostrarControlesDeLocal) { IconButton(onClick = { pasoCierreTurno = PasoCierreTurno.CONFIRMAR }) { Icon(Icons.Default.LockOpen, "Cerrar turno", tint = MaterialTheme.colorScheme.error) } }
+                                if (!esHistorico) {
+                                    IconButton(onClick = { onVerHistorialTurnos() }) { Icon(Icons.Default.History, "Historial de turnos", tint = ColorIconoAccion) }
+                                }
+                                IconButton(onClick = { viewModel.refrescar() }) { Icon(Icons.Default.Refresh, null, tint = ColorIconoAccion) }
+                                if (mostrarBotonVentasRealizadas && dia != null && ventasNoAnuladas.isNotEmpty()) {
+                                    Box {
+                                        IconButton(onClick = { mostrarMenuExportar = true }) { Icon(Icons.Default.FileDownload, null, tint = ColorIconoAccion) }
+                                        DropdownMenu(expanded = mostrarMenuExportar, onDismissRequest = { mostrarMenuExportar = false }) {
+                                            DropdownMenuItem(text = { Text("PDF") }, leadingIcon = { Icon(Icons.Default.PictureAsPdf, null) }, onClick = { mostrarMenuExportar = false; ReporteExporter.exportarPdf(context, dia) })
+                                            DropdownMenuItem(text = { Text("TXT") }, leadingIcon = { Icon(Icons.Default.Description, null) }, onClick = { mostrarMenuExportar = false; ReporteExporter.exportarTxt(context, dia) })
+                                            DropdownMenuItem(text = { Text("Word") }, leadingIcon = { Icon(Icons.Default.Article, null) }, onClick = { mostrarMenuExportar = false; ReporteExporter.exportarWord(context, dia) })
+                                            DropdownMenuItem(text = { Text("CSV") }, leadingIcon = { Icon(Icons.Default.TableChart, null) }, onClick = { mostrarMenuExportar = false; CsvExporter.exportarInventario(context, dia) })
+                                            DropdownMenuItem(text = { Text("Compartir") }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = { mostrarMenuExportar = false; ReporteExporter.compartirTexto(context, dia) })
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -176,7 +203,7 @@ fun InventarioScreen(
                     LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
 
                         if (mostrarControlesDeLocal && uiState.turnosDelDia.isNotEmpty()) {
-                            item { SeccionTitulo("Vendedores", Icons.Default.Groups) }
+                            item { SeccionTitulo("Vendedores", Icons.Default.Groups, TonoVendedores) }
                             item {
                                 val vendedores = remember(uiState.turnosDelDia) {
                                     uiState.turnosDelDia
@@ -225,50 +252,50 @@ fun InventarioScreen(
                         }
 
                         item { TotalesGeneralesCard(dia.totales_ventas) }
-                        item { SeccionTitulo("Tarjeta", Icons.Default.CreditCard) }
+                        item { SeccionTitulo("Tarjeta", Icons.Default.CreditCard, TonoTarjeta) }
                         if (tarjetasResumen.isEmpty()) item { TextoVacioSeccion("Sin cobros por tarjeta") }
                         items(tarjetasResumen, key = { "tj_${it.nombre}_${it.numero}" }) { t -> TarjetaResumenRow(t) }
 
-                        item { SeccionTitulo("Productos vendidos", Icons.Default.PointOfSale) }
+                        item { SeccionTitulo("Productos vendidos", Icons.Default.PointOfSale, TonoProductosVendidos) }
                         if (dia.productos_vendidos.isEmpty()) item { TextoVacioSeccion("Sin ventas") }
                         items(dia.productos_vendidos, key = { "pv_${it.nombre}" }) { p -> ProductoVendidoRow(p) }
 
-                        item { SeccionTitulo("Pagos por tarjetas", Icons.Default.CreditCard) }
+                        item { SeccionTitulo("Pagos por tarjetas", Icons.Default.CreditCard, TonoPagosTarjeta) }
                         if (pagosPorTarjeta.isEmpty()) item { TextoVacioSeccion("Sin pagos por tarjeta") }
                         items(pagosPorTarjeta, key = { "pg_${it.id}" }) { v -> PagoTarjetaRow(v) }
 
-                        item { SeccionTitulo(if (vistaPersonalEfectiva) "Productos ingresados" else "Productos nuevos ingresados", Icons.Default.AddBox) }
+                        item { SeccionTitulo(if (vistaPersonalEfectiva) "Productos ingresados" else "Productos nuevos ingresados", Icons.Default.AddBox, TonoProductosIngresados) }
                         if (dia.productos_nuevos.isEmpty()) item { TextoVacioSeccion("Sin productos nuevos") }
                         items(dia.productos_nuevos, key = { "pn_${it.id}" }) { p -> ProductoNuevoRow(p, mostrarSolicitadoPor = vistaPersonalEfectiva) }
 
                         if (!vistaPersonalEfectiva) {
                             item { Spacer(Modifier.height(4.dp)); Divider(); Spacer(Modifier.height(4.dp)) }
-                            item { SeccionTitulo("Productos modificados", Icons.Default.Edit) }
+                            item { SeccionTitulo("Productos modificados", Icons.Default.Edit, TonoProductosModificados) }
                             if (dia.productos_modificados.isEmpty()) item { TextoVacioSeccion("Sin productos modificados") }
                             items(dia.productos_modificados, key = { "pm_${it.id}" }) { p -> ProductoInfoRow(p) }
 
-                            item { SeccionTitulo("Productos eliminados", Icons.Default.Delete) }
+                            item { SeccionTitulo("Productos eliminados", Icons.Default.Delete, TonoProductosEliminados) }
                             if (dia.productos_eliminados.isEmpty()) item { TextoVacioSeccion("Sin productos eliminados") }
                             items(dia.productos_eliminados, key = { "pe_${it.id}" }) { p -> ProductoEliminadoRow(p) }
                         }
 
                         if (vistaPersonalEfectiva) {
                             item { Spacer(Modifier.height(4.dp)); Divider(); Spacer(Modifier.height(4.dp)) }
-                            item { SeccionTitulo("Solicitudes y aumentos", Icons.Default.PendingActions) }
+                            item { SeccionTitulo("Solicitudes y aumentos", Icons.Default.PendingActions, TonoSolicitudes) }
                             if (dia.solicitudes.isEmpty()) item { TextoVacioSeccion("Sin solicitudes") }
                             items(dia.solicitudes, key = { "sa_${it.id}" }) { s -> SolicitudRow(s) }
                         }
 
-                        item { SeccionTitulo("Devueltos", Icons.Default.AssignmentReturn) }
+                        item { SeccionTitulo("Devueltos", Icons.Default.AssignmentReturn, TonoDevueltos) }
                         if (dia.devueltos.isEmpty()) item { TextoVacioSeccion("Sin devoluciones") }
                         items(dia.devueltos, key = { "dv_${it.id}" }) { d -> DevueltoInfoRow(d, mostrarSolicitadoPor = vistaPersonalEfectiva) }
 
-                        item { SeccionTitulo("Mermas", Icons.Default.Warning) }
+                        item { SeccionTitulo("Mermas", Icons.Default.Warning, TonoMermas) }
                         if (dia.mermas.isEmpty()) item { TextoVacioSeccion("Sin mermas") }
                         items(dia.mermas, key = { "me_${it.id}" }) { m -> MermaInfoRow(m, esVistaPersonal = vistaPersonalEfectiva) }
 
                         item { Spacer(Modifier.height(4.dp)); Divider(); Spacer(Modifier.height(4.dp)) }
-                        item { SeccionTitulo("Detalle de ventas", Icons.Default.Receipt) }
+                        item { SeccionTitulo("Detalle de ventas", Icons.Default.Receipt, TonoDetalleVentas) }
                         if (ventasNoAnuladas.isEmpty()) item { TextoVacioSeccion("Sin ventas") }
                         items(ventasPagina, key = { "vt_${it.id}" }) { v -> VentaInfoRow(v) }
                         if (ventasNoAnuladas.isNotEmpty()) item { PaginacionBar(pagina = paginaSegura, totalPaginas = totalPaginasVentas, onPaginaAnterior = { paginaVentas = paginaSegura - 1 }, onPaginaSiguiente = { paginaVentas = paginaSegura + 1 }) }
@@ -390,11 +417,37 @@ fun InventarioScreen(
 private fun InventarioDia.totalEsperadoEnCaja(): Double = totales_ventas.efectivo
 
 @Composable
-private fun SeccionTitulo(texto: String, icono: androidx.compose.ui.graphics.vector.ImageVector) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icono, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(texto.uppercase(), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+private fun BandejaTitulo(texto: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.primary
+    ) {
+        Text(
+            texto,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = 0.3.sp,
+            color = MaterialTheme.colorScheme.onPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun SeccionTitulo(
+    texto: String,
+    icono: ImageVector,
+    tono: TonoSeccion = TonoSeccion(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
+) {
+    Surface(shape = RoundedCornerShape(8.dp), color = tono.fondo) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Icon(icono, null, tint = tono.acento, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(texto.uppercase(), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = tono.acento, letterSpacing = 0.6.sp)
+        }
     }
 }
 
@@ -541,20 +594,29 @@ private fun VentaInfoRow(v: VentaInfo) {
 @Composable
 private fun TotalesGeneralesCard(totales: TotalesVentas) {
     NeuCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp)) {
-            FilaResumenDinero("Total efectivo", totales.efectivo)
-            FilaResumenDinero("Total transferencia", totales.transferencia)
-            Divider(modifier = Modifier.padding(vertical = 8.dp))
-            FilaResumenDinero("Total generado (${totales.cantidad_ventas} ventas)", totales.efectivo + totales.transferencia, destacado = true)
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilaResumenDinero("Total efectivo", totales.efectivo, Icons.Default.Payments, TonoEfectivo)
+            FilaResumenDinero("Total transferencia", totales.transferencia, Icons.Default.SwapHoriz, TonoTransferencia)
+            FilaResumenDinero("Total generado (${totales.cantidad_ventas} ventas)", totales.efectivo + totales.transferencia, Icons.Default.TrendingUp, TonoTotalGenerado, destacado = true)
         }
     }
 }
 
 @Composable
-private fun FilaResumenDinero(etiqueta: String, valor: Double, destacado: Boolean = false) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(etiqueta, style = if (destacado) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium)
-        Text("${formatearMonto(valor)} CUP", style = if (destacado) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium, fontWeight = if (destacado) FontWeight.Bold else FontWeight.Normal, color = if (destacado) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+private fun FilaResumenDinero(etiqueta: String, valor: Double, icono: ImageVector, tono: TonoSeccion, destacado: Boolean = false) {
+    Surface(shape = RoundedCornerShape(10.dp), color = tono.fondo, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = if (destacado) 12.dp else 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(icono, null, tint = tono.acento, modifier = Modifier.size(if (destacado) 22.dp else 18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(etiqueta, style = if (destacado) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium, fontWeight = if (destacado) FontWeight.Bold else FontWeight.Medium, color = tono.acento)
+            }
+            Text("${formatearMonto(valor)} CUP", style = if (destacado) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = tono.acento)
+        }
     }
 }
 
