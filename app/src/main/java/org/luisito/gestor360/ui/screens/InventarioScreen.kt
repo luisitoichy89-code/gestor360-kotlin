@@ -156,7 +156,6 @@ fun InventarioScreen(
                 NeuCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), shape = RoundedCornerShape(20.dp), containerColor = MaterialTheme.colorScheme.primaryContainer) {
                     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (onBack != null) { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = MaterialTheme.colorScheme.onPrimaryContainer) }; Spacer(Modifier.width(4.dp)) }
-                        TituloPantalla(titulo, modifier = Modifier.weight(1f, fill = false))
                         Spacer(Modifier.weight(1f))
                         Surface(
                             shape = RoundedCornerShape(50),
@@ -185,7 +184,7 @@ fun InventarioScreen(
                         }
                     }
                 }
-                if (!esHistorico) {
+                if (!esHistorico && !vistaPersonalEfectiva) {
                     Button(
                         onClick = onVerVentasRealizadas,
                         shape = RoundedCornerShape(14.dp),
@@ -423,20 +422,6 @@ fun InventarioScreen(
 }
 
 private fun InventarioDia.totalEsperadoEnCaja(): Double = totales_ventas.efectivo
-
-@Composable
-private fun TituloPantalla(texto: String, modifier: Modifier = Modifier) {
-    Text(
-        texto,
-        modifier = modifier,
-        style = MaterialTheme.typography.titleLarge,
-        fontWeight = FontWeight.ExtraBold,
-        letterSpacing = 0.2.sp,
-        color = MaterialTheme.colorScheme.primary,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis
-    )
-}
 
 @Composable
 private fun IconoAccionBandeja(
