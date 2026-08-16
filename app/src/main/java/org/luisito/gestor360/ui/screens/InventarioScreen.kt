@@ -2,10 +2,16 @@ package org.luisito.gestor360.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -13,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -57,9 +64,6 @@ private val TonoDetalleVentas = TonoSeccion(Color(0xFFE1F5FE), Color(0xFF0277BD)
 private val TonoEfectivo = TonoSeccion(Color(0xFFE8F5E9), Color(0xFF2E7D32))
 private val TonoTransferencia = TonoSeccion(Color(0xFFE3F2FD), Color(0xFF1565C0))
 private val TonoTotalGenerado = TonoSeccion(Color(0xFFFFF8E1), Color(0xFFF57F17))
-
-private val ColorBandejaIconos = Color(0xFFFFCC80)
-private val ColorIconoAccion = Color(0xFF5D4037)
 
 private fun InventarioDia.filtradoPorUsuario(usuarioId: Long?): InventarioDia {
     val ventasPropias = ventas.filter { it.usuario_id != null && it.usuario_id == usuarioId }
@@ -152,18 +156,22 @@ fun InventarioScreen(
                 NeuCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), shape = RoundedCornerShape(20.dp), containerColor = MaterialTheme.colorScheme.primaryContainer) {
                     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (onBack != null) { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = MaterialTheme.colorScheme.onPrimaryContainer) }; Spacer(Modifier.width(4.dp)) }
-                        BandejaTitulo(titulo)
+                        TituloPantalla(titulo, modifier = Modifier.weight(1f, fill = false))
                         Spacer(Modifier.weight(1f))
-                        Surface(shape = RoundedCornerShape(50), color = ColorBandejaIconos) {
-                            Row(modifier = Modifier.padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                if (mostrarControlesDeLocal) { IconButton(onClick = { pasoCierreTurno = PasoCierreTurno.CONFIRMAR }) { Icon(Icons.Default.LockOpen, "Cerrar turno", tint = MaterialTheme.colorScheme.error) } }
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        ) {
+                            Row(modifier = Modifier.padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                if (mostrarControlesDeLocal) { IconoAccionBandeja(Icons.Default.LockOpen, "Cerrar turno", tint = MaterialTheme.colorScheme.error) { pasoCierreTurno = PasoCierreTurno.CONFIRMAR } }
                                 if (!esHistorico) {
-                                    IconButton(onClick = { onVerHistorialTurnos() }) { Icon(Icons.Default.History, "Historial de turnos", tint = ColorIconoAccion) }
+                                    IconoAccionBandeja(Icons.Default.History, "Historial de turnos") { onVerHistorialTurnos() }
                                 }
-                                IconButton(onClick = { viewModel.refrescar() }) { Icon(Icons.Default.Refresh, null, tint = ColorIconoAccion) }
+                                IconoAccionBandeja(Icons.Default.Refresh, "Actualizar") { viewModel.refrescar() }
                                 if (mostrarBotonVentasRealizadas && dia != null && ventasNoAnuladas.isNotEmpty()) {
                                     Box {
-                                        IconButton(onClick = { mostrarMenuExportar = true }) { Icon(Icons.Default.FileDownload, null, tint = ColorIconoAccion) }
+                                        IconoAccionBandeja(Icons.Default.FileDownload, "Descargar") { mostrarMenuExportar = true }
                                         DropdownMenu(expanded = mostrarMenuExportar, onDismissRequest = { mostrarMenuExportar = false }) {
                                             DropdownMenuItem(text = { Text("PDF") }, leadingIcon = { Icon(Icons.Default.PictureAsPdf, null) }, onClick = { mostrarMenuExportar = false; ReporteExporter.exportarPdf(context, dia) })
                                             DropdownMenuItem(text = { Text("TXT") }, leadingIcon = { Icon(Icons.Default.Description, null) }, onClick = { mostrarMenuExportar = false; ReporteExporter.exportarTxt(context, dia) })
@@ -417,22 +425,40 @@ fun InventarioScreen(
 private fun InventarioDia.totalEsperadoEnCaja(): Double = totales_ventas.efectivo
 
 @Composable
-private fun BandejaTitulo(texto: String, modifier: Modifier = Modifier) {
-    Surface(
+private fun TituloPantalla(texto: String, modifier: Modifier = Modifier) {
+    Text(
+        texto,
         modifier = modifier,
-        shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.primary
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.ExtraBold,
+        letterSpacing = 0.2.sp,
+        color = MaterialTheme.colorScheme.primary,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
+}
+
+@Composable
+private fun IconoAccionBandeja(
+    icono: ImageVector,
+    descripcion: String?,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    onClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val presionado by interactionSource.collectIsPressedAsState()
+    val fondo = if (presionado) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.surface
+    val colorIcono = if (presionado) MaterialTheme.colorScheme.surface else tint
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(fondo)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
+        contentAlignment = Alignment.Center
     ) {
-        Text(
-            texto,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.ExtraBold,
-            letterSpacing = 0.3.sp,
-            color = MaterialTheme.colorScheme.onPrimary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        Icon(icono, descripcion, tint = colorIcono, modifier = Modifier.size(20.dp))
     }
 }
 

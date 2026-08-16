@@ -52,7 +52,7 @@ fun HistorialTurnosScreen(
                             Icon(Icons.Default.ArrowBack, "Volver", tint = MaterialTheme.colorScheme.onPrimaryContainer)
                         }
                         Spacer(Modifier.width(4.dp))
-                        BandejaTitulo("Historial de turnos")
+                        TituloPantalla("Historial de turnos")
                     }
                 }
             }
@@ -89,23 +89,17 @@ fun HistorialTurnosScreen(
 }
 
 @Composable
-private fun BandejaTitulo(texto: String, modifier: Modifier = Modifier) {
-    Surface(
+private fun TituloPantalla(texto: String, modifier: Modifier = Modifier) {
+    Text(
+        texto,
         modifier = modifier,
-        shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.primary
-    ) {
-        Text(
-            texto,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.ExtraBold,
-            letterSpacing = 0.3.sp,
-            color = MaterialTheme.colorScheme.onPrimary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.ExtraBold,
+        letterSpacing = 0.2.sp,
+        color = MaterialTheme.colorScheme.primary,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
 }
 
 @Composable
@@ -116,15 +110,12 @@ private fun TurnoCard(turno: TurnoInfo, onClick: () -> Unit) {
     ) {
         Column(Modifier.padding(16.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.primaryContainer) {
-                    Text(
-                        "Turno #${turno.numeroTurno}",
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
+                Text(
+                    "Turno #${turno.numeroTurno}",
+                    fontWeight = FontWeight.ExtraBold,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = if (turno.cierre == null) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
